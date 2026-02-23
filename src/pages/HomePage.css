@@ -761,8 +761,18 @@
 
     .hero__visual {
         display: flex;
-        transform: scale(0.85);
-        /* Slightly scale down for better fit on tablet/small mobile screens */
+    }
+
+    .hero__product-showcase {
+        width: 100%;
+        max-width: 320px;
+        height: auto;
+        aspect-ratio: 1;
+    }
+
+    .hero__showcase-img {
+        width: 75%;
+        height: 75%;
     }
 
     .categories-grid {
@@ -796,6 +806,15 @@
 
     .hero__actions .btn {
         width: 100%;
+        margin: 0;
+    }
+
+    .hero__trust {
+        gap: 10px;
+    }
+
+    .hero__trust span {
+        font-size: 0.75rem;
     }
 
     .products-grid {
