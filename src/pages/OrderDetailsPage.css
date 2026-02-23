@@ -1,0 +1,519 @@
+/* ============================================
+   Order Details Page
+   ============================================ */
+.order-details-page {
+    min-height: 100vh;
+    background: var(--order-bg, #F4F8FF);
+}
+
+/* ── Header ── */
+.order-details-header {
+    background: linear-gradient(135deg, var(--primary-bg), #fff);
+    border-bottom: 1px solid var(--border);
+    padding: 40px 0 36px;
+}
+
+.order-details-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 14px;
+}
+
+.order-details-title-row h1 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+    font-size: clamp(1.25rem, 3vw, 1.6rem);
+}
+
+.order-details-title-row p {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* ── Body ── */
+.order-details-body {
+    padding: 32px 0 64px;
+}
+
+/* ── Grid ── */
+.order-details-grid {
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    gap: 24px;
+    align-items: start;
+}
+
+.order-details-left,
+.order-details-right {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+/* ── Order Section Card ── */
+.order-section {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 24px;
+    box-shadow: var(--shadow-sm);
+}
+
+.order-section h2 {
+    font-size: 1.0625rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.order-section h2 i {
+    color: var(--cta);
+    font-size: 1rem;
+}
+
+/* ── Timeline Inline Steps ── */
+.timeline-steps-inline {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: relative;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.timeline-step-inline {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+    gap: 6px;
+    position: relative;
+    min-width: 60px;
+}
+
+.timeline-step-inline__icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: var(--neutral-bg);
+    border: 2px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9375rem;
+    color: var(--text-muted);
+    transition: all 300ms ease;
+    z-index: 1;
+}
+
+.timeline-step-inline.done .timeline-step-inline__icon {
+    background: linear-gradient(135deg, var(--cta), var(--accent));
+    border-color: var(--cta);
+    color: white;
+    box-shadow: 0 4px 12px rgba(0, 119, 255, 0.3);
+}
+
+.timeline-step-inline__label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-align: center;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.timeline-step-inline.done .timeline-step-inline__label {
+    color: var(--cta);
+}
+
+.timeline-step-inline__connector {
+    position: absolute;
+    top: 18px;
+    left: 55%;
+    right: -55%;
+    height: 2px;
+    background: var(--border);
+    z-index: 0;
+}
+
+.timeline-step-inline__connector.done {
+    background: var(--cta);
+}
+
+/* ── Timeline Progress Bar ── */
+.timeline-progress-bar {
+    height: 5px;
+    background: var(--border);
+    border-radius: 4px;
+    margin-bottom: 24px;
+    overflow: hidden;
+}
+
+.timeline-progress-bar__fill {
+    height: 100%;
+    background: linear-gradient(to right, var(--cta), var(--accent));
+    border-radius: 4px;
+    transition: width 600ms ease;
+}
+
+/* ── Timeline List ── */
+.timeline-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.timeline-list__item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.timeline-list__dot {
+    flex-shrink: 0;
+    font-size: 1.0625rem;
+    margin-top: 1px;
+}
+
+.timeline-list__item.done .timeline-list__dot {
+    color: var(--cta);
+}
+
+.timeline-list__item.pending .timeline-list__dot {
+    color: var(--text-muted);
+    opacity: 0.5;
+}
+
+.timeline-list__step {
+    font-weight: 700;
+    font-size: 0.9375rem;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+}
+
+.timeline-list__item.pending .timeline-list__step {
+    color: var(--text-muted);
+}
+
+.timeline-list__date {
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.timeline-list__date i {
+    font-size: 0.75rem;
+}
+
+/* ── Items ── */
+.order-items-list {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.order-detail-item {
+    display: flex;
+    gap: 16px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+}
+
+.order-detail-item:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.order-detail-item__img {
+    width: 90px;
+    height: 90px;
+    border-radius: 10px;
+    object-fit: cover;
+    border: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.order-detail-item__info {
+    flex: 1;
+}
+
+.order-detail-item__info h3 {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.order-detail-item__info p {
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.order-detail-item__info p i {
+    font-size: 0.8rem;
+}
+
+.order-detail-item__price {
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: var(--cta) !important;
+}
+
+/* ── Spec Accordion ── */
+.spec-accordion {
+    margin-top: 10px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.spec-accordion__toggle {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    width: 100%;
+    padding: 10px 14px;
+    background: var(--neutral-bg);
+    border: none;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--accent);
+    cursor: pointer;
+    text-align: left;
+    transition: background 200ms ease;
+}
+
+.spec-accordion__toggle:hover {
+    background: var(--primary-bg);
+}
+
+.spec-accordion__toggle i {
+    font-size: 0.8rem;
+}
+
+.spec-accordion__content {
+    background: white;
+}
+
+.spec-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 9px 14px;
+    font-size: 0.8125rem;
+    border-top: 1px solid var(--border);
+}
+
+.spec-key {
+    color: var(--text-muted);
+    font-weight: 500;
+    text-transform: capitalize;
+}
+
+.spec-val {
+    color: var(--text-primary);
+    font-weight: 600;
+    text-align: right;
+}
+
+/* ── Shipping ── */
+.shipping-address-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    background: var(--neutral-bg);
+    border-radius: 12px;
+    padding: 16px;
+    border: 1px solid var(--border);
+}
+
+.shipping-address-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: var(--primary-bg);
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    color: var(--cta);
+    flex-shrink: 0;
+}
+
+.shipping-name,
+.shipping-addr,
+.shipping-phone {
+    font-size: 0.875rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+    color: var(--text-secondary);
+}
+
+.shipping-name {
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.shipping-name i,
+.shipping-addr i,
+.shipping-phone i {
+    color: var(--cta);
+    font-size: 0.8rem;
+}
+
+/* ── Order Summary Card ── */
+.order-summary-card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 24px;
+    box-shadow: var(--shadow-sm);
+}
+
+.order-summary-card h3 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 9px 0;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    border-bottom: 1px dashed var(--border);
+}
+
+.summary-row:last-child {
+    border-bottom: none;
+}
+
+.summary-row span {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.summary-row i {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.summary-total {
+    font-size: 1rem;
+    font-weight: 800 !important;
+    color: var(--text-primary) !important;
+}
+
+.summary-total strong {
+    color: var(--cta);
+    font-size: 1.15rem;
+}
+
+.text-green {
+    color: #059669 !important;
+    font-weight: 600;
+}
+
+/* ── Payment Info ── */
+.payment-info-card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 24px;
+    box-shadow: var(--shadow-sm);
+}
+
+.payment-info-card h3 {
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-primary);
+}
+
+.payment-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.875rem;
+    padding: 8px 0;
+    border-bottom: 1px dashed var(--border);
+}
+
+.payment-row:last-child {
+    border-bottom: none;
+}
+
+.payment-row span:first-child {
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.payment-row span:first-child i {
+    font-size: 0.8rem;
+}
+
+.payment-row code {
+    font-size: 0.75rem;
+    background: var(--neutral-bg);
+    padding: 2px 8px;
+    border-radius: 5px;
+}
+
+/* ── Order Actions ── */
+.order-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+@media (max-width: 900px) {
+    .order-details-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .timeline-steps-inline {
+        gap: 4px;
+    }
+
+    .timeline-step-inline__connector {
+        display: none;
+    }
+}
+
+@media (max-width: 560px) {
+    .order-details-title-row {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}

@@ -1,0 +1,143 @@
+.footer {
+    background: var(--text-primary);
+    color: rgba(255, 255, 255, 0.7);
+    padding: 64px 0 0;
+    margin-top: 64px;
+}
+
+.footer__grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr;
+    gap: 48px;
+    padding-bottom: 48px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.footer__logo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 1.25rem;
+    color: white;
+    font-weight: 700;
+    margin-bottom: 12px;
+}
+
+.footer__logo strong {
+    color: var(--accent);
+}
+
+.footer__tagline {
+    font-size: 0.875rem;
+    line-height: 1.6;
+    margin-bottom: 20px;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.footer__social {
+    display: flex;
+    gap: 10px;
+}
+
+.social-link {
+    width: 36px;
+    height: 36px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.875rem;
+    color: rgba(255, 255, 255, 0.7);
+    transition: all 200ms ease;
+    text-decoration: none;
+}
+
+.social-link:hover {
+    background: var(--cta);
+    color: white;
+    transform: translateY(-2px);
+}
+
+.footer__col h4 {
+    color: white;
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin-bottom: 16px;
+    letter-spacing: 0.5px;
+}
+
+.footer__col ul {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.footer__col ul li a {
+    font-size: 0.875rem;
+    color: rgba(255, 255, 255, 0.5);
+    transition: color 200ms ease;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.footer__col ul li a i {
+    font-size: 0.875rem;
+}
+
+.footer__col ul li a:hover {
+    color: var(--accent);
+}
+
+.footer__bottom {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 24px 0;
+}
+
+.footer__bottom p {
+    font-size: 0.8125rem;
+    color: rgba(255, 255, 255, 0.35);
+}
+
+.footer__payments {
+    display: flex;
+    gap: 8px;
+}
+
+.payment-pill {
+    padding: 4px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 6px;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.5);
+    letter-spacing: 0.3px;
+}
+
+@media (max-width: 900px) {
+    .footer__grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 32px;
+    }
+}
+
+@media (max-width: 560px) {
+    .footer__grid {
+        grid-template-columns: 1fr;
+        gap: 28px;
+    }
+
+    .footer__bottom {
+        flex-direction: column;
+        gap: 16px;
+        text-align: center;
+    }
+
+    .footer__payments {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+}
