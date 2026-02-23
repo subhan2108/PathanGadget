@@ -245,11 +245,10 @@
 }
 
 .stats-bar__inner {
-    display: flex;
-    justify-content: space-around;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 24px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    align-items: start;
+    gap: 16px;
 }
 
 .stat-item {
@@ -797,5 +796,22 @@
 
     .cta-banner__actions {
         justify-content: center;
+    }
+
+    .stat-bi-icon {
+        font-size: 1.1rem;
+    }
+
+    .stat-value {
+        font-size: 1.1rem;
+    }
+
+    .stat-label {
+        font-size: 0.6rem;
+        line-height: 1.2;
+    }
+
+    .stats-bar__inner {
+        gap: 8px;
     }
 }
