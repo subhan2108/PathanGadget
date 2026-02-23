@@ -743,6 +743,10 @@
         gap: 40px;
     }
 
+    .hero__content {
+        align-items: center;
+    }
+
     .hero__subtitle {
         max-width: 100%;
     }
@@ -779,6 +783,19 @@
     .hero {
         min-height: auto;
         padding: 56px 0 72px;
+    }
+
+    .hero__content {
+        gap: 16px;
+    }
+
+    .hero__actions {
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .hero__actions .btn {
+        width: 100%;
     }
 
     .products-grid {
