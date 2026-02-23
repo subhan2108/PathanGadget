@@ -741,6 +741,7 @@
     .hero__inner {
         grid-template-columns: 1fr;
         text-align: center;
+        gap: 40px;
     }
 
     .hero__subtitle {
@@ -756,7 +757,9 @@
     }
 
     .hero__visual {
-        display: none;
+        display: flex;
+        transform: scale(0.85);
+        /* Slightly scale down for better fit on tablet/small mobile screens */
     }
 
     .categories-grid {
