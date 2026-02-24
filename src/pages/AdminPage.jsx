@@ -11,10 +11,12 @@ import {
     adminAddTrackingStep
 } from '../lib/adminService'
 import { useAuth } from '../context/AuthContext'
+import { useCategories } from '../hooks/useProducts'
 import './AdminPage.css'
 
 export default function AdminPage() {
     const { user, profile } = useAuth()
+    const { categories } = useCategories()
     const [tab, setTab] = useState('products')
     const [loading, setLoading] = useState(false)
 
@@ -287,12 +289,12 @@ export default function AdminPage() {
                             <div className="form-row mb-3" style={{ display: 'flex', gap: 15 }}>
                                 <div className="form-group" style={{ flex: 1 }}>
                                     <label>Category</label>
-                                    <select className="form-control" value={productForm.category || ''} onChange={e => setProductForm({ ...productForm, category: e.target.value })}>
-                                        <option value="smartphones">Smartphones</option>
-                                        <option value="laptops">Laptops</option>
-                                        <option value="wearables">Wearables</option>
-                                        <option value="audio">Audio</option>
-                                    </select>
+                                    <input type="text" list="admin-categories" className="form-control" value={productForm.category || ''} onChange={e => setProductForm({ ...productForm, category: e.target.value })} placeholder="Select or type new..." />
+                                    <datalist id="admin-categories">
+                                        {categories.map(c => (
+                                            <option key={c.id} value={c.id}>{c.name}</option>
+                                        ))}
+                                    </datalist>
                                 </div>
                                 <div className="form-group" style={{ flex: 1 }}>
                                     <label>Brand</label>
