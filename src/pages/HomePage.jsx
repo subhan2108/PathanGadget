@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { products, categories, formatPrice } from '../data/mockData'
+import { categories, formatPrice } from '../data/mockData'
+import { useProducts } from '../hooks/useProducts'
 import { useCart } from '../context/CartContext'
 import './HomePage.css'
 
@@ -24,19 +25,12 @@ const CATEGORY_ICONS = {
     headphones: 'bi-headphones',
 }
 
-function ProductCard({ product, loading }) {
+function ProductCard({ product: raw, loading }) {
     const { addToCart } = useCart()
     const navigate = useNavigate()
     const [added, setAdded] = useState(false)
 
-    const handleAdd = (e) => {
-        e.stopPropagation()
-        addToCart(product)
-        setAdded(true)
-        setTimeout(() => setAdded(false), 1500)
-    }
-
-    if (loading) {
+    if (loading || !raw) {
         return (
             <div className="product-card product-card--skeleton">
                 <div className="skeleton product-card__img-wrap" />
@@ -49,7 +43,24 @@ function ProductCard({ product, loading }) {
         )
     }
 
-    const discount = Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
+    const product = {
+        ...raw,
+        originalPrice: raw.original_price ?? raw.originalPrice ?? raw.price,
+        inStock: raw.in_stock ?? raw.inStock ?? true,
+        reviewCount: raw.review_count ?? raw.reviewCount ?? raw.reviews ?? 0,
+        image: raw.image_url ?? raw.image ?? '',
+    }
+
+    const handleAdd = (e) => {
+        e.stopPropagation()
+        addToCart(product)
+        setAdded(true)
+        setTimeout(() => setAdded(false), 1500)
+    }
+
+    const discount = product.originalPrice > product.price
+        ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
+        : 0
 
     return (
         <div className="product-card" id={`product-card-${product.id}`}>
@@ -81,7 +92,7 @@ function ProductCard({ product, loading }) {
                         <i key={i} className={`bi ${i < Math.floor(product.rating) ? 'bi-star-fill' : 'bi-star'}`} />
                     ))}
                     <span className="rating-val">{product.rating}</span>
-                    <span className="rating-count">({product.reviews.toLocaleString()})</span>
+                    <span className="rating-count">({product.reviewCount.toLocaleString()})</span>
                 </div>
                 <div className="product-card__pricing">
                     <span className="price-current">{formatPrice(product.price)}</span>
@@ -116,18 +127,13 @@ function ProductCard({ product, loading }) {
 }
 
 export default function HomePage() {
+    const navigate = useNavigate()
     const [activeCategory, setActiveCategory] = useState('all')
-    const [loading, setLoading] = useState(true)
     const [visibleCount, setVisibleCount] = useState(8)
 
-    useEffect(() => {
-        const timer = setTimeout(() => setLoading(false), 1200)
-        return () => clearTimeout(timer)
-    }, [])
-
-    const filtered = activeCategory === 'all'
-        ? products
-        : products.filter(p => p.category === activeCategory)
+    // Fetch live products based on the active featured tab
+    const filters = activeCategory === 'all' ? {} : { category: activeCategory }
+    const { products: filtered, loading } = useProducts(filters, 'featured')
 
     const displayed = filtered.slice(0, visibleCount)
 
@@ -219,10 +225,10 @@ export default function HomePage() {
                                 key={cat.id}
                                 id={`category-${cat.id}`}
                                 className="category-card"
-                                onClick={() => { setActiveCategory(cat.id); document.getElementById('featured')?.scrollIntoView({ behavior: 'smooth' }) }}
+                                onClick={() => navigate(`/products?category=${cat.id}`)}
                                 role="button"
                                 tabIndex={0}
-                                onKeyDown={e => e.key === 'Enter' && setActiveCategory(cat.id)}
+                                onKeyDown={e => e.key === 'Enter' && navigate(`/products?category=${cat.id}`)}
                             >
                                 <div className="category-card__img-wrap">
                                     <img src={cat.image} alt={cat.name} className="category-card__img" loading="lazy" />
