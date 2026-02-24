@@ -3,20 +3,48 @@ import { supabase } from './supabaseClient'
 /* ── Products Admin ── */
 
 export async function adminGetProducts() {
-    const { data, error } = await supabase.from('products').select('*').order('created_at', { ascending: false })
+    const { data, error } = await supabase.from('products').select('*, product_images(*)').order('created_at', { ascending: false })
     if (error) throw error
     return data
 }
 
 export async function adminCreateProduct(productData) {
-    const { data, error } = await supabase.from('products').insert([productData]).select().single()
+    const { extraImages, ...mainData } = productData;
+    const { data, error } = await supabase.from('products').insert([mainData]).select().single()
     if (error) throw error
+
+    if (extraImages && extraImages.length > 0) {
+        const imageRows = extraImages.map((url, i) => ({
+            product_id: data.id,
+            url: url,
+            sort_order: i
+        }))
+        await supabase.from('product_images').insert(imageRows)
+    }
+
     return data
 }
 
 export async function adminUpdateProduct(id, updates) {
-    const { data, error } = await supabase.from('products').update(updates).eq('id', id).select().single()
+    const { extraImages, product_images, ...mainData } = updates;
+    const { data, error } = await supabase.from('products').update(mainData).eq('id', id).select().single()
     if (error) throw error
+
+    // Sync extra images if provided
+    if (extraImages !== undefined) {
+        // Clear old ones
+        await supabase.from('product_images').delete().eq('product_id', id)
+        // Insert new ones
+        if (extraImages.length > 0) {
+            const imageRows = extraImages.map((url, i) => ({
+                product_id: id,
+                url: url,
+                sort_order: i
+            }))
+            await supabase.from('product_images').insert(imageRows)
+        }
+    }
+
     return data
 }
 

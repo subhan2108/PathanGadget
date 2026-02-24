@@ -62,14 +62,16 @@ export default function AdminPage() {
 
     const openProductModal = (prod = null) => {
         setEditingProductId(prod ? prod.id : null)
+        const sortedImages = prod?.product_images ? [...prod.product_images].sort((a, b) => a.sort_order - b.sort_order).map(i => i.url) : []
         setProductForm(prod ? {
             ...prod,
             colors: prod.colors?.join(', ') || '',
-            details: prod.details ? JSON.stringify(prod.details, null, 2) : '{}'
+            details: prod.details ? JSON.stringify(prod.details, null, 2) : '{}',
+            extraImages: sortedImages.join('\n')
         } : {
             name: '', price: 0, original_price: 0, category: 'smartphones', brand: '',
             description: '', image_url: '', badge: '', in_stock: true,
-            rating: 0, review_count: 0, colors: '', details: '{}'
+            rating: 0, review_count: 0, colors: '', details: '{}', extraImages: ''
         })
         setShowProductModal(true)
     }
@@ -85,11 +87,12 @@ export default function AdminPage() {
                 return;
             }
 
-            // format colors from comma separated
+            const { extraImages, ...restForm } = productForm;
             const formattedForm = {
-                ...productForm,
-                colors: productForm.colors ? productForm.colors.split(',').map(c => c.trim()).filter(Boolean) : [],
-                details: parsedDetails
+                ...restForm,
+                colors: restForm.colors ? restForm.colors.split(',').map(c => c.trim()).filter(Boolean) : [],
+                details: parsedDetails,
+                extraImages: extraImages ? extraImages.split('\n').map(u => u.trim()).filter(Boolean) : []
             };
 
             if (editingProductId) {
@@ -322,8 +325,12 @@ export default function AdminPage() {
                                 </div>
                             </div>
                             <div className="form-group mb-3">
-                                <label>Image URL</label>
+                                <label>Image URL (Primary)</label>
                                 <input type="url" className="form-control" name="image_url" value={productForm.image_url || ''} onChange={e => setProductForm({ ...productForm, image_url: e.target.value })} required />
+                            </div>
+                            <div className="form-group mb-3">
+                                <label>Extra Gallery Images (1 URL per line)</label>
+                                <textarea className="form-control" rows="3" placeholder="https://..." value={productForm.extraImages || ''} onChange={e => setProductForm({ ...productForm, extraImages: e.target.value })} />
                             </div>
                             <div className="form-group mb-3">
                                 <label>Description</label>

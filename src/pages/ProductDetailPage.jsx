@@ -199,10 +199,12 @@ export default function ProductDetailPage() {
 
     const colors = product.colors || []
 
-    // Gallery: fallback to single image if product_images doesn't exist (mockData)
-    const gallery = (product.product_images || []).length > 0
-        ? product.product_images.map(img => img.url)
-        : [product.image_url ?? product.image]
+    // Gallery: primary image first, then extra product_images if they exist
+    const mainImg = product.image_url ?? product.image;
+    const gallery = mainImg ? [mainImg] : [];
+    if (product.product_images && product.product_images.length > 0) {
+        gallery.push(...[...product.product_images].sort((a, b) => a.sort_order - b.sort_order).map(img => img.url));
+    }
 
     // Specs/Description from 'details' (Supabase) or 'specs' (MockData)
     const details = product.details || {}

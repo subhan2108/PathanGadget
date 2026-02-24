@@ -110,7 +110,7 @@ export async function fetchCategories() {
 export async function fetchProductById(id) {
     const { data: product, error } = await supabase
         .from('products')
-        .select('*')
+        .select('*, product_images(*)')
         .eq('id', id)
         .single();
 
