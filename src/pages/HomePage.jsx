@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { categories, formatPrice } from '../data/mockData'
-import { useProducts } from '../hooks/useProducts'
+import { formatPrice } from '../data/mockData'
+import { useProducts, useCategories } from '../hooks/useProducts'
 import { useCart } from '../context/CartContext'
 import './HomePage.css'
 
@@ -23,6 +23,7 @@ const CATEGORY_ICONS = {
     watches: 'bi-smartwatch',
     airpods: 'bi-earbuds',
     headphones: 'bi-headphones',
+    smartphones: 'bi-phone',
 }
 
 function ProductCard({ product: raw, loading }) {
@@ -134,6 +135,7 @@ export default function HomePage() {
     // Fetch live products based on the active featured tab
     const filters = activeCategory === 'all' ? {} : { category: activeCategory }
     const { products: filtered, loading } = useProducts(filters, 'featured')
+    const { categories } = useCategories()
 
     const displayed = filtered.slice(0, visibleCount)
 
@@ -228,8 +230,12 @@ export default function HomePage() {
                                 onClick={() => navigate(`/products?category=${cat.id}`)}
                                 role="button"
                                 tabIndex={0}
-                                onKeyDown={e => e.key === 'Enter' && navigate(`/products?category=${cat.id}`)}
-                            >
+                                onKeyDown={e => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                        e.preventDefault()
+                                        navigate(`/products?category=${cat.id}`)
+                                    }
+                                }}                            >
                                 <div className="category-card__img-wrap">
                                     <img src={cat.image} alt={cat.name} className="category-card__img" loading="lazy" />
                                     <div className="category-card__overlay" />
@@ -263,9 +269,7 @@ export default function HomePage() {
                     <div className="filter-tabs" id="product-filters" role="tablist">
                         {[
                             { id: 'all', label: 'All Products', icon: 'bi-grid' },
-                            { id: 'watches', label: 'Watches', icon: 'bi-smartwatch' },
-                            { id: 'airpods', label: 'AirPods', icon: 'bi-earbuds' },
-                            { id: 'headphones', label: 'Headphones', icon: 'bi-headphones' },
+                            ...categories.map(c => ({ id: c.id, label: c.name, icon: CATEGORY_ICONS[c.id] || c.icon || 'bi-box' }))
                         ].map(cat => (
                             <button
                                 key={cat.id}

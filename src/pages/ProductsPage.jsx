@@ -10,6 +10,7 @@ const CATEGORY_ICONS = {
     watches: 'bi-smartwatch',
     airpods: 'bi-earbuds',
     headphones: 'bi-headphones',
+    smartphones: 'bi-phone',
 }
 
 const COLOR_MAP = {

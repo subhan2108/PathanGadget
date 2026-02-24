@@ -10,9 +10,39 @@ export async function fetchProducts(filters = {}, sortBy = 'featured') {
         query = query.eq('category', filters.category);
     }
 
+    if (filters.search) {
+        query = query.or(`name.ilike.%${filters.search}%,description.ilike.%${filters.search}%`);
+    }
+
+    if (filters.colors && filters.colors.length > 0) {
+        query = query.contains('colors', filters.colors);
+    }
+
+    if (filters.brands && filters.brands.length > 0) {
+        query = query.in('brand', filters.brands);
+    }
+
+    if (filters.priceRange) {
+        query = query.gte('price', filters.priceRange[0]).lte('price', filters.priceRange[1]);
+    }
+
+    if (filters.minRating > 0) {
+        query = query.gte('rating', filters.minRating);
+    }
+
+    if (filters.inStockOnly) {
+        query = query.eq('in_stock', true);
+    }
+
     // Sort logic
-    if (sortBy === 'price_asc') query = query.order('price', { ascending: true });
-    else if (sortBy === 'price_desc') query = query.order('price', { ascending: false });
+    if (sortBy === 'price-asc') query = query.order('price', { ascending: true });
+    else if (sortBy === 'price-desc') query = query.order('price', { ascending: false });
+    else if (sortBy === 'rating') query = query.order('rating', { ascending: false });
+    else if (sortBy === 'reviews') query = query.order('review_count', { ascending: false });
+    else if (sortBy === 'discount') {
+        // Since we don't have a computed column for discount, fallback to rating for now, or just default.
+        query = query.order('rating', { ascending: false });
+    }
     else query = query.order('rating', { ascending: false }); // featured fallback
 
     const { data, error } = await query;
@@ -21,16 +51,60 @@ export async function fetchProducts(filters = {}, sortBy = 'featured') {
 }
 
 export async function fetchFilterMeta() {
+    const { data: products, error } = await supabase.from('products').select('brand, colors, price');
+    if (error || !products) return { brands: [], colors: [], minPrice: 0, maxPrice: 60000 };
+
+    const brands = new Set();
+    const colors = new Set();
+    let minPrice = Infinity;
+    let maxPrice = 0;
+
+    products.forEach(p => {
+        if (p.brand) brands.add(p.brand);
+        if (p.colors && Array.isArray(p.colors)) {
+            p.colors.forEach(c => colors.add(c));
+        }
+        if (p.price < minPrice) minPrice = p.price;
+        if (p.price > maxPrice) maxPrice = p.price;
+    });
+
     return {
-        brands: ['TechBrand', 'AirBuds', 'SoundPeak', 'BassMax', 'Quantum'],
-        colors: ['Black', 'White', 'Blue', 'Silver', 'Red', 'Pink', 'Green', 'Midnight', 'Starlight'],
-        minPrice: 0,
-        maxPrice: 60000
+        brands: Array.from(brands),
+        colors: Array.from(colors),
+        minPrice: minPrice === Infinity ? 0 : minPrice,
+        maxPrice: maxPrice === 0 ? 60000 : maxPrice,
     };
 }
 
 export async function fetchCategories() {
-    return categories;
+    // Determine category counts dynamically from DB
+    const { data, error } = await supabase.from('products').select('category');
+    if (error) return categories; // Fallback to mocks if error
+
+    // Group counts
+    const counts = {};
+    data.forEach(p => {
+        if (p.category) counts[p.category] = (counts[p.category] || 0) + 1;
+    });
+
+    const categoryMeta = {
+        'watches': { name: 'Smart Watches', description: 'Track your health and stay connected', icon: '⌚', color: '#0077FF', image: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&h=400&fit=crop' },
+        'airpods': { name: 'AirPods & Earbuds', description: 'Immersive sound, total freedom', icon: '🎧', color: '#2EA8FF', image: 'https://images.unsplash.com/photo-1606220588913-b3aacb4d2f46?w=600&h=400&fit=crop' },
+        'headphones': { name: 'Headphones', description: 'Professional studio-grade audio', icon: '🎵', color: '#6C5CE7', image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=600&h=400&fit=crop' },
+        'smartphones': { name: 'Smartphones', description: 'Latest flagship mobile devices', icon: '📱', color: '#00B894', image: 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=600&h=400&fit=crop' },
+    };
+
+    return Object.keys(counts).map(id => ({
+        id,
+        count: counts[id],
+        ...(categoryMeta[id] || {
+            name: id.charAt(0).toUpperCase() + id.slice(1),
+            description: `Explore our ${id} collection`,
+            icon: '📦',
+            color: '#888',
+            image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=600&h=400&fit=crop'
+        })
+    }));
 }
 
 export async function fetchProductById(id) {
