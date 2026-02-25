@@ -97,52 +97,35 @@ function SimilarProductCard({ product }) {
 
 /* ─── Image Zoom Component ───────────────────────── */
 function ZoomImage({ src, alt }) {
-    const imgRef = useRef(null)
-    const lensRef = useRef(null)
+    const [style, setStyle] = useState({ transformOrigin: 'center center', transform: 'scale(1)' })
     const [zoomed, setZoomed] = useState(false)
-    const [zoomStyle, setZoomStyle] = useState({})
 
-    const handleMove = useCallback((e) => {
-        const img = imgRef.current
-        const lens = lensRef.current
-        if (!img || !lens) return
+    const handleMouseMove = (e) => {
+        const { left, top, width, height } = e.currentTarget.getBoundingClientRect()
+        // Default to center if dimensions somehow fail
+        if (!width || !height) return;
+        const x = ((e.clientX - left) / width) * 100
+        const y = ((e.clientY - top) / height) * 100
+        setStyle({ transformOrigin: `${x}% ${y}%`, transform: 'scale(2.2)' }) // Zoom strength 2.2x
+    }
 
-        const rect = img.getBoundingClientRect()
-        const clientX = e.touches ? e.touches[0].clientX : e.clientX
-        const clientY = e.touches ? e.touches[0].clientY : e.clientY
-        let x = clientX - rect.left
-        let y = clientY - rect.top
-
-        const lensW = lens.offsetWidth / 2
-        const lensH = lens.offsetHeight / 2
-        x = Math.max(lensW, Math.min(x, rect.width - lensW))
-        y = Math.max(lensH, Math.min(y, rect.height - lensH))
-
-        lens.style.left = `${x - lensW}px`
-        lens.style.top = `${y - lensH}px`
-
-        const scaleX = 2.5 // Zoom multiplier
-        const scaleY = 2.5
-
-        setZoomStyle({
-            backgroundImage: `url(${src})`,
-            backgroundSize: `${rect.width * scaleX}px ${rect.height * scaleY}px`,
-            backgroundPosition: `-${(x - lensW) * scaleX}px -${(y - lensH) * scaleY}px`
-        })
-    }, [src])
+    const handleMouseLeave = () => {
+        setZoomed(false)
+        setStyle({ transformOrigin: 'center center', transform: 'scale(1)' })
+    }
 
     return (
         <div
             className="zoom-container"
             onMouseEnter={() => setZoomed(true)}
-            onMouseLeave={() => setZoomed(false)}
-            onMouseMove={handleMove}
+            onMouseLeave={handleMouseLeave}
+            onMouseMove={handleMouseMove}
         >
-            <img ref={imgRef} src={src} alt={alt} className="main-product-img" />
-            <div ref={lensRef} className={`zoom-lens ${zoomed ? 'visible' : ''}`} />
-            <div
-                className={`zoom-result ${zoomed ? 'visible' : ''}`}
-                style={zoomStyle}
+            <img
+                src={src}
+                alt={alt}
+                className={`main-product-img ${zoomed ? 'is-zoomed' : ''}`}
+                style={style}
             />
         </div>
     )
