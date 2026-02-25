@@ -59,7 +59,8 @@ export function AuthProvider({ children }) {
             options: {
                 data: {
                     full_name: fullName
-                }
+                },
+                emailRedirectTo: window.location.origin
             }
         })
 
@@ -92,12 +93,17 @@ export function AuthProvider({ children }) {
     const signInWithGoogle = async () => {
         const { data, error } = await supabase.auth.signInWithOAuth({
             provider: 'google',
+            options: {
+                redirectTo: window.location.origin
+            }
         })
         return { data, error }
     }
 
     const resetPassword = async (email) => {
-        const { data, error } = await supabase.auth.resetPasswordForEmail(email)
+        const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: window.location.origin,
+        })
         return { data, error }
     }
 
