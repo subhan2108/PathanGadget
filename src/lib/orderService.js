@@ -86,6 +86,8 @@ export async function placeOrder(orderData) {
             delivery_fee: orderData.delivery_fee || 0,
             total: orderData.total,
             payment_method: orderData.payment_method || 'Card',
+            payment_status: orderData.payment_id ? 'paid' : 'pending',
+            razorpay_id: orderData.payment_id || null,
             address_id: addressRef,
             shipping_details: typeof orderData.shipping === 'object' ? orderData.shipping : { address: orderData.shipping }
         }])

@@ -4,6 +4,7 @@ import { useCart } from '../context/CartContext'
 import { useAuth } from '../context/AuthContext'
 import { placeOrder } from '../lib/orderService'
 import { formatPrice } from '../lib/productsService'
+import { supabase } from '../lib/supabaseClient'
 import './PaymentPage.css'
 
 const PAYMENT_METHODS = [
@@ -76,51 +77,75 @@ export default function PaymentPage() {
 
         // ── Razorpay Integration ──
         if (['upi', 'card', 'netbanking'].includes(form.paymentMethod)) {
-            const options = {
-                key: 'rzp_test_mock_key', // Replace with your actual key
-                amount: total * 100, // Razorpay expects amount in paise
-                currency: 'INR',
-                name: 'ElectroCart',
-                description: `Order ${orderNumber}`,
-                image: '/favicon.svg',
-                handler: async function (response) {
-                    // Payment successful — now place the order
-                    try {
-                        await placeOrder({
-                            user_id: user.id,
-                            order_number: orderNumber,
-                            subtotal: subtotal,
-                            delivery_fee: shipping,
-                            total: total,
-                            payment_method: form.paymentMethod,
-                            payment_id: response.razorpay_payment_id,
-                            items: orderItems,
-                            shipping: { name: `${form.firstName} ${form.lastName}`, email: form.email, phone: form.phone, address: form.address, city: form.city, state: form.state, pincode: form.pincode }
-                        })
-                        setLoading(false)
-                        setSuccess(true)
-                        setTimeout(() => clearCart(), 100)
-                    } catch (err) {
-                        console.error('❌ Finalize order error:', err)
-                        alert('Payment was successful but order creation failed. Please contact support.')
-                        setLoading(false)
-                    }
-                },
-                prefill: {
-                    name: `${form.firstName} ${form.lastName}`,
-                    email: form.email,
-                    contact: form.phone
-                },
-                theme: { color: '#2563eb' },
-                modal: {
-                    ondismiss: function () {
-                        setLoading(false)
+            try {
+                // 1. Create order on the backend (Supabase Edge Function)
+                const { data, error } = await supabase.functions.invoke('create-razorpay-order', {
+                    body: { amount: total * 100, currency: 'INR', receipt: orderNumber }
+                })
+
+                if (error) throw new Error('Razorpay setup failed: ' + error.message)
+                if (data?.error) throw new Error('Failed to generate order: ' + data.error)
+
+                const order_id = data.id // The order ID from Razorpay
+
+                const options = {
+                    key: import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_mock_key', // Uses your actual key from .env
+                    amount: total * 100, // Razorpay expects amount in paise
+                    currency: 'INR',
+                    name: 'ElectroCart',
+                    description: `Order ${orderNumber}`,
+                    image: '/favicon.svg',
+                    order_id: order_id, // Mandatory for secure payments!
+                    handler: async function (response) {
+                        // Payment successful — now place the order in our database
+                        try {
+                            await placeOrder({
+                                user_id: user.id,
+                                order_number: orderNumber,
+                                subtotal: subtotal,
+                                delivery_fee: shipping,
+                                total: total,
+                                payment_method: form.paymentMethod,
+                                payment_id: response.razorpay_payment_id,
+                                razorpay_order_id: response.razorpay_order_id,
+                                razorpay_signature: response.razorpay_signature,
+                                items: orderItems,
+                                shipping: { name: `${form.firstName} ${form.lastName}`, email: form.email, phone: form.phone, address: form.address, city: form.city, state: form.state, pincode: form.pincode }
+                            })
+                            setLoading(false)
+                            setSuccess(true)
+                            setTimeout(() => clearCart(), 100)
+                        } catch (err) {
+                            console.error('❌ Finalize order error:', err)
+                            alert('Payment was successful but order creation failed. Please contact support.')
+                            setLoading(false)
+                        }
+                    },
+                    prefill: {
+                        name: `${form.firstName} ${form.lastName}`,
+                        email: form.email,
+                        contact: form.phone
+                    },
+                    theme: { color: '#2563eb' },
+                    modal: {
+                        ondismiss: function () {
+                            setLoading(false)
+                        }
                     }
                 }
-            }
 
-            const rzp = new window.Razorpay(options)
-            rzp.open()
+                const rzp = new window.Razorpay(options)
+                rzp.on('payment.failed', function (response) {
+                    console.error("Payment failed", response.error)
+                    alert(`Payment Failed: ${response.error.description}`)
+                    setLoading(false)
+                })
+                rzp.open()
+            } catch (err) {
+                console.error("Razorpay initiation error:", err)
+                alert("Failed to initialize payment gateway. Please try again.")
+                setLoading(false)
+            }
         } else {
             // Cash on Delivery
             try {
