@@ -12,7 +12,7 @@ export default function Footer() {
                     <div className="footer__brand">
                         <Link to="/" className="footer__logo">
                             <i className="bi bi-lightning-charge-fill" />
-                            <span>Electro<strong>Cart</strong></span>
+                            <span>Pathan<strong>Gadgets</strong></span>
                         </Link>
                         <p className="footer__tagline">Premium wearable tech delivered to your doorstep. Curated. Trusted. Fast.</p>
                         <div className="footer__social">

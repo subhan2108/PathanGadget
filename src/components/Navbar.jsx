@@ -79,7 +79,7 @@ export default function Navbar() {
                     {/* Logo */}
                     <Link to="/" className="navbar__logo" id="nav-logo">
                         <i className="bi bi-lightning-charge-fill logo-icon" />
-                        <span className="logo-text">Electro<span className="logo-accent">Cart</span></span>
+                        <span className="logo-text">Pathan<span className="logo-accent">Gadgets</span></span>
                     </Link>
 
                     {/* Desktop Nav */}

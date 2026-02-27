@@ -306,7 +306,7 @@ export default function HomePage() {
             <section className="section features-section" id="features-section">
                 <div className="container">
                     <div className="section-header">
-                        <span className="section-label"><i className="bi bi-patch-check-fill" /> Why ElectroCart</span>
+                        <span className="section-label"><i className="bi bi-patch-check-fill" /> Why Pathan Gadgets</span>
                         <h2>Built for Trust & Speed</h2>
                         <p>Every purchase backed by our premium guarantee</p>
                     </div>
