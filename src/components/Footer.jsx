@@ -59,7 +59,7 @@ export default function Footer() {
                 </div>
 
                 <div className="footer__bottom">
-                    <p>© {year} ElectroCart. All rights reserved.</p>
+                    <p>© {year} PathanGadgets. All rights reserved.</p>
                     <div className="footer__payments">
                         <span className="payment-pill"><i className="bi bi-phone" /> UPI</span>
                         <span className="payment-pill"><i className="bi bi-credit-card" /> Visa</span>

@@ -50,8 +50,7 @@ export default function PaymentPage() {
     const orderItems = cartItems
     const subtotal = cartTotal
     const shipping = subtotal >= 999 ? 0 : 99
-    const tax = Math.round(subtotal * 0.18)
-    const total = subtotal + shipping + tax
+    const total = subtotal + shipping
 
     const set = (key, val) => {
         setForm(f => ({ ...f, [key]: val }))
@@ -411,10 +410,6 @@ export default function PaymentPage() {
                                 <div className="summary-calc-row">
                                     <span><i className="bi bi-truck" /> Shipping</span>
                                     <span className={shipping === 0 ? 'text-green' : ''}>{shipping === 0 ? 'FREE' : formatPrice(shipping)}</span>
-                                </div>
-                                <div className="summary-calc-row">
-                                    <span><i className="bi bi-percent" /> GST (18%)</span>
-                                    <span>{formatPrice(tax)}</span>
                                 </div>
                             </div>
                             <hr className="divider" />
