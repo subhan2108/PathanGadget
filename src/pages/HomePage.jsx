@@ -153,7 +153,7 @@ export default function HomePage() {
                             <i className="bi bi-fire" /> New Arrivals 2024
                         </span>
                         <h1 className="hero__title">
-                            Premium Tech,<br />
+                            Premium Tech<br />
                             <span className="hero__title-accent">Unbeatable Prices</span>
                         </h1>
                         <p className="hero__subtitle">

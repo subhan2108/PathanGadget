@@ -64,8 +64,8 @@ export async function placeOrder(orderData) {
                 phone: orderData.shipping.phone || '',
                 line1: orderData.shipping.address || '',
                 city: typeof orderData.shipping === 'object' ? (orderData.shipping.city || 'City') : '',
-                state: 'State',
-                pincode: '000000'
+                state: typeof orderData.shipping === 'object' ? (orderData.shipping.state || '') : '',
+                pincode: typeof orderData.shipping === 'object' ? (orderData.shipping.pincode || '') : ''
             }])
             .select()
             .single();
