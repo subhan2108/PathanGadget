@@ -372,7 +372,7 @@ export default function AdminPage() {
                                                     {selectedOrder.payment_status}
                                                 </span>
                                             </p>
-                                            <p style={{ margin: '0 0 5px 0' }}><strong>Razorpay ID:</strong> <code>{selectedOrder.razorpay_id || 'N/A'}</code></p>
+                                            <p style={{ margin: '0 0 5px 0' }}><strong>UTR/Transaction ID:</strong> <code>{selectedOrder.razorpay_id || 'N/A'}</code></p>
                                             <p style={{ margin: 0 }}><strong>Date:</strong> {new Date(selectedOrder.created_at).toLocaleString()}</p>
                                         </div>
                                         <div style={{ textAlign: 'right' }}>

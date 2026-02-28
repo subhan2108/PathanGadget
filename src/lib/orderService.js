@@ -85,9 +85,9 @@ export async function placeOrder(orderData) {
             subtotal: orderData.subtotal,
             delivery_fee: orderData.delivery_fee || 0,
             total: orderData.total,
-            payment_method: orderData.payment_method || 'Card',
-            payment_status: orderData.payment_id ? 'paid' : 'pending',
-            razorpay_id: orderData.payment_id || null,
+            payment_method: orderData.payment_method || 'UPI',
+            payment_status: orderData.payment_method === 'COD' ? 'pending' : (orderData.payment_id ? 'verifying' : 'pending'),
+            razorpay_id: orderData.payment_method === 'UPI' ? (orderData.payment_id || null) : null, // Storing UTR string here
             address_id: addressRef,
             shipping_details: typeof orderData.shipping === 'object' ? orderData.shipping : { address: orderData.shipping }
         }])

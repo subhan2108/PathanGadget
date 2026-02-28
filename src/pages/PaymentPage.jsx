@@ -4,13 +4,13 @@ import { useCart } from '../context/CartContext'
 import { useAuth } from '../context/AuthContext'
 import { placeOrder } from '../lib/orderService'
 import { formatPrice } from '../lib/productsService'
-import { supabase } from '../lib/supabaseClient'
 import './PaymentPage.css'
 
+const MERCHANT_UPI_ID = import.meta.env.VITE_UPI_ID || 'merchant@upi'
+const MERCHANT_NAME = import.meta.env.VITE_UPI_NAME || 'ElectroCart'
+
 const PAYMENT_METHODS = [
-    { id: 'upi', label: 'UPI', icon: 'bi-phone', desc: 'Pay via GPay, PhonePe, Paytm' },
-    { id: 'card', label: 'Credit / Debit Card', icon: 'bi-credit-card', desc: 'Visa, Mastercard, RuPay' },
-    { id: 'netbanking', label: 'Net Banking', icon: 'bi-bank', desc: 'All major Indian banks' },
+    { id: 'upi_qr', label: 'UPI / QR Code', icon: 'bi-qr-code-scan', desc: 'Scan and pay via GPay, PhonePe, Paytm, etc.' },
     { id: 'cod', label: 'Cash on Delivery', icon: 'bi-cash-coin', desc: 'Available for orders under ₹10,000' },
 ]
 
@@ -24,14 +24,11 @@ function validate(form) {
     if (!form.city?.trim()) err.city = 'City is required'
     if (!form.state?.trim()) err.state = 'State is required'
     if (!form.pincode?.match(/^\d{6}$/)) err.pincode = 'Enter a valid 6-digit pincode'
-    if (form.paymentMethod === 'card') {
-        if (!form.cardNumber?.replace(/\s/g, '').match(/^\d{16}$/)) err.cardNumber = 'Enter a valid 16-digit card number'
-        if (!form.cardName?.trim()) err.cardName = 'Name on card is required'
-        if (!form.expiry?.match(/^\d{2}\/\d{2}$/)) err.expiry = 'Enter valid expiry (MM/YY)'
-        if (!form.cvv?.match(/^\d{3,4}$/)) err.cvv = 'Enter valid CVV'
-    }
-    if (form.paymentMethod === 'upi') {
-        if (!form.upiId?.match(/^[\w.-]+@[\w]+$/)) err.upiId = 'Enter a valid UPI ID (e.g. name@upi)'
+
+    if (form.paymentMethod === 'upi_qr') {
+        if (!form.utr?.trim() || form.utr?.trim().length < 12) {
+            err.utr = 'Enter a valid 12-digit UTR or Transaction ID'
+        }
     }
     return err
 }
@@ -40,7 +37,7 @@ export default function PaymentPage() {
     const navigate = useNavigate()
     const { user } = useAuth()
     const { cartItems, cartTotal, clearCart } = useCart()
-    const [form, setForm] = useState({ paymentMethod: 'upi' })
+    const [form, setForm] = useState({ paymentMethod: 'upi_qr' })
     const [errors, setErrors] = useState({})
     const [loading, setLoading] = useState(false)
     const [success, setSuccess] = useState(false)
@@ -57,10 +54,9 @@ export default function PaymentPage() {
         setErrors(e => ({ ...e, [key]: undefined }))
     }
 
-    const formatCard = (val) => {
-        const digits = val.replace(/\D/g, '').slice(0, 16)
-        return digits.replace(/(.{4})/g, '$1 ').trim()
-    }
+    // Generate UPI URL
+    const upiLink = `upi://pay?pa=${MERCHANT_UPI_ID}&pn=${encodeURIComponent(MERCHANT_NAME)}&am=${total}&cu=INR&tr=${orderNumber}`
+    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiLink)}`
 
     const handleSubmit = async (e) => {
         e.preventDefault()
@@ -74,98 +70,25 @@ export default function PaymentPage() {
 
         setLoading(true)
 
-        // ── Razorpay Integration ──
-        if (['upi', 'card', 'netbanking'].includes(form.paymentMethod)) {
-            try {
-                // 1. Create order on the backend (Supabase Edge Function)
-                const { data, error } = await supabase.functions.invoke('create-razorpay-order', {
-                    body: { amount: total * 100, currency: 'INR', receipt: orderNumber }
-                })
-
-                if (error) throw new Error('Razorpay setup failed: ' + error.message)
-                if (data?.error) throw new Error('Failed to generate order: ' + data.error)
-
-                const order_id = data.id // The order ID from Razorpay
-
-                const options = {
-                    key: import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_mock_key', // Uses your actual key from .env
-                    amount: total * 100, // Razorpay expects amount in paise
-                    currency: 'INR',
-                    name: 'ElectroCart',
-                    description: `Order ${orderNumber}`,
-                    image: '/favicon.svg',
-                    order_id: order_id, // Mandatory for secure payments!
-                    handler: async function (response) {
-                        // Payment successful — now place the order in our database
-                        try {
-                            await placeOrder({
-                                user_id: user.id,
-                                order_number: orderNumber,
-                                subtotal: subtotal,
-                                delivery_fee: shipping,
-                                total: total,
-                                payment_method: form.paymentMethod,
-                                payment_id: response.razorpay_payment_id,
-                                razorpay_order_id: response.razorpay_order_id,
-                                razorpay_signature: response.razorpay_signature,
-                                items: orderItems,
-                                shipping: { name: `${form.firstName} ${form.lastName}`, email: form.email, phone: form.phone, address: form.address, city: form.city, state: form.state, pincode: form.pincode }
-                            })
-                            setLoading(false)
-                            setSuccess(true)
-                            setTimeout(() => clearCart(), 100)
-                        } catch (err) {
-                            console.error('❌ Finalize order error:', err)
-                            alert('Payment was successful but order creation failed. Please contact support.')
-                            setLoading(false)
-                        }
-                    },
-                    prefill: {
-                        name: `${form.firstName} ${form.lastName}`,
-                        email: form.email,
-                        contact: form.phone
-                    },
-                    theme: { color: '#2563eb' },
-                    modal: {
-                        ondismiss: function () {
-                            setLoading(false)
-                        }
-                    }
-                }
-
-                const rzp = new window.Razorpay(options)
-                rzp.on('payment.failed', function (response) {
-                    console.error("Payment failed", response.error)
-                    alert(`Payment Failed: ${response.error.description}`)
-                    setLoading(false)
-                })
-                rzp.open()
-            } catch (err) {
-                console.error("Razorpay initiation error:", err)
-                alert("Failed to initialize payment gateway. Please try again.")
-                setLoading(false)
-            }
-        } else {
-            // Cash on Delivery
-            try {
-                await placeOrder({
-                    user_id: user.id,
-                    order_number: orderNumber,
-                    subtotal: subtotal,
-                    delivery_fee: shipping,
-                    total: total,
-                    payment_method: form.paymentMethod,
-                    items: orderItems,
-                    shipping: { name: `${form.firstName} ${form.lastName}`, email: form.email, phone: form.phone, address: form.address, city: form.city, state: form.state, pincode: form.pincode }
-                })
-                setLoading(false)
-                setSuccess(true)
-                setTimeout(() => clearCart(), 100)
-            } catch (err) {
-                console.error('❌ COD error:', err)
-                alert('Failed to place order: ' + err.message)
-                setLoading(false)
-            }
+        try {
+            await placeOrder({
+                user_id: user.id,
+                order_number: orderNumber,
+                subtotal: subtotal,
+                delivery_fee: shipping,
+                total: total,
+                payment_method: form.paymentMethod === 'upi_qr' ? 'UPI' : 'COD',
+                payment_id: form.paymentMethod === 'upi_qr' ? form.utr : undefined, // Save the UTR as the payment_id for UPI
+                items: orderItems,
+                shipping: { name: `${form.firstName} ${form.lastName}`, email: form.email, phone: form.phone, address: form.address, city: form.city, state: form.state, pincode: form.pincode }
+            })
+            setLoading(false)
+            setSuccess(true)
+            setTimeout(() => clearCart(), 100)
+        } catch (err) {
+            console.error('❌ Finalize order error:', err)
+            alert('Failed to place order: ' + err.message)
+            setLoading(false)
         }
     }
 
@@ -179,21 +102,29 @@ export default function PaymentPage() {
                         <div className="success-ring" />
                         <div className="success-checkmark"><i className="bi bi-check-lg" /></div>
                     </div>
-                    <h2>Payment Successful!</h2>
-                    <p>Your order <code>{orderNumber}</code> has been placed. You'll receive a confirmation email shortly.</p>
+                    <h2>Order Placed Successfully!</h2>
+                    <p>Your order <code>{orderNumber}</code> has been received. {form.paymentMethod === 'upi_qr' ? 'Administration will verify your UTR and process your order shortly.' : 'You will pay Cash on Delivery.'}</p>
                     <div className="success-details">
                         <div className="success-detail-row">
                             <span><i className="bi bi-bag-check" /> Items</span>
                             <span>{orderItems.length} product{orderItems.length > 1 ? 's' : ''}</span>
                         </div>
                         <div className="success-detail-row">
-                            <span><i className="bi bi-cash" /> Amount Paid</span>
+                            <span><i className="bi bi-cash" /> Amount {form.paymentMethod === 'upi_qr' ? 'Paid' : 'to Pay'}</span>
                             <strong>{formatPrice(total)}</strong>
                         </div>
-                        <div className="success-detail-row">
-                            <span><i className="bi bi-truck" /> Expected Delivery</span>
-                            <span>2–4 Business Days</span>
-                        </div>
+                        {form.paymentMethod === 'upi_qr' && (
+                            <div className="success-detail-row">
+                                <span><i className="bi bi-hash" /> UTR Verified</span>
+                                <span>{form.utr}</span>
+                            </div>
+                        )}
+                        {form.paymentMethod === 'cod' && (
+                            <div className="success-detail-row">
+                                <span><i className="bi bi-cash-coin" /> Payment Status</span>
+                                <span>Cash on Delivery</span>
+                            </div>
+                        )}
                     </div>
                     <div className="success-actions">
                         <button className="btn btn-primary btn-lg" onClick={() => navigate(`/track/${orderNumber}`)} id="success-track">
@@ -210,14 +141,12 @@ export default function PaymentPage() {
 
     return (
         <div className="payment-page page-enter" id="payment-page">
-            {/* Header */}
             <div className="payment-header" id="payment-header">
                 <div className="container">
-                    <h1><i className="bi bi-lock-fill" /> Secure Checkout</h1>
+                    <h1><i className="bi bi-qr-code-scan" /> Secure UPI Checkout</h1>
                     <div className="payment-header__trust">
-                        <span><i className="bi bi-shield-check" /> SSL Encrypted</span>
-                        <span><i className="bi bi-credit-card" /> 100% Secure</span>
-                        <span><i className="bi bi-lock" /> PCI DSS Compliant</span>
+                        <span><i className="bi bi-shield-check" /> 100% Safe</span>
+                        <span><i className="bi bi-phone" /> Pay via any UPI App</span>
                     </div>
                 </div>
             </div>
@@ -313,59 +242,26 @@ export default function PaymentPage() {
                                 ))}
                             </div>
 
-                            {/* UPI Input */}
-                            {form.paymentMethod === 'upi' && (
-                                <div className={`form-field ${errors.upiId ? 'error' : ''}`} style={{ marginTop: 16 }}>
-                                    <label htmlFor="upiId"><i className="bi bi-phone" /> UPI ID</label>
-                                    <input id="upiId" type="text" placeholder="yourname@upi" value={form.upiId || ''} onChange={e => set('upiId', e.target.value)} />
-                                    {errors.upiId && <span className="field-error"><i className="bi bi-exclamation-circle" /> {errors.upiId}</span>}
+                            {/* UPI QR Display */}
+                            {form.paymentMethod === 'upi_qr' && (
+                                <div className="upi-qr-section" style={{ marginTop: 24, textAlign: 'center', padding: 24, background: 'var(--surface)', borderRadius: 12, border: '1px solid var(--border)' }}>
+                                    <h4 style={{ marginBottom: 16 }}>Scan to Pay with any UPI App</h4>
+                                    <img src={qrCodeUrl} alt="UPI QR Code" style={{ width: 200, height: 200, borderRadius: 8, border: '4px solid white', margin: '0 auto', display: 'block' }} />
+                                    <div style={{ marginTop: 16, fontSize: 14, color: 'var(--text-secondary)' }}>
+                                        <p>or pay to UPI ID:</p>
+                                        <strong style={{ fontSize: 16, color: 'var(--text)', background: 'var(--background)', padding: '8px 16px', borderRadius: 8, display: 'inline-block', marginTop: 8 }}>{MERCHANT_UPI_ID}</strong>
+                                    </div>
+                                    <p style={{ marginTop: 16, marginBottom: 0, fontSize: 14, fontWeight: 500, color: 'var(--primary)' }}>Please pay EXACTLY: {formatPrice(total)}</p>
                                 </div>
                             )}
 
-                            {/* Card Fields */}
-                            {form.paymentMethod === 'card' && (
-                                <div className="card-fields" style={{ marginTop: 16 }}>
-                                    <div className={`form-field ${errors.cardNumber ? 'error' : ''}`}>
-                                        <label htmlFor="cardNumber"><i className="bi bi-credit-card" /> Card Number</label>
-                                        <input id="cardNumber" type="text" placeholder="1234 5678 9012 3456" maxLength={19} value={form.cardNumber || ''} onChange={e => set('cardNumber', formatCard(e.target.value))} />
-                                        {errors.cardNumber && <span className="field-error"><i className="bi bi-exclamation-circle" /> {errors.cardNumber}</span>}
-                                    </div>
-                                    <div className={`form-field ${errors.cardName ? 'error' : ''}`}>
-                                        <label htmlFor="cardName"><i className="bi bi-person-badge" /> Name on Card</label>
-                                        <input id="cardName" type="text" placeholder="ARJUN SHARMA" value={form.cardName || ''} onChange={e => set('cardName', e.target.value.toUpperCase())} />
-                                        {errors.cardName && <span className="field-error"><i className="bi bi-exclamation-circle" /> {errors.cardName}</span>}
-                                    </div>
-                                    <div className="form-row">
-                                        <div className={`form-field ${errors.expiry ? 'error' : ''}`}>
-                                            <label htmlFor="expiry"><i className="bi bi-calendar" /> Expiry (MM/YY)</label>
-                                            <input id="expiry" type="text" placeholder="08/27" maxLength={5} value={form.expiry || ''} onChange={e => {
-                                                let v = e.target.value.replace(/\D/g, '')
-                                                if (v.length > 2) v = v.slice(0, 2) + '/' + v.slice(2, 4)
-                                                set('expiry', v)
-                                            }} />
-                                            {errors.expiry && <span className="field-error"><i className="bi bi-exclamation-circle" /> {errors.expiry}</span>}
-                                        </div>
-                                        <div className={`form-field ${errors.cvv ? 'error' : ''}`}>
-                                            <label htmlFor="cvv"><i className="bi bi-lock" /> CVV</label>
-                                            <input id="cvv" type="password" placeholder="•••" maxLength={4} value={form.cvv || ''} onChange={e => set('cvv', e.target.value.replace(/\D/g, ''))} />
-                                            {errors.cvv && <span className="field-error"><i className="bi bi-exclamation-circle" /> {errors.cvv}</span>}
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Net Banking */}
-                            {form.paymentMethod === 'netbanking' && (
-                                <div className="form-field" style={{ marginTop: 16 }}>
-                                    <label htmlFor="bankSelect"><i className="bi bi-bank" /> Select Bank</label>
-                                    <select id="bankSelect" value={form.bank || ''} onChange={e => set('bank', e.target.value)}>
-                                        <option value="">Choose your bank</option>
-                                        {['SBI', 'HDFC Bank', 'ICICI Bank', 'Axis Bank', 'Kotak Mahindra', 'PNB'].map(b => (
-                                            <option key={b} value={b}>{b}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                            )}
+                            {/* UTR Input */}
+                            <div className={`form-field ${errors.utr ? 'error' : ''}`} style={{ marginTop: 24 }}>
+                                <label htmlFor="utr"><i className="bi bi-hash" /> UTR / Transaction Reference Number</label>
+                                <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 8 }}>After payment, please enter the 12-digit UPI Transaction Reference Number to confirm your order.</p>
+                                <input id="utr" type="text" placeholder="e.g. 312345678901" value={form.utr || ''} onChange={e => set('utr', e.target.value.replace(/\D/g, ''))} maxLength={12} />
+                                {errors.utr && <span className="field-error"><i className="bi bi-exclamation-circle" /> {errors.utr}</span>}
+                            </div>
                         </div>
 
                         <button
@@ -381,7 +277,7 @@ export default function PaymentPage() {
                         </button>
 
                         <p className="payment-disclaimer">
-                            <i className="bi bi-shield-fill-check" /> Your payment is secured with 256-bit SSL encryption.
+                            <i className="bi bi-shield-fill-check" /> Admin manual verification required after order placement.
                         </p>
                     </form>
 
@@ -426,7 +322,7 @@ export default function PaymentPage() {
 
                         {/* Trust Badges */}
                         <div className="trust-badges">
-                            <div className="trust-badge"><i className="bi bi-shield-check" /><span>Secure Checkout</span></div>
+                            <div className="trust-badge"><i className="bi bi-qr-code" /><span>Verified Merchant</span></div>
                             <div className="trust-badge"><i className="bi bi-arrow-return-left" /><span>7-Day Returns</span></div>
                             <div className="trust-badge"><i className="bi bi-headset" /><span>24/7 Support</span></div>
                         </div>
@@ -436,3 +332,4 @@ export default function PaymentPage() {
         </div>
     )
 }
+
