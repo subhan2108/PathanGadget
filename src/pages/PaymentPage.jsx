@@ -6,7 +6,7 @@ import { placeOrder } from '../lib/orderService'
 import { formatPrice } from '../lib/productsService'
 import './PaymentPage.css'
 
-const MERCHANT_UPI_ID = import.meta.env.VITE_UPI_ID || 'merchant@upi'
+const MERCHANT_UPI_ID = import.meta.env.VITE_UPI_ID || 'subhan21@fam'
 const MERCHANT_NAME = import.meta.env.VITE_UPI_NAME || 'ElectroCart'
 
 const PAYMENT_METHODS = [
