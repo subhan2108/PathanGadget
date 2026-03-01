@@ -42,7 +42,7 @@ export default function Footer() {
                             <li><Link to="/orders"><i className="bi bi-box-seam" /> My Orders</Link></li>
                             <li><Link to="/track/ORD-2024-002"><i className="bi bi-geo-alt" /> Track Order</Link></li>
                             <li><Link to="/payment"><i className="bi bi-bag-check" /> Checkout</Link></li>
-                            <li><a href="#"><i className="bi bi-arrow-return-left" /> Returns & Refunds</a></li>
+                            <li><Link to="/refund"><i className="bi bi-arrow-return-left" /> Returns & Refunds</Link></li>
                         </ul>
                     </div>
 
@@ -50,10 +50,9 @@ export default function Footer() {
                     <div className="footer__col">
                         <h4>Support</h4>
                         <ul>
-                            <li><a href="#"><i className="bi bi-question-circle" /> Help Center</a></li>
-                            <li><a href="#"><i className="bi bi-chat-dots" /> Contact Us</a></li>
-                            <li><a href="#"><i className="bi bi-shield-check" /> Warranty Info</a></li>
-                            <li><a href="#"><i className="bi bi-file-text" /> Privacy Policy</a></li>
+                            <li><Link to="/shipping"><i className="bi bi-truck" /> Shipping Policy</Link></li>
+                            <li><Link to="/terms"><i className="bi bi-file-earmark-text" /> Terms & Conditions</Link></li>
+                            <li><Link to="/privacy"><i className="bi bi-shield-lock" /> Privacy Policy</Link></li>
                         </ul>
                     </div>
                 </div>

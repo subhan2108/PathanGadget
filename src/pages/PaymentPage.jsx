@@ -1,16 +1,13 @@
-import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import React, { useState, useEffect } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useCart } from '../context/CartContext'
 import { useAuth } from '../context/AuthContext'
-import { placeOrder } from '../lib/orderService'
+import { placeOrder, fetchOrderDetails, createPhonePeOrder, checkPhonePeStatus } from '../lib/orderService'
 import { formatPrice } from '../lib/productsService'
 import './PaymentPage.css'
 
-const MERCHANT_UPI_ID = import.meta.env.VITE_UPI_ID || 'subhan21@fam'
-const MERCHANT_NAME = import.meta.env.VITE_UPI_NAME || 'ElectroCart'
-
 const PAYMENT_METHODS = [
-    { id: 'upi_qr', label: 'UPI / QR Code', icon: 'bi-qr-code-scan', desc: 'Scan and pay via GPay, PhonePe, Paytm, etc.' },
+    { id: 'phonepe', label: 'PhonePe Gateway', icon: 'bi-phone', desc: 'Secure automatic payments via Card, NetBanking or UPI Apps.' },
     { id: 'cod', label: 'Cash on Delivery', icon: 'bi-cash-coin', desc: 'Available for orders under ₹10,000' },
 ]
 
@@ -24,39 +21,61 @@ function validate(form) {
     if (!form.city?.trim()) err.city = 'City is required'
     if (!form.state?.trim()) err.state = 'State is required'
     if (!form.pincode?.match(/^\d{6}$/)) err.pincode = 'Enter a valid 6-digit pincode'
-
-    if (form.paymentMethod === 'upi_qr') {
-        if (!form.utr?.trim() || form.utr?.trim().length < 12) {
-            err.utr = 'Enter a valid 12-digit UTR or Transaction ID'
-        }
-    }
     return err
 }
 
 export default function PaymentPage() {
     const navigate = useNavigate()
+    const [searchParams] = useSearchParams()
+    const verifyOrderId = searchParams.get('orderId')
+
     const { user } = useAuth()
     const { cartItems, cartTotal, clearCart } = useCart()
-    const [form, setForm] = useState({ paymentMethod: 'upi_qr' })
+    const [form, setForm] = useState({ paymentMethod: 'phonepe' })
     const [errors, setErrors] = useState({})
-    const [loading, setLoading] = useState(false)
+    const [loading, setLoading] = useState(!!verifyOrderId)
     const [success, setSuccess] = useState(false)
     const [orderNumber] = useState(() => 'ORD-' + Math.random().toString(36).toUpperCase().slice(-6))
+    const [loadedOrder, setLoadedOrder] = useState(null)
 
-    // Use cart items
-    const orderItems = cartItems
-    const subtotal = cartTotal
-    const shipping = subtotal >= 999 ? 0 : 99
-    const total = subtotal + shipping
+    // Verification Effect
+    useEffect(() => {
+        if (verifyOrderId) {
+            checkPhonePeStatus(verifyOrderId).then((data) => {
+                if (data?.success && data?.code === 'PAYMENT_SUCCESS') {
+                    fetchOrderDetails(verifyOrderId).then(o => {
+                        if (o) setLoadedOrder(o)
+                        setSuccess(true)
+                        setLoading(false)
+                        clearCart()
+                    }).catch(() => {
+                        setSuccess(true)
+                        setLoading(false)
+                        clearCart()
+                    })
+                } else {
+                    alert('Payment was not successful or is still pending.')
+                    navigate('/payment', { replace: true })
+                    setLoading(false)
+                }
+            }).catch(e => {
+                alert('Error verifying payment: ' + e.message)
+                navigate('/payment', { replace: true })
+                setLoading(false)
+            })
+        }
+    }, [verifyOrderId, navigate, clearCart])
+
+    // Use cart items or loaded items
+    const orderItems = loadedOrder ? loadedOrder.order_items : cartItems
+    const subtotal = loadedOrder ? loadedOrder.subtotal : cartTotal
+    const shipping = 0
+    const total = loadedOrder ? loadedOrder.total : subtotal
 
     const set = (key, val) => {
         setForm(f => ({ ...f, [key]: val }))
         setErrors(e => ({ ...e, [key]: undefined }))
     }
-
-    // Generate UPI URL
-    const upiLink = `upi://pay?pa=${MERCHANT_UPI_ID}&pn=${encodeURIComponent(MERCHANT_NAME)}&am=${total}&cu=INR&tr=${orderNumber}`
-    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiLink)}`
 
     const handleSubmit = async (e) => {
         e.preventDefault()
@@ -77,11 +96,27 @@ export default function PaymentPage() {
                 subtotal: subtotal,
                 delivery_fee: shipping,
                 total: total,
-                payment_method: form.paymentMethod === 'upi_qr' ? 'UPI' : 'COD',
-                payment_id: form.paymentMethod === 'upi_qr' ? form.utr : undefined, // Save the UTR as the payment_id for UPI
+                payment_method: form.paymentMethod === 'phonepe' ? 'PhonePe' : 'COD',
                 items: orderItems,
                 shipping: { name: `${form.firstName} ${form.lastName}`, email: form.email, phone: form.phone, address: form.address, city: form.city, state: form.state, pincode: form.pincode }
             })
+
+            if (form.paymentMethod === 'phonepe') {
+                const response = await createPhonePeOrder({
+                    orderId: orderNumber,
+                    amount: total,
+                    mobileNumber: form.phone
+                }, window.location.origin)
+
+                if (response?.data?.instrumentResponse?.redirectInfo?.url) {
+                    window.location.href = response.data.instrumentResponse.redirectInfo.url;
+                } else {
+                    throw new Error('Could not initialize PhonePe checkout: ' + JSON.stringify(response));
+                }
+                return; // Prevent further execution, wait for redirect
+            }
+
+            // COD Flow
             setLoading(false)
             setSuccess(true)
             setTimeout(() => clearCart(), 100)
@@ -92,9 +127,11 @@ export default function PaymentPage() {
         }
     }
 
-
     // ── Success State ──
     if (success) {
+        const finalOrderNumber = loadedOrder ? loadedOrder.order_number : orderNumber;
+        const finalMethod = loadedOrder ? loadedOrder.payment_method : (form.paymentMethod === 'phonepe' ? 'PhonePe' : 'COD');
+
         return (
             <div className="payment-success" id="payment-success">
                 <div className="payment-success__card">
@@ -103,23 +140,23 @@ export default function PaymentPage() {
                         <div className="success-checkmark"><i className="bi bi-check-lg" /></div>
                     </div>
                     <h2>Order Placed Successfully!</h2>
-                    <p>Your order <code>{orderNumber}</code> has been received. {form.paymentMethod === 'upi_qr' ? 'Administration will verify your UTR and process your order shortly.' : 'You will pay Cash on Delivery.'}</p>
+                    <p>Your order <code>{finalOrderNumber}</code> has been received. {finalMethod === 'PhonePe' ? 'Your online payment has been fully verified and your order will be processed shortly.' : 'You will pay Cash on Delivery.'}</p>
                     <div className="success-details">
                         <div className="success-detail-row">
                             <span><i className="bi bi-bag-check" /> Items</span>
-                            <span>{orderItems.length} product{orderItems.length > 1 ? 's' : ''}</span>
+                            <span>{orderItems?.length || 0} product{(orderItems?.length || 0) > 1 ? 's' : ''}</span>
                         </div>
                         <div className="success-detail-row">
-                            <span><i className="bi bi-cash" /> Amount {form.paymentMethod === 'upi_qr' ? 'Paid' : 'to Pay'}</span>
+                            <span><i className="bi bi-cash" /> Amount {finalMethod === 'PhonePe' ? 'Paid' : 'to Pay'}</span>
                             <strong>{formatPrice(total)}</strong>
                         </div>
-                        {form.paymentMethod === 'upi_qr' && (
+                        {finalMethod === 'PhonePe' && (
                             <div className="success-detail-row">
-                                <span><i className="bi bi-hash" /> UTR Verified</span>
-                                <span>{form.utr}</span>
+                                <span><i className="bi bi-shield-check" /> Payment Status</span>
+                                <span className="text-green">Verified successfully by PhonePe</span>
                             </div>
                         )}
-                        {form.paymentMethod === 'cod' && (
+                        {finalMethod === 'COD' && (
                             <div className="success-detail-row">
                                 <span><i className="bi bi-cash-coin" /> Payment Status</span>
                                 <span>Cash on Delivery</span>
@@ -127,7 +164,7 @@ export default function PaymentPage() {
                         )}
                     </div>
                     <div className="success-actions">
-                        <button className="btn btn-primary btn-lg" onClick={() => navigate(`/track/${orderNumber}`)} id="success-track">
+                        <button className="btn btn-primary btn-lg" onClick={() => navigate(`/track/${finalOrderNumber}`)} id="success-track">
                             <i className="bi bi-geo-alt-fill" /> Track Your Order
                         </button>
                         <button className="btn btn-secondary" onClick={() => navigate('/')} id="success-home">
@@ -139,14 +176,29 @@ export default function PaymentPage() {
         )
     }
 
+    if (loading && verifyOrderId) {
+        return (
+            <div className="payment-page page-enter" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
+                <div style={{ textAlign: 'center' }}>
+                    <div className="spinner" style={{ width: 40, height: 40, borderWidth: 4, margin: '0 auto 20px auto', borderColor: 'var(--primary)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+                    <h2 style={{ marginTop: 20 }}>Verifying Payment...</h2>
+                    <p style={{ color: 'var(--text-secondary)' }}>Please do not close this window.</p>
+                </div>
+                <style>{`
+                    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+                `}</style>
+            </div>
+        )
+    }
+
     return (
         <div className="payment-page page-enter" id="payment-page">
             <div className="payment-header" id="payment-header">
                 <div className="container">
-                    <h1><i className="bi bi-qr-code-scan" /> Secure UPI Checkout</h1>
+                    <h1><i className="bi bi-shield-lock-fill" /> Secure Checkout</h1>
                     <div className="payment-header__trust">
                         <span><i className="bi bi-shield-check" /> 100% Safe</span>
-                        <span><i className="bi bi-phone" /> Pay via any UPI App</span>
+                        <span><i className="bi bi-lightning-charge" /> Instant Verification</span>
                     </div>
                 </div>
             </div>
@@ -241,27 +293,6 @@ export default function PaymentPage() {
                                     </label>
                                 ))}
                             </div>
-
-                            {/* UPI QR Display */}
-                            {form.paymentMethod === 'upi_qr' && (
-                                <div className="upi-qr-section" style={{ marginTop: 24, textAlign: 'center', padding: 24, background: 'var(--surface)', borderRadius: 12, border: '1px solid var(--border)' }}>
-                                    <h4 style={{ marginBottom: 16 }}>Scan to Pay with any UPI App</h4>
-                                    <img src={qrCodeUrl} alt="UPI QR Code" style={{ width: 200, height: 200, borderRadius: 8, border: '4px solid white', margin: '0 auto', display: 'block' }} />
-                                    <div style={{ marginTop: 16, fontSize: 14, color: 'var(--text-secondary)' }}>
-                                        <p>or pay to UPI ID:</p>
-                                        <strong style={{ fontSize: 16, color: 'var(--text)', background: 'var(--background)', padding: '8px 16px', borderRadius: 8, display: 'inline-block', marginTop: 8 }}>{MERCHANT_UPI_ID}</strong>
-                                    </div>
-                                    <p style={{ marginTop: 16, marginBottom: 0, fontSize: 14, fontWeight: 500, color: 'var(--primary)' }}>Please pay EXACTLY: {formatPrice(total)}</p>
-                                </div>
-                            )}
-
-                            {/* UTR Input */}
-                            <div className={`form-field ${errors.utr ? 'error' : ''}`} style={{ marginTop: 24 }}>
-                                <label htmlFor="utr"><i className="bi bi-hash" /> UTR / Transaction Reference Number</label>
-                                <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 8 }}>After payment, please enter the 12-digit UPI Transaction Reference Number to confirm your order.</p>
-                                <input id="utr" type="text" placeholder="e.g. 312345678901" value={form.utr || ''} onChange={e => set('utr', e.target.value.replace(/\D/g, ''))} maxLength={12} />
-                                {errors.utr && <span className="field-error"><i className="bi bi-exclamation-circle" /> {errors.utr}</span>}
-                            </div>
                         </div>
 
                         <button
@@ -271,8 +302,8 @@ export default function PaymentPage() {
                             disabled={loading}
                         >
                             {loading
-                                ? <><span className="spinner" /> Processing…</>
-                                : <><i className="bi bi-lock-fill" /> Place Order · {formatPrice(total)}</>
+                                ? <><span className="spinner" /> {form.paymentMethod === 'phonepe' ? 'Redirecting to PhonePe...' : 'Processing…'}</>
+                                : <><i className="bi bi-lock-fill" /> {form.paymentMethod === 'phonepe' ? 'Pay Now with PhonePe' : 'Place Order'}</>
                             }
                         </button>
 
@@ -286,12 +317,11 @@ export default function PaymentPage() {
                         <div className="payment-summary-card">
                             <h3><i className="bi bi-cart3" /> Order Summary</h3>
                             <div className="summary-items">
-                                {orderItems.map(item => (
+                                {orderItems?.map(item => (
                                     <div key={item.id} className="summary-item">
-                                        <img src={item.image} alt={item.name} />
+                                        <img src={item.image || item.image_url} alt={item.name} />
                                         <div>
                                             <p className="summary-item__name">{item.name}</p>
-                                            <p className="summary-item__qty"><i className="bi bi-layers" /> × {item.quantity}</p>
                                         </div>
                                         <span className="summary-item__price">{formatPrice(item.price * item.quantity)}</span>
                                     </div>
@@ -303,21 +333,8 @@ export default function PaymentPage() {
                                     <span><i className="bi bi-tag" /> Subtotal</span>
                                     <span>{formatPrice(subtotal)}</span>
                                 </div>
-                                <div className="summary-calc-row">
-                                    <span><i className="bi bi-truck" /> Shipping</span>
-                                    <span className={shipping === 0 ? 'text-green' : ''}>{shipping === 0 ? 'FREE' : formatPrice(shipping)}</span>
-                                </div>
                             </div>
                             <hr className="divider" />
-                            <div className="summary-total-row">
-                                <strong><i className="bi bi-receipt" /> Total</strong>
-                                <strong className="total-amount">{formatPrice(total)}</strong>
-                            </div>
-                            {shipping === 0 && (
-                                <div className="free-shipping-badge">
-                                    <i className="bi bi-truck" /> You get FREE shipping!
-                                </div>
-                            )}
                         </div>
 
                         {/* Trust Badges */}
@@ -332,4 +349,3 @@ export default function PaymentPage() {
         </div>
     )
 }
-

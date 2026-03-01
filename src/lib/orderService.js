@@ -21,6 +21,16 @@ export async function fetchUserOrders(userId) {
     return data;
 }
 
+export async function checkUtrExists(utr) {
+    if (!utr) return false;
+    const { data } = await supabase
+        .from('orders')
+        .select('id')
+        .eq('razorpay_id', utr)
+        .limit(1);
+    return data && data.length > 0;
+}
+
 export async function fetchOrderDetails(orderNumberOrId, withTracking = false) {
     // Determine if it looks like a numeric ID or the ORD- string
     let query = supabase.from('orders').select('*, order_items (*), addresses(*)');
@@ -86,8 +96,8 @@ export async function placeOrder(orderData) {
             delivery_fee: orderData.delivery_fee || 0,
             total: orderData.total,
             payment_method: orderData.payment_method || 'UPI',
-            payment_status: orderData.payment_method === 'COD' ? 'pending' : (orderData.payment_id ? 'verifying' : 'pending'),
-            razorpay_id: orderData.payment_method === 'UPI' ? (orderData.payment_id || null) : null, // Storing UTR string here
+            payment_status: orderData.payment_method === 'COD' ? 'pending' : (orderData.payment_id ? 'verifying' : 'paid'),
+            razorpay_id: orderData.payment_id || null, // Storing UTR string here
             address_id: addressRef,
             shipping_details: typeof orderData.shipping === 'object' ? orderData.shipping : { address: orderData.shipping }
         }])
@@ -122,4 +132,31 @@ export async function placeOrder(orderData) {
     }]);
 
     return order;
+}
+
+export async function createPhonePeOrder(orderData, redirectUrlBase) {
+    const { data, error } = await supabase.functions.invoke('phonepe-api', {
+        body: {
+            action: 'create',
+            payload: {
+                orderId: orderData.orderId,
+                amount: orderData.amount,
+                mobileNumber: orderData.mobileNumber,
+                redirectUrlBase
+            }
+        }
+    });
+    if (error) throw error;
+    return data;
+}
+
+export async function checkPhonePeStatus(orderId) {
+    const { data, error } = await supabase.functions.invoke('phonepe-api', {
+        body: {
+            action: 'status',
+            payload: { orderId }
+        }
+    });
+    if (error) throw error;
+    return data;
 }

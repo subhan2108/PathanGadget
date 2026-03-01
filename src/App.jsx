@@ -12,6 +12,10 @@ import ProductsPage from './pages/ProductsPage'
 import AdminPage from './pages/AdminPage'
 import { CartProvider } from './context/CartContext'
 import { AuthProvider } from './context/AuthContext'
+import TermsPage from './pages/TermsPage'
+import PrivacyPage from './pages/PrivacyPage'
+import ShippingPage from './pages/ShippingPage'
+import RefundPage from './pages/RefundPage'
 
 export default function App() {
     return (
@@ -30,6 +34,10 @@ export default function App() {
                             <Route path="/payment" element={<PaymentPage />} />
                             <Route path="/track/:id" element={<OrderTrackingPage />} />
                             <Route path="/admin" element={<AdminPage />} />
+                            <Route path="/terms" element={<TermsPage />} />
+                            <Route path="/privacy" element={<PrivacyPage />} />
+                            <Route path="/shipping" element={<ShippingPage />} />
+                            <Route path="/refund" element={<RefundPage />} />
                         </Routes>
                     </main>
                     <Footer />
