@@ -205,6 +205,15 @@ export default function ProductDetailPage() {
         setTimeout(() => setAdded(false), 2000)
     }
 
+    const handleBuyNow = async () => {
+        await addToCart({
+            ...product,
+            image: product.image_url ?? product.image,
+            originalPrice: originalPrice
+        }, qty)
+        navigate('/payment')
+    }
+
     return (
         <div className="product-detail-page page-enter" id="product-detail-page">
 
@@ -347,7 +356,7 @@ export default function ProductDetailPage() {
                             </button>
                             <button
                                 className="btn btn-primary btn-lg pdp-buy-btn"
-                                onClick={() => { handleAddToCart(); navigate('/payment') }}
+                                onClick={handleBuyNow}
                                 disabled={!inStock}
                             >
                                 <i className="bi bi-lightning-charge-fill" /> Buy Now
