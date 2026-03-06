@@ -347,7 +347,7 @@ export default function ProductDetailPage() {
                             </button>
                             <button
                                 className="btn btn-primary btn-lg pdp-buy-btn"
-                                onClick={() => { handleAddToCart(); navigate('/cart') }}
+                                onClick={() => { handleAddToCart(); navigate('/payment') }}
                                 disabled={!inStock}
                             >
                                 <i className="bi bi-lightning-charge-fill" /> Buy Now
