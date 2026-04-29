@@ -68,7 +68,7 @@ function SimilarProductCard({ product }) {
 
     return (
         <div className="similar-card" id={`similar-${product.id}`}>
-            <div className="similar-card__img-wrap" onClick={() => navigate(`/products/${product.id}`)}>
+            <div className="similar-card__img-wrap" onClick={() => navigate(`/products/${product.handle || product.id}`)}>
                 <img src={product.image_url ?? product.image} alt={product.name} loading="lazy" />
                 {product.badge && <span className="similar-card__badge">{product.badge}</span>}
                 {discount > 0 && <span className="similar-card__discount">-{discount}%</span>}
@@ -186,7 +186,7 @@ export default function ProductDetailPage() {
     const mainImg = product.image_url ?? product.image;
     const gallery = mainImg ? [mainImg] : [];
     if (product.product_images && product.product_images.length > 0) {
-        gallery.push(...[...product.product_images].sort((a, b) => a.sort_order - b.sort_order).map(img => img.url));
+        gallery.push(...[...product.product_images].sort((a, b) => a.sort_order - b.sort_order).map(img => img.image_url));
     }
 
     // Specs/Description from 'details' (Supabase) or 'specs' (MockData)

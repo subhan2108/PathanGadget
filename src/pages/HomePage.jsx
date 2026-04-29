@@ -67,7 +67,7 @@ function ProductCard({ product: raw, loading }) {
         <div className="product-card" id={`product-card-${product.id}`}>
             <div
                 className="product-card__img-wrap"
-                onClick={() => navigate(`/products/${product.id}`)}
+                onClick={() => navigate(`/products/${product.handle}`)}
                 style={{ cursor: 'pointer' }}
             >
                 <img src={product.image} alt={product.name} className="product-card__img" loading="lazy" />
@@ -85,7 +85,7 @@ function ProductCard({ product: raw, loading }) {
                 </p>
                 <h3
                     className="product-card__title"
-                    onClick={() => navigate(`/products/${product.id}`)}
+                    onClick={() => navigate(`/products/${product.handle}`)}
                     style={{ cursor: 'pointer' }}
                 >{product.name}</h3>
                 <div className="product-card__rating">
@@ -116,7 +116,7 @@ function ProductCard({ product: raw, loading }) {
                     <button
                         id={`view-details-${product.id}`}
                         className="btn btn-outline product-card__details-btn"
-                        onClick={() => navigate(`/products/${product.id}`)}
+                        onClick={() => navigate(`/products/${product.handle}`)}
                         title="View Details"
                     >
                         <i className="bi bi-eye" />

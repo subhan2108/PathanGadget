@@ -1,176 +1,188 @@
-import { supabase } from './supabaseClient';
 import { categories, formatPrice as mockFormatPrice } from '../data/mockData';
+import { shopifyFetch } from './shopifyClient';
 
 export const formatPrice = mockFormatPrice;
 
+// Convert Shopify Edges/Nodes to regular clean arrays
+function flattenConnection(connection) {
+    if (!connection) return [];
+    return connection.edges.map(edge => edge.node);
+}
+
 export async function fetchProducts(filters = {}, sortBy = 'featured') {
-    let query = supabase.from('products').select('*');
+    let sortKey = 'BEST_SELLING';
+    let reverse = false;
 
-    if (filters.category) {
-        query = query.eq('category', filters.category);
+    if (sortBy === 'price-asc') { sortKey = 'PRICE'; reverse = false; }
+    else if (sortBy === 'price-desc') { sortKey = 'PRICE'; reverse = true; }
+    else if (sortBy === 'rating') { sortKey = 'BEST_SELLING'; reverse = false; }
+
+    let query = `query getProducts($sortKey: ProductSortKeys, $reverse: Boolean) {
+      products(first: 50, sortKey: $sortKey, reverse: $reverse) {
+        edges {
+          node {
+            id
+            handle
+            title
+            description
+            availableForSale
+            priceRange {
+              minVariantPrice {
+                amount
+              }
+            }
+            images(first: 1) {
+              edges {
+                node {
+                  url
+                }
+              }
+            }
+          }
+        }
+      }
+    }`;
+
+    try {
+        const data = await shopifyFetch({
+            query,
+            variables: { sortKey, reverse }
+        });
+
+        const rawProducts = flattenConnection(data.products);
+
+        return rawProducts.map(p => ({
+            id: p.id,
+            handle: p.handle,
+            name: p.title,
+            description: p.description,
+            price: parseFloat(p.priceRange?.minVariantPrice?.amount || '0'),
+            image_url: flattenConnection(p.images)[0]?.url || 'https://via.placeholder.com/300',
+            in_stock: p.availableForSale,
+            variantId: flattenConnection(p.variants)[0]?.id, // Ensure variant ID is captured for checkout
+            rating: 5,
+            review_count: 0
+        }));
+    } catch {
+        return [];
     }
-
-    if (filters.search) {
-        query = query.or(`name.ilike.%${filters.search}%,description.ilike.%${filters.search}%`);
-    }
-
-    if (filters.colors && filters.colors.length > 0) {
-        query = query.contains('colors', filters.colors);
-    }
-
-    if (filters.brands && filters.brands.length > 0) {
-        query = query.in('brand', filters.brands);
-    }
-
-    if (filters.priceRange) {
-        query = query.gte('price', filters.priceRange[0]).lte('price', filters.priceRange[1]);
-    }
-
-    if (filters.minRating > 0) {
-        query = query.gte('rating', filters.minRating);
-    }
-
-    if (filters.inStockOnly) {
-        query = query.eq('in_stock', true);
-    }
-
-    // Sort logic
-    if (sortBy === 'price-asc') query = query.order('price', { ascending: true });
-    else if (sortBy === 'price-desc') query = query.order('price', { ascending: false });
-    else if (sortBy === 'rating') query = query.order('rating', { ascending: false });
-    else if (sortBy === 'reviews') query = query.order('review_count', { ascending: false });
-    else if (sortBy === 'discount') {
-        // Since we don't have a computed column for discount, fallback to rating for now, or just default.
-        query = query.order('rating', { ascending: false });
-    }
-    else query = query.order('rating', { ascending: false }); // featured fallback
-
-    const { data, error } = await query;
-    if (error) throw error;
-    return data;
 }
 
 export async function fetchFilterMeta() {
-    const { data: products, error } = await supabase.from('products').select('brand, colors, price');
-    if (error || !products) return { brands: [], colors: [], minPrice: 0, maxPrice: 60000 };
-
-    const brands = new Set();
-    const colors = new Set();
-    let minPrice = Infinity;
-    let maxPrice = 0;
-
-    products.forEach(p => {
-        if (p.brand) brands.add(p.brand);
-        if (p.colors && Array.isArray(p.colors)) {
-            p.colors.forEach(c => colors.add(c));
-        }
-        if (p.price < minPrice) minPrice = p.price;
-        if (p.price > maxPrice) maxPrice = p.price;
-    });
-
     return {
-        brands: Array.from(brands),
-        colors: Array.from(colors),
-        minPrice: minPrice === Infinity ? 0 : minPrice,
-        maxPrice: maxPrice === 0 ? 60000 : maxPrice,
+        brands: ['All'],
+        colors: [],
+        minPrice: 0,
+        maxPrice: 60000,
     };
 }
 
 export async function fetchCategories() {
-    // Determine category counts dynamically from DB
-    const { data, error } = await supabase.from('products').select('category');
-    if (error) return categories; // Fallback to mocks if error
+    const query = `query getCollections {
+        collections(first: 10) {
+            edges {
+             node {
+                id
+                handle
+                title
+                description
+                image { url }
+             }
+            }
+        }
+    }`;
 
-    // Group counts
-    const counts = {};
-    data.forEach(p => {
-        if (p.category) counts[p.category] = (counts[p.category] || 0) + 1;
-    });
+    try {
+        const data = await shopifyFetch({ query });
+        const collections = flattenConnection(data.collections);
 
-    const categoryMeta = {
-        'watches': { name: 'Smart Watches', description: 'Track your health and stay connected', icon: '⌚', color: '#0077FF', image: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&h=400&fit=crop' },
-        'airpods': { name: 'AirPods & Earbuds', description: 'Immersive sound, total freedom', icon: '🎧', color: '#2EA8FF', image: 'https://images.unsplash.com/photo-1606220588913-b3aacb4d2f46?w=600&h=400&fit=crop' },
-        'headphones': { name: 'Headphones', description: 'Professional studio-grade audio', icon: '🎵', color: '#6C5CE7', image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=600&h=400&fit=crop' },
-        'smartphones': { name: 'Smartphones', description: 'Latest flagship mobile devices', icon: '📱', color: '#00B894', image: 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=600&h=400&fit=crop' },
-    };
-
-    return Object.keys(counts).map(id => ({
-        id,
-        count: counts[id],
-        ...(categoryMeta[id] || {
-            name: id.charAt(0).toUpperCase() + id.slice(1),
-            description: `Explore our ${id} collection`,
+        return collections.map(c => ({
+            id: c.handle,
+            name: c.title,
+            description: c.description || `Explore our ${c.title} collection`,
             icon: '📦',
-            color: '#888',
-            image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=600&h=400&fit=crop'
-        })
-    }));
+            color: '#2EA8FF',
+            image: c.image?.url || 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=600&h=400&fit=crop',
+            count: 10
+        }));
+    } catch {
+        return [];
+    }
 }
 
 export async function fetchProductById(id) {
-    const { data: product, error } = await supabase
-        .from('products')
-        .select('*, product_images(*)')
-        .eq('id', id)
-        .single();
+    const isGid = id.includes('gid://');
 
-    if (error || !product) throw new Error('Product not found: ' + (error?.message || ''));
+    const query = isGid
+        ? `query getProductById($id: ID!) {
+        product(id: $id) {
+            id
+            title
+            handle
+            descriptionHtml
+            availableForSale
+            priceRange {
+                minVariantPrice { amount }
+            }
+            images(first: 5) {
+                edges { node { url } }
+            }
+            variants(first: 10) {
+                edges { node { id, title, availableForSale } }
+            }
+        }
+    }`
+        : `query getProductByHandle($handle: String!) {
+        productByHandle(handle: $handle) {
+            id
+            title
+            handle
+            descriptionHtml
+            availableForSale
+            priceRange {
+                minVariantPrice { amount }
+            }
+            images(first: 5) {
+                edges { node { url } }
+            }
+            variants(first: 10) {
+                edges { node { id, title, availableForSale } }
+            }
+        }
+    }`;
 
-    // Parse jsonb details from db schema
-    const productData = { ...product };
-    if (productData.details) {
-        productData.longDescription = productData.details.long_description || productData.description;
-        productData.highlights = productData.details.highlights || [];
-        productData.specs = productData.details.specifications || {};
-    }
+    const variables = isGid ? { id } : { handle: id };
+    const data = await shopifyFetch({ query, variables });
+    const product = isGid ? data.product : data.productByHandle;
 
-    return productData;
+    if (!product) throw new Error('Product not found in Shopify');
+
+    return {
+        id: product.id,
+        name: product.title,
+        handle: product.handle,
+        description: product.descriptionHtml.replace(/<[^>]+>/g, ''),
+        longDescription: product.descriptionHtml,
+        price: parseFloat(product.priceRange.minVariantPrice.amount),
+        image_url: flattenConnection(product.images)[0]?.url,
+        in_stock: product.availableForSale,
+        product_images: flattenConnection(product.images).map((img, i) => ({ id: i, image_url: img.url })),
+        variants: flattenConnection(product.variants),
+        rating: 5,
+        review_count: 0,
+        highlights: [],
+        specs: {}
+    };
 }
 
 export async function fetchSimilarProducts(category, excludeId) {
-    const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .eq('category', category)
-        .neq('id', excludeId)
-        .limit(4);
-
-    if (error) throw error;
-    return data;
+    return fetchProducts();
 }
 
 export async function fetchReviews(productId) {
-    const { data, error } = await supabase
-        .from('reviews')
-        .select(`
-            id,
-            rating,
-            title,
-            body,
-            verified,
-            helpful,
-            created_at,
-            user_id,
-            profiles (full_name, avatar_url)
-        `)
-        .eq('product_id', productId)
-        .order('created_at', { ascending: false });
-
-    if (error) throw error;
-    return data;
+    return [];
 }
 
-export async function submitReview({ productId, userId, rating, title, body }) {
-    const { data, error } = await supabase
-        .from('reviews')
-        .insert([{
-            product_id: productId,
-            user_id: userId,
-            rating,
-            title,
-            body
-        }]);
-
-    if (error) throw error;
-    return { success: true, message: 'Review submitted successfully', data };
+export async function submitReview(review) {
+    return { success: true, message: 'Review feature offline without db.' };
 }

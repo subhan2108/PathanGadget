@@ -74,10 +74,10 @@ function ProductCard({ product: raw }) {
         <article className="plp-card" id={`plp-card-${product.id}`}>
             <div
                 className="plp-card__img-wrap"
-                onClick={() => navigate(`/products/${product.id}`)}
+                onClick={() => navigate(`/products/${product.handle}`)}
                 role="button"
                 tabIndex={0}
-                onKeyDown={e => e.key === 'Enter' && navigate(`/products/${product.id}`)}
+                onKeyDown={e => e.key === 'Enter' && navigate(`/products/${product.handle}`)}
             >
                 <img src={product.image} alt={product.name} loading="lazy" />
                 {product.badge && <span className="plp-card__badge">{product.badge}</span>}
@@ -99,7 +99,7 @@ function ProductCard({ product: raw }) {
 
                 <h3
                     className="plp-card__name"
-                    onClick={() => navigate(`/products/${product.id}`)}
+                    onClick={() => navigate(`/products/${product.handle}`)}
                 >
                     {product.name}
                 </h3>
@@ -152,7 +152,7 @@ function ProductCard({ product: raw }) {
                     <button
                         id={`plp-view-${product.id}`}
                         className="btn btn-outline plp-view-btn"
-                        onClick={() => navigate(`/products/${product.id}`)}
+                        onClick={() => navigate(`/products/${product.handle}`)}
                         title="View Details"
                     >
                         <i className="bi bi-eye" />

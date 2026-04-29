@@ -58,27 +58,15 @@ export default function PaymentPage() {
         const errs = validate(form)
         if (Object.keys(errs).length > 0) { setErrors(errs); return }
 
-        if (!user) {
-            alert('Please login to place an order.')
-            return
-        }
-
         setLoading(true)
 
         try {
-            await placeOrder({
-                user_id: user.id,
-                order_number: orderNumber,
-                subtotal: subtotal,
-                delivery_fee: shipping,
-                total: total,
-                payment_method: form.paymentMethod === 'upi_qr' ? 'UPI' : 'COD',
-                items: orderItems,
-                shipping: { name: `${form.firstName} ${form.lastName}`, email: form.email, phone: form.phone, address: form.address, city: form.city, state: form.state, pincode: form.pincode }
-            })
-            setLoading(false)
-            setSuccess(true)
+            const { createShopifyCheckout } = await import('../lib/shopifyClient')
+            const checkoutUrl = await createShopifyCheckout(orderItems)
+
+            // Redirect the user to the secure Shopify checkout
             setTimeout(() => clearCart(), 100)
+            window.location.href = checkoutUrl;
         } catch (err) {
             console.error('❌ Finalize order error:', err)
             alert('Failed to place order: ' + err.message)
