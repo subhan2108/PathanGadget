@@ -1,106 +1,91 @@
-import { supabase } from './supabaseClient';
+import sql from './db';
+
+/**
+ * Cart Service (Neon Postgres Implementation)
+ * Stores cart items with metadata to avoid unnecessary Shopify API calls.
+ */
 
 export async function fetchCart(userId) {
     if (!userId) return [];
-
-    // Fetch cart items joined with product data
-    const { data, error } = await supabase
-        .from('cart_items')
-        .select(`
-            id,
-            quantity,
-            color,
-            product_id,
-            products (
-                name,
-                price,
-                image_url,
-                original_price
-            )
-        `)
-        .eq('user_id', userId);
-
-    if (error) {
-        console.error('Error fetching cart:', error);
+    try {
+        const rows = await sql`
+            SELECT * FROM cart_items 
+            WHERE user_id = ${userId}
+            ORDER BY created_at DESC
+        `;
+        return rows.map(r => ({ ...r, image: r.image_url }));
+    } catch (err) {
+        console.error('Error fetching cart:', err);
         return [];
     }
-
-    // Transform data to match existing frontend structure
-    return data.map(item => ({
-        id: item.product_id, // frontend uses product.id as item.id often, or we should map it
-        cartItemId: item.id,
-        quantity: item.quantity,
-        color: item.color,
-        name: item.products.name,
-        price: item.products.price,
-        image: item.products.image_url,
-        originalPrice: item.products.original_price
-    }));
 }
 
 export async function addToCartDB(userId, item) {
-    if (!userId) return null;
-
-    // Upsert on user_id + product_id via RPC or onConflict
-    const { data, error } = await supabase
-        .from('cart_items')
-        .upsert({
-            user_id: userId,
-            product_id: item.id,
-            quantity: item.quantity,
-            color: item.color || null
-        }, { onConflict: 'user_id,product_id' })
-        .select()
-        .single();
-
-    if (error) console.error('Error adding to cart DB:', error);
-    return data;
+    if (!userId) return false;
+    try {
+        // We store the Shopify GID as product_id
+        await sql`
+            INSERT INTO cart_items (user_id, product_id, quantity, color, name, price, image_url)
+            VALUES (
+                ${userId}, 
+                ${item.id}, 
+                ${item.quantity || 1}, 
+                ${item.color || null},
+                ${item.name},
+                ${item.price},
+                ${item.image_url || item.image}
+            )
+            ON CONFLICT (user_id, product_id) 
+            DO UPDATE SET 
+                quantity = cart_items.quantity + EXCLUDED.quantity,
+                color = EXCLUDED.color
+        `;
+        return true;
+    } catch (err) {
+        console.error('Error adding to cart:', err);
+        return false;
+    }
 }
 
 export async function updateCartQtyDB(userId, productId, qty) {
-    if (!userId) return null;
-
-    if (qty <= 0) return removeFromCartDB(userId, productId);
-
-    const { data, error } = await supabase
-        .from('cart_items')
-        .update({ quantity: qty })
-        .eq('user_id', userId)
-        .eq('product_id', productId)
-        .select()
-        .single();
-
-    if (error) console.error('Error updating cart DB:', error);
-    return data;
+    if (!userId) return false;
+    try {
+        await sql`
+            UPDATE cart_items 
+            SET quantity = ${qty}
+            WHERE user_id = ${userId} AND product_id = ${productId}
+        `;
+        return true;
+    } catch (err) {
+        console.error('Error updating cart qty:', err);
+        return false;
+    }
 }
 
 export async function removeFromCartDB(userId, productId) {
-    if (!userId) return true;
-
-    const { error } = await supabase
-        .from('cart_items')
-        .delete()
-        .eq('user_id', userId)
-        .eq('product_id', productId);
-
-    if (error) {
-        console.error('Error removing from cart DB:', error);
+    if (!userId) return false;
+    try {
+        await sql`
+            DELETE FROM cart_items 
+            WHERE user_id = ${userId} AND product_id = ${productId}
+        `;
+        return true;
+    } catch (err) {
+        console.error('Error removing from cart:', err);
         return false;
     }
-    return true;
 }
 
 export async function clearCartDB(userId) {
-    if (!userId) return true;
-
-    const { error } = await supabase
-        .from('cart_items')
-        .delete()
-        .eq('user_id', userId);
-
-    if (error) {
-        console.error('Error clearing cart DB:', error);
+    if (!userId) return false;
+    try {
+        await sql`
+            DELETE FROM cart_items 
+            WHERE user_id = ${userId}
+        `;
+        return true;
+    } catch (err) {
+        console.error('Error clearing cart:', err);
         return false;
     }
-    return true;
 }

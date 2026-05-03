@@ -1,125 +1,112 @@
-import { supabase } from './supabaseClient';
+import sql from './db';
+
+/**
+ * Order Service (Neon Postgres Implementation)
+ */
 
 export async function fetchUserOrders(userId) {
     if (!userId) return [];
+    try {
+        // Fetch orders and their items using a join or multiple queries
+        const orders = await sql`
+            SELECT * FROM orders 
+            WHERE user_id = ${userId}
+            ORDER BY created_at DESC
+        `;
+        
+        if (orders.length === 0) return [];
 
-    const { data, error } = await supabase
-        .from('orders')
-        .select(`
-            *,
-            order_items (*)
-        `)
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
+        // Fetch all items for these orders
+        const orderIds = orders.map(o => o.id);
+        const allItems = await sql`
+            SELECT * FROM order_items 
+            WHERE order_id IN (${orderIds})
+        `;
 
-    if (error) {
-        console.error('Error fetching orders:', error);
+        // Map items back to orders
+        return orders.map(order => ({
+            ...order,
+            items: allItems.filter(item => item.order_id === order.id).map(i => ({
+                ...i,
+                image: i.image_url
+            }))
+        }));
+    } catch (err) {
+        console.error('Error fetching user orders:', err);
         return [];
     }
-
-    // Map data to match frontend requirements if needed
-    return data;
 }
 
-export async function fetchOrderDetails(orderNumberOrId, withTracking = false) {
-    // Determine if it looks like a numeric ID or the ORD- string
-    let query = supabase.from('orders').select('*, order_items (*), addresses(*)');
+export async function fetchOrderDetails(orderNumberOrId) {
+    try {
+        // Handle both order_number (string) and id (integer)
+        const isNumericId = !isNaN(orderNumberOrId) && !String(orderNumberOrId).startsWith('ORD');
+        
+        const orderRows = isNumericId 
+            ? await sql`SELECT * FROM orders WHERE id = ${parseInt(orderNumberOrId)}`
+            : await sql`SELECT * FROM orders WHERE order_number = ${orderNumberOrId}`;
+        
+        if (orderRows.length === 0) return null;
+        
+        const order = orderRows[0];
+        const items = await sql`
+            SELECT * FROM order_items 
+            WHERE order_id = ${order.id}
+        `;
+        const normalizedItems = items.map(i => ({ ...i, image: i.image_url }));
+        
+        // Mock tracking data since we don't have a tracking table yet
+        const mockTracking = [
+            { id: 1, label: 'Order Placed', description: 'Your order has been successfully placed.', timestamp: order.created_at },
+            { id: 2, label: 'Processing', description: 'Our team is preparing your package.', timestamp: new Date(new Date(order.created_at).getTime() + 3600000) }
+        ];
 
-    if (String(orderNumberOrId).startsWith('ORD')) {
-        query = query.eq('order_number', orderNumberOrId);
-    } else {
-        query = query.eq('id', orderNumberOrId);
+        return { ...order, items: normalizedItems, order_tracking: mockTracking };
+    } catch (err) {
+        console.error('Error fetching order details:', err);
+        return null;
     }
-
-    const { data: order, error } = await query.single();
-    if (error || !order) return null;
-
-    if (withTracking) {
-        const { data: tracking } = await supabase
-            .from('order_tracking')
-            .select('*')
-            .eq('order_id', order.id)
-            .order('timestamp', { ascending: true });
-
-        order.order_tracking = tracking || [];
-    }
-
-    return order;
 }
 
 export async function placeOrder(orderData) {
-    const userId = orderData.user_id;
-    // Calculate a unique order number (for simplicity randomly base generator)
-    const orderNumber = orderData.order_number || `ORD-${new Date().getFullYear()}-${Math.floor(Math.random() * 900000) + 100000}`;
+    try {
+        // 1. Insert Order
+        const [newOrder] = await sql`
+            INSERT INTO orders (
+                order_number, user_id, total, subtotal, 
+                delivery_fee, payment_method, payment_id, shipping_address
+            ) VALUES (
+                ${orderData.order_number},
+                ${orderData.user_id || null},
+                ${orderData.total},
+                ${orderData.subtotal},
+                ${orderData.delivery_fee},
+                ${orderData.payment_method},
+                ${orderData.payment_id || null},
+                ${JSON.stringify(orderData.shipping)}
+            ) RETURNING id
+        `;
 
-    // Create Address first (Or bind if already exists)
-    let addressRef = null;
-    if (orderData.shipping) {
-        // Insert fallback directly or store JSON fallback
-        const { data: addressData, error: addressError } = await supabase
-            .from('addresses')
-            .insert([{
-                user_id: userId,
-                full_name: orderData.shipping.name || '',
-                phone: orderData.shipping.phone || '',
-                line1: orderData.shipping.address || '',
-                city: typeof orderData.shipping === 'object' ? (orderData.shipping.city || 'City') : '',
-                state: typeof orderData.shipping === 'object' ? (orderData.shipping.state || '') : '',
-                pincode: typeof orderData.shipping === 'object' ? (orderData.shipping.pincode || '') : ''
-            }])
-            .select()
-            .single();
-
-        if (!addressError && addressData) {
-            addressRef = addressData.id;
+        // 2. Insert Items
+        for (const item of orderData.items) {
+            await sql`
+                INSERT INTO order_items (
+                    order_id, product_id, name, price, quantity, image_url, color
+                ) VALUES (
+                    ${newOrder.id},
+                    ${item.id},
+                    ${item.name},
+                    ${item.price},
+                    ${item.quantity},
+                    ${item.image_url || item.image},
+                    ${item.color || null}
+                )
+            `;
         }
+
+        return { success: true, id: newOrder.id };
+    } catch (err) {
+        console.error('Error placing order in Neon:', err);
+        throw err;
     }
-
-    // Create the Order
-    const { data: order, error: orderError } = await supabase
-        .from('orders')
-        .insert([{
-            user_id: userId,
-            order_number: orderNumber,
-            status: 'processing',
-            subtotal: orderData.subtotal,
-            delivery_fee: orderData.delivery_fee || 0,
-            total: orderData.total,
-            payment_method: orderData.payment_method || 'UPI',
-            payment_status: orderData.payment_method === 'COD' ? 'pending' : (orderData.payment_id ? 'verifying' : 'pending'),
-            razorpay_id: orderData.payment_method === 'UPI' ? (orderData.payment_id || null) : null, // Storing UTR string here
-            address_id: addressRef,
-            shipping_details: typeof orderData.shipping === 'object' ? orderData.shipping : { address: orderData.shipping }
-        }])
-        .select()
-        .single();
-
-    if (orderError) throw new Error('Could not create order: ' + orderError.message);
-
-    // Create order items
-    if (orderData.items && orderData.items.length > 0) {
-        const orderItemsMap = orderData.items.map(item => ({
-            order_id: order.id,
-            product_id: item.id || null, // Assuming product has id 
-            name: item.name,
-            image_url: item.image || item.image_url,
-            price: item.price,
-            quantity: item.quantity,
-            color: item.color || null
-        }));
-
-        const { error: itemsError } = await supabase.from('order_items').insert(orderItemsMap);
-        if (itemsError) console.error("Could not insert order items: ", itemsError);
-    }
-
-    // Insert initial tracking event
-    await supabase.from('order_tracking').insert([{
-        order_id: order.id,
-        status: 'processing',
-        label: 'Order Placed',
-        description: 'Your order has been placed and is being processed.',
-        is_current: true
-    }]);
-
-    return order;
 }

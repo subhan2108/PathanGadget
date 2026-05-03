@@ -135,7 +135,7 @@ export default function OrderDetailsPage() {
                         <div className="order-section" id="order-items">
                             <h2><i className="bi bi-bag" /> Items in Order</h2>
                             <div className="order-items-list">
-                                {(order.order_items || []).map(item => (
+                                {(order.items || []).map(item => (
                                     <div key={item.id} className="order-detail-item">
                                         <img src={item.image_url} alt={item.name} className="order-detail-item__img" />
                                         <div className="order-detail-item__info">
@@ -155,8 +155,13 @@ export default function OrderDetailsPage() {
                             <div className="shipping-address-card">
                                 <div className="shipping-address-icon"><i className="bi bi-house-door-fill" /></div>
                                 <div>
-                                    <p className="shipping-name"><i className="bi bi-person-fill" /> Customer</p>
-                                    <p className="shipping-addr"><i className="bi bi-map" /> Shipping to registered address</p>
+                                    <p className="shipping-name">
+                                        <i className="bi bi-person-fill" /> {order.shipping_address?.firstName} {order.shipping_address?.lastName}
+                                    </p>
+                                    <p className="shipping-addr">
+                                        <i className="bi bi-map" /> {order.shipping_address?.address}, {order.shipping_address?.city}, {order.shipping_address?.state} {order.shipping_address?.pincode}
+                                    </p>
+                                    <p className="shipping-phone"><i className="bi bi-telephone-fill" /> {order.shipping_address?.phone}</p>
                                 </div>
                             </div>
                         </div>

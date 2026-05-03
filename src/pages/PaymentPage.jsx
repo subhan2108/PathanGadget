@@ -1,16 +1,15 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useCart } from '../context/CartContext'
 import { useAuth } from '../context/AuthContext'
 import { placeOrder } from '../lib/orderService'
 import { formatPrice } from '../lib/productsService'
+import { loadRazorpayScript, openRazorpayCheckout } from '../lib/razorpayService'
 import './PaymentPage.css'
 
-const MERCHANT_UPI_ID = import.meta.env.VITE_UPI_ID || 'merchant@upi'
-const MERCHANT_NAME = import.meta.env.VITE_UPI_NAME || 'ElectroCart'
 
 const PAYMENT_METHODS = [
-    { id: 'upi_qr', label: 'UPI / QR Code', icon: 'bi-qr-code-scan', desc: 'Scan and pay via GPay, PhonePe, Paytm, etc.' },
+    { id: 'razorpay', label: 'Online Payment', icon: 'bi-credit-card', desc: 'Cards, Netbanking, UPI, Wallets' },
     { id: 'cod', label: 'Cash on Delivery', icon: 'bi-cash-coin', desc: 'Available for orders under ₹10,000' },
 ]
 
@@ -32,11 +31,15 @@ export default function PaymentPage() {
     const navigate = useNavigate()
     const { user } = useAuth()
     const { cartItems, cartTotal, clearCart } = useCart()
-    const [form, setForm] = useState({ paymentMethod: 'upi_qr' })
+    const [form, setForm] = useState({ paymentMethod: 'razorpay' })
     const [errors, setErrors] = useState({})
     const [loading, setLoading] = useState(false)
     const [success, setSuccess] = useState(false)
     const [orderNumber] = useState(() => 'ORD-' + Math.random().toString(36).toUpperCase().slice(-6))
+
+    useEffect(() => {
+        loadRazorpayScript();
+    }, []);
 
     // Use cart items
     const orderItems = cartItems
@@ -49,9 +52,6 @@ export default function PaymentPage() {
         setErrors(e => ({ ...e, [key]: undefined }))
     }
 
-    // Generate UPI URL
-    const upiLink = `upi://pay?pa=${MERCHANT_UPI_ID}&pn=${encodeURIComponent(MERCHANT_NAME)}&am=${total}&cu=INR&tr=${orderNumber}`
-    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiLink)}`
 
     const handleSubmit = async (e) => {
         e.preventDefault()
@@ -61,12 +61,62 @@ export default function PaymentPage() {
         setLoading(true)
 
         try {
-            const { createShopifyCheckout } = await import('../lib/shopifyClient')
-            const checkoutUrl = await createShopifyCheckout(orderItems)
-
-            // Redirect the user to the secure Shopify checkout
-            setTimeout(() => clearCart(), 100)
-            window.location.href = checkoutUrl;
+            if (form.paymentMethod === 'razorpay') {
+                // 1. Open Checkout Directly (No backend order creation)
+                await openRazorpayCheckout({
+                    amount: total,
+                    user: { ...form, ...user },
+                    onSuccess: async (response) => {
+                        // 2. Try to place order (will fail if no Supabase, so we catch it)
+                        try {
+                            await placeOrder({
+                                user_id: user?.id,
+                                order_number: orderNumber,
+                                items: orderItems,
+                                subtotal,
+                                delivery_fee: shipping,
+                                total,
+                                payment_method: 'RAZORPAY',
+                                payment_id: response.razorpay_payment_id,
+                                shipping: form
+                            });
+                        } catch (e) {
+                            console.warn("Order not saved to DB (Supabase missing):", e.message);
+                        }
+                        
+                        clearCart();
+                        setSuccess(true);
+                    },
+                    onDismiss: () => {
+                        setLoading(false);
+                    }
+                });
+            } else if (form.paymentMethod === 'cod') {
+                // Try to place direct order
+                try {
+                    await placeOrder({
+                        user_id: user?.id,
+                        order_number: orderNumber,
+                        items: orderItems,
+                        subtotal,
+                        delivery_fee: shipping,
+                        total,
+                        payment_method: form.paymentMethod.toUpperCase(),
+                        shipping: form
+                    });
+                } catch (e) {
+                    console.warn("Order not saved to DB (Supabase missing):", e.message);
+                }
+                
+                clearCart();
+                setSuccess(true);
+            } else {
+                // Fallback to Shopify if needed (though we want to move away)
+                const { createShopifyCheckout } = await import('../lib/shopifyClient')
+                const checkoutUrl = await createShopifyCheckout(orderItems)
+                clearCart()
+                window.location.href = checkoutUrl;
+            }
         } catch (err) {
             console.error('❌ Finalize order error:', err)
             alert('Failed to place order: ' + err.message)
@@ -85,14 +135,14 @@ export default function PaymentPage() {
                         <div className="success-checkmark"><i className="bi bi-check-lg" /></div>
                     </div>
                     <h2>Order Placed Successfully!</h2>
-                    <p>Your order <code>{orderNumber}</code> has been received. {form.paymentMethod === 'upi_qr' ? 'Please complete your UPI payment using the app of your choice to finalize processing.' : 'You will pay Cash on Delivery.'}</p>
+                    <p>Your order <code>{orderNumber}</code> has been received. {form.paymentMethod === 'cod' ? 'You will pay Cash on Delivery.' : 'Your payment was successful.'}</p>
                     <div className="success-details">
                         <div className="success-detail-row">
                             <span><i className="bi bi-bag-check" /> Items</span>
                             <span>{orderItems.length} product{orderItems.length > 1 ? 's' : ''}</span>
                         </div>
                         <div className="success-detail-row">
-                            <span><i className="bi bi-cash" /> Amount {form.paymentMethod === 'upi_qr' ? 'to Pay' : 'to Pay'}</span>
+                            <span><i className="bi bi-cash" /> Amount to Pay</span>
                             <strong>{formatPrice(total)}</strong>
                         </div>
                         {form.paymentMethod === 'cod' && (
@@ -119,10 +169,10 @@ export default function PaymentPage() {
         <div className="payment-page page-enter" id="payment-page">
             <div className="payment-header" id="payment-header">
                 <div className="container">
-                    <h1><i className="bi bi-qr-code-scan" /> Secure UPI Checkout</h1>
+                    <h1><i className="bi bi-shield-lock-fill" /> Secure Checkout</h1>
                     <div className="payment-header__trust">
-                        <span><i className="bi bi-shield-check" /> 100% Safe</span>
-                        <span><i className="bi bi-phone" /> Pay via any UPI App</span>
+                        <span><i className="bi bi-shield-check" /> 100% Safe Payments</span>
+                        <span><i className="bi bi-credit-card" /> All major cards & UPI accepted</span>
                     </div>
                 </div>
             </div>
@@ -218,18 +268,6 @@ export default function PaymentPage() {
                                 ))}
                             </div>
 
-                            {/* UPI QR Display */}
-                            {form.paymentMethod === 'upi_qr' && (
-                                <div className="upi-qr-section" style={{ marginTop: 24, textAlign: 'center', padding: 24, background: 'var(--surface)', borderRadius: 12, border: '1px solid var(--border)' }}>
-                                    <h4 style={{ marginBottom: 16 }}>Scan to Pay with any UPI App</h4>
-                                    <img src={qrCodeUrl} alt="UPI QR Code" style={{ width: 200, height: 200, borderRadius: 8, border: '4px solid white', margin: '0 auto', display: 'block' }} />
-                                    <div style={{ marginTop: 16, fontSize: 14, color: 'var(--text-secondary)' }}>
-                                        <p>or pay to UPI ID:</p>
-                                        <strong style={{ fontSize: 16, color: 'var(--text)', background: 'var(--background)', padding: '8px 16px', borderRadius: 8, display: 'inline-block', marginTop: 8 }}>{MERCHANT_UPI_ID}</strong>
-                                    </div>
-                                    <p style={{ marginTop: 16, marginBottom: 0, fontSize: 14, fontWeight: 500, color: 'var(--primary)' }}>Please pay EXACTLY: {formatPrice(total)}</p>
-                                </div>
-                            )}
                         </div>
 
                         <button

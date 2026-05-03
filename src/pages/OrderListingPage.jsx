@@ -133,7 +133,7 @@ export default function OrderListingPage() {
 
                                 {/* Items */}
                                 <div className="order-card__items">
-                                    {(order.order_items || order.items || []).map((item, index) => (
+                                    {(order.items || []).map((item, index) => (
                                         <div key={item.id || index} className="order-item-row">
                                             <img src={item.image_url || item.image} alt={item.name} className="order-item-row__img" />
                                             <div className="order-item-row__info">

@@ -2,21 +2,23 @@ import React, { useState, useEffect, useRef } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useCart } from '../context/CartContext'
 import { useAuth } from '../context/AuthContext'
-import AuthModal from './AuthModal'
+import { 
+    SignedIn, 
+    SignedOut, 
+    SignInButton, 
+    UserButton,
+    useClerk
+} from '@clerk/clerk-react'
 import './Navbar.css'
 
 export default function Navbar() {
     const [scrolled, setScrolled] = useState(false)
     const [menuOpen, setMenuOpen] = useState(false)
     const [cartOpen, setCartOpen] = useState(false)
-    const [authOpen, setAuthOpen] = useState(false)
-    const [authTab, setAuthTab] = useState('login')
-    const [profileOpen, setProfileOpen] = useState(false)
 
     const { cartItems, cartCount, cartTotal, removeFromCart, updateQty } = useCart()
-    const { user, profile, signOut, isAuthenticated } = useAuth()
+    const { signOut } = useAuth()
     const location = useLocation()
-    const profileRef = useRef(null)
 
     useEffect(() => {
         const handler = () => setScrolled(window.scrollY > 20)
@@ -25,45 +27,14 @@ export default function Navbar() {
     }, [])
 
     /* Close drawers on route change */
+    /* Close drawers on route change */
     useEffect(() => {
         setMenuOpen(false)
         setCartOpen(false)
-        setProfileOpen(false)
     }, [location])
-
-    /* Close profile dropdown on outside click */
-    useEffect(() => {
-        if (!profileOpen) return
-        const handler = (e) => {
-            if (profileRef.current && !profileRef.current.contains(e.target))
-                setProfileOpen(false)
-        }
-        document.addEventListener('mousedown', handler)
-        return () => document.removeEventListener('mousedown', handler)
-    }, [profileOpen])
 
     const formatPrice = (p) =>
         new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0 }).format(p)
-
-    const openAuth = (tab = 'login') => {
-        setAuthTab(tab)
-        setAuthOpen(true)
-        setMenuOpen(false)
-    }
-
-    const handleSignOut = async () => {
-        setProfileOpen(false)
-        await signOut()
-    }
-
-    /* Get user display name */
-    const displayName = profile?.full_name
-        || user?.user_metadata?.full_name
-        || user?.email?.split('@')[0]
-        || 'Account'
-
-    /* Get user avatar */
-    const avatarUrl = profile?.avatar_url || user?.user_metadata?.avatar_url || null
 
     const navLinks = [
         { to: '/', label: 'Home', icon: 'bi-house' },
@@ -110,61 +81,29 @@ export default function Navbar() {
                             {cartCount > 0 && <span className="cart-badge">{cartCount}</span>}
                         </button>
 
-                        {/* Auth: logged in → avatar dropdown, logged out → Sign In btn */}
-                        {isAuthenticated ? (
-                            <div className="nav-profile" ref={profileRef}>
-                                <button
-                                    id="nav-profile-btn"
-                                    className="nav-avatar-btn"
-                                    onClick={() => setProfileOpen(o => !o)}
-                                    aria-label="Account menu"
-                                >
-                                    {avatarUrl
-                                        ? <img src={avatarUrl} alt={displayName} className="nav-avatar-img" />
-                                        : <span className="nav-avatar-initials">
-                                            {displayName.charAt(0).toUpperCase()}
-                                        </span>
-                                    }
-                                    <span className="nav-display-name">{displayName.split(' ')[0]}</span>
-                                    <i className={`bi bi-chevron-${profileOpen ? 'up' : 'down'} nav-chevron`} />
-                                </button>
-
-                                {/* Profile Dropdown */}
-                                {profileOpen && (
-                                    <div className="profile-dropdown" id="profile-dropdown">
-                                        <div className="profile-dropdown__head">
-                                            <p className="profile-name">{displayName}</p>
-                                            <p className="profile-email">{user?.email}</p>
-                                        </div>
-                                        <div className="profile-dropdown__links">
-                                            <Link to="/orders" className="profile-link" id="dd-orders">
-                                                <i className="bi bi-box-seam" /> My Orders
-                                            </Link>
-                                            <Link to="/admin" className="profile-link text-primary" id="dd-admin">
-                                                <i className="bi bi-shield-lock" /> Admin Dashboard
-                                            </Link>
-                                        </div>
-                                        <div className="profile-dropdown__footer">
-                                            <button
-                                                id="nav-signout-btn"
-                                                className="signout-btn"
-                                                onClick={handleSignOut}
-                                            >
-                                                <i className="bi bi-box-arrow-right" /> Sign Out
-                                            </button>
-                                        </div>
-                                    </div>
-                                )}
+                        {/* Auth: Clerk handles SignedIn and SignedOut states */}
+                        <SignedIn>
+                            <div className="nav-profile">
+                                <UserButton 
+                                    afterSignOutUrl="/" 
+                                    appearance={{
+                                        elements: {
+                                            userButtonAvatarBox: 'nav-avatar-img-clerk'
+                                        }
+                                    }}
+                                />
                             </div>
-                        ) : (
-                            <button
-                                id="nav-signin-btn"
-                                className="btn btn-outline navbar__signin"
-                                onClick={() => openAuth('login')}
-                            >
-                                <i className="bi bi-person-circle" /> Sign In
-                            </button>
-                        )}
+                        </SignedIn>
+                        <SignedOut>
+                            <SignInButton mode="modal">
+                                <button
+                                    id="nav-signin-btn"
+                                    className="btn btn-outline navbar__signin"
+                                >
+                                    <i className="bi bi-person-circle" /> Sign In
+                                </button>
+                            </SignInButton>
+                        </SignedOut>
 
                         <Link to="/payment" id="nav-checkout" className="btn btn-primary navbar__cta">
                             Buy Now <i className="bi bi-arrow-right" />
@@ -193,20 +132,23 @@ export default function Navbar() {
                         </Link>
                     ))}
 
-                    {isAuthenticated ? (
-                        <button className="mobile-menu__link mobile-signout" onClick={handleSignOut}>
-                            <i className="bi bi-box-arrow-right" /> Sign Out ({displayName.split(' ')[0]})
+                    <SignedIn>
+                        <button className="mobile-menu__link mobile-signout" onClick={() => signOut()}>
+                            <i className="bi bi-box-arrow-right" /> Sign Out
                         </button>
-                    ) : (
-                        <>
-                            <button className="mobile-menu__link" onClick={() => openAuth('login')} id="mobile-signin">
+                    </SignedIn>
+                    <SignedOut>
+                        <SignInButton mode="modal">
+                            <button className="mobile-menu__link" id="mobile-signin">
                                 <i className="bi bi-box-arrow-in-right" /> Sign In
                             </button>
-                            <button className="mobile-menu__link" onClick={() => openAuth('register')} id="mobile-register">
+                        </SignInButton>
+                        <SignInButton mode="modal">
+                            <button className="mobile-menu__link" id="mobile-register">
                                 <i className="bi bi-person-plus" /> Create Account
                             </button>
-                        </>
-                    )}
+                        </SignInButton>
+                    </SignedOut>
 
                     <Link to="/payment" className="btn btn-primary btn-full mobile-menu__cta">
                         Buy Now <i className="bi bi-arrow-right" />
@@ -272,14 +214,14 @@ export default function Navbar() {
                             <span>Total</span>
                             <strong>{formatPrice(cartTotal)}</strong>
                         </div>
-                        {!isAuthenticated && (
+                        <SignedOut>
                             <p className="cart-auth-notice">
                                 <i className="bi bi-info-circle" />
-                                <button className="auth-link" onClick={() => { setCartOpen(false); openAuth('login') }}>
-                                    Sign in
-                                </button> to save your cart & checkout
+                                <SignInButton mode="modal">
+                                    <button className="auth-link">Sign in</button>
+                                </SignInButton> to save your cart & checkout
                             </p>
-                        )}
+                        </SignedOut>
                         <Link
                             to="/payment"
                             className="btn btn-primary btn-lg btn-full"
@@ -292,12 +234,7 @@ export default function Navbar() {
                 )}
             </aside>
 
-            {/* ── Auth Modal ── */}
-            <AuthModal
-                isOpen={authOpen}
-                onClose={() => setAuthOpen(false)}
-                initialTab={authTab}
-            />
+            {/* ── Auth Modal is now handled by Clerk ── */}
         </>
     )
 }

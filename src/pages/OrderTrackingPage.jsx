@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { fetchOrderDetails } from '../lib/orderService'
-import { supabase } from '../lib/supabaseClient'
 import './OrderTrackingPage.css'
 
 // Bootstrap icon names for each tracking step
@@ -26,34 +25,7 @@ export default function OrderTrackingPage() {
         })
     }, [id])
 
-    useEffect(() => {
-        if (!order?.id) return;
 
-        // ── Realtime Subscription ──
-        const channel = supabase.channel(`order-${order.id}`)
-            .on('postgres_changes', {
-                event: '*',
-                schema: 'public',
-                table: 'order_tracking',
-                filter: `order_id=eq.${order.id}`
-            }, (payload) => {
-                console.log('📡 Realtime Tracking Update:', payload)
-                // Re-fetch or update state locally
-                fetchOrderDetails(id, true).then(data => {
-                    setOrder(data)
-                    if (data?.order_tracking) {
-                        data.order_tracking.forEach((_, i) => {
-                            setTimeout(() => setAnimatedStep(i), i * 350 + 200)
-                        })
-                    }
-                })
-            })
-            .subscribe()
-
-        return () => {
-            supabase.removeChannel(channel)
-        }
-    }, [order?.id, id])
 
     if (loading) return (
         <div className="tracking-page page-enter">

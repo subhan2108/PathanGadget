@@ -17,12 +17,20 @@ import PrivacyPage from './pages/PrivacyPage'
 import ShippingPage from './pages/ShippingPage'
 import RefundPage from './pages/RefundPage'
 
+import { ClerkProvider } from '@clerk/clerk-react'
+
+const CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
+
+if (!CLERK_PUBLISHABLE_KEY) {
+    throw new Error("Missing Publishable Key")
+}
+
 export default function App() {
     return (
-        // AuthProvider wraps everything so any component can access user state
-        <AuthProvider>
-            <CartProvider>
-                <BrowserRouter>
+        <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY}>
+            <AuthProvider>
+                <CartProvider>
+                    <BrowserRouter>
                     <Navbar />
                     <main>
                         <Routes>
@@ -44,5 +52,6 @@ export default function App() {
                 </BrowserRouter>
             </CartProvider>
         </AuthProvider>
+        </ClerkProvider>
     )
 }
