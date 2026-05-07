@@ -44,7 +44,7 @@ export default function PaymentPage() {
     // Use cart items
     const orderItems = cartItems
     const subtotal = cartTotal
-    const shipping = subtotal >= 999 ? 0 : 99
+    const shipping = 0
     const total = subtotal + shipping
 
     const set = (key, val) => {
@@ -309,21 +309,14 @@ export default function PaymentPage() {
                                     <span><i className="bi bi-tag" /> Subtotal</span>
                                     <span>{formatPrice(subtotal)}</span>
                                 </div>
-                                <div className="summary-calc-row">
-                                    <span><i className="bi bi-truck" /> Shipping</span>
-                                    <span className={shipping === 0 ? 'text-green' : ''}>{shipping === 0 ? 'FREE' : formatPrice(shipping)}</span>
-                                </div>
+
                             </div>
                             <hr className="divider" />
                             <div className="summary-total-row">
                                 <strong><i className="bi bi-receipt" /> Total</strong>
                                 <strong className="total-amount">{formatPrice(total)}</strong>
                             </div>
-                            {shipping === 0 && (
-                                <div className="free-shipping-badge">
-                                    <i className="bi bi-truck" /> You get FREE shipping!
-                                </div>
-                            )}
+
                         </div>
 
                         {/* Trust Badges */}
