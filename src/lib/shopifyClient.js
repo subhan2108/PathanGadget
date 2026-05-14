@@ -1,3 +1,4 @@
+// v2.1 - Fixed TypeError and improved GID handling
 export const SHOPIFY_DOMAIN = import.meta.env.VITE_SHOPIFY_DOMAIN || 'electrocart-13.myshopify.com';
 export const SHOPIFY_STOREFRONT_TOKEN = import.meta.env.VITE_SHOPIFY_STOREFRONT_TOKEN || '9a8853b62939d98eba2f1622d19e608f';
 
@@ -28,18 +29,39 @@ export async function shopifyFetch({ query, variables = {} }) {
     }
 }
 
-// Function to generate the secure Shopify Checkout URL based on current cart
 export async function createShopifyCheckout(cartItems) {
+    if (!cartItems || cartItems.length === 0) {
+        throw new Error('Cart is empty');
+    }
+
     const lines = cartItems.map(item => {
-        // If we don't have a specific Shopify Variant ID, we need to pass standard IDs. 
-        // In this implementation, the "item.id" must be the Variant GID or Product GID.
-        // For custom products, you typically need to fetch the variants first. 
-        // Assuming item.variants[0].id is passed as the real ID.
+        // Robust ID resolution
+        let variantId = item.variantId;
+        
+        // If no explicit variantId, check the main id (if it's a Shopify GID string)
+        if (!variantId && item.id && typeof item.id === 'string' && item.id.includes('ProductVariant')) {
+            variantId = item.id;
+        }
+
+        // Fallback to first variant if available
+        if (!variantId && item.variants && item.variants[0] && item.variants[0].id) {
+            variantId = item.variants[0].id;
+        }
+
+        if (!variantId) {
+            console.warn('Skipping item missing Shopify Variant ID:', item.name);
+            return null;
+        }
+
         return {
-            merchandiseId: item.variantId || item.id, // Must be a gid://shopify/ProductVariant/...
-            quantity: item.quantity
+            merchandiseId: variantId,
+            quantity: parseInt(item.quantity) || 1
         };
-    });
+    }).filter(line => line !== null);
+
+    if (lines.length === 0) {
+        throw new Error('No valid Shopify products found in cart. Please clear cart and try again.');
+    }
 
     const query = `
     mutation cartCreate($input: CartInput!) {
@@ -61,9 +83,15 @@ export async function createShopifyCheckout(cartItems) {
     };
 
     const data = await shopifyFetch({ query, variables });
+    
     if (data?.cartCreate?.userErrors?.length > 0) {
         throw new Error(data.cartCreate.userErrors[0].message);
     }
 
-    return data.cartCreate.cart.checkoutUrl;
+    const url = data?.cartCreate?.cart?.checkoutUrl;
+    if (!url) {
+        throw new Error('Shopify did not return a checkout URL');
+    }
+
+    return url;
 }

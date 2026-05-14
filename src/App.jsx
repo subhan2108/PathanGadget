@@ -5,7 +5,6 @@ import Footer from './components/Footer'
 import HomePage from './pages/HomePage'
 import OrderListingPage from './pages/OrderListingPage'
 import OrderDetailsPage from './pages/OrderDetailsPage'
-import PaymentPage from './pages/PaymentPage'
 import OrderTrackingPage from './pages/OrderTrackingPage'
 import ProductDetailPage from './pages/ProductDetailPage'
 import ProductsPage from './pages/ProductsPage'
@@ -39,7 +38,6 @@ export default function App() {
                             <Route path="/products/:id" element={<ProductDetailPage />} />
                             <Route path="/orders" element={<OrderListingPage />} />
                             <Route path="/orders/:id" element={<OrderDetailsPage />} />
-                            <Route path="/payment" element={<PaymentPage />} />
                             <Route path="/track/:id" element={<OrderTrackingPage />} />
                             <Route path="/admin" element={<AdminPage />} />
                             <Route path="/terms" element={<TermsPage />} />

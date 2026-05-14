@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import { useAuth } from './AuthContext'
 import { fetchCart, addToCartDB, updateCartQtyDB, removeFromCartDB, clearCartDB } from '../lib/cartService'
+import { createShopifyCheckout } from '../lib/shopifyClient'
 
 const CartContext = createContext()
 
@@ -109,6 +110,16 @@ export function CartProvider({ children }) {
     const cartCount = cartItems.reduce((sum, i) => sum + i.quantity, 0)
     const cartTotal = cartItems.reduce((sum, i) => Number(sum) + (Number(i.price) * i.quantity), 0)
 
+    const checkout = async () => {
+        try {
+            const checkoutUrl = await createShopifyCheckout(cartItems)
+            window.location.href = checkoutUrl
+        } catch (err) {
+            console.error('Checkout failed:', err)
+            alert('Failed to start checkout. Please try again.')
+        }
+    }
+
     return (
         <CartContext.Provider value={{
             cartItems,
@@ -116,6 +127,7 @@ export function CartProvider({ children }) {
             removeFromCart,
             updateQty,
             clearCart,
+            checkout,
             cartCount,
             cartTotal,
             loading

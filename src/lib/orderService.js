@@ -5,14 +5,15 @@ import sql from './db';
  */
 
 export async function fetchUserOrders(userId) {
+    console.log('Fetching orders for user:', userId);
     if (!userId) return [];
     try {
-        // Fetch orders and their items using a join or multiple queries
         const orders = await sql`
             SELECT * FROM orders 
             WHERE user_id = ${userId}
             ORDER BY created_at DESC
         `;
+        console.log('Orders found in DB for user:', orders.length);
         
         if (orders.length === 0) return [];
 
@@ -20,7 +21,7 @@ export async function fetchUserOrders(userId) {
         const orderIds = orders.map(o => o.id);
         const allItems = await sql`
             SELECT * FROM order_items 
-            WHERE order_id IN (${orderIds})
+            WHERE order_id = ANY(${orderIds})
         `;
 
         // Map items back to orders

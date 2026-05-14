@@ -13,7 +13,12 @@ export async function fetchCart(userId) {
             WHERE user_id = ${userId}
             ORDER BY created_at DESC
         `;
-        return rows.map(r => ({ ...r, image: r.image_url }));
+        return rows.map(r => ({ 
+            ...r, 
+            id: r.product_id, // Map product_id back to id for the frontend
+            variantId: r.variant_id, 
+            image: r.image_url 
+        }));
     } catch (err) {
         console.error('Error fetching cart:', err);
         return [];
@@ -23,21 +28,22 @@ export async function fetchCart(userId) {
 export async function addToCartDB(userId, item) {
     if (!userId) return false;
     try {
-        // We store the Shopify GID as product_id
         await sql`
-            INSERT INTO cart_items (user_id, product_id, quantity, color, name, price, image_url)
+            INSERT INTO cart_items (user_id, product_id, variant_id, name, price, image_url, quantity, color)
             VALUES (
                 ${userId}, 
                 ${item.id}, 
-                ${item.quantity || 1}, 
-                ${item.color || null},
+                ${item.variantId || null},
                 ${item.name},
                 ${item.price},
-                ${item.image_url || item.image}
+                ${item.image_url || item.image},
+                ${item.quantity || 1}, 
+                ${item.color || null}
             )
             ON CONFLICT (user_id, product_id) 
             DO UPDATE SET 
                 quantity = cart_items.quantity + EXCLUDED.quantity,
+                variant_id = EXCLUDED.variant_id,
                 color = EXCLUDED.color
         `;
         return true;

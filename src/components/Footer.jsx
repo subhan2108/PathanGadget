@@ -41,7 +41,6 @@ export default function Footer() {
                         <ul>
                             <li><Link to="/orders"><i className="bi bi-box-seam" /> My Orders</Link></li>
                             <li><Link to="/track/ORD-2024-002"><i className="bi bi-geo-alt" /> Track Order</Link></li>
-                            <li><Link to="/payment"><i className="bi bi-bag-check" /> Checkout</Link></li>
                             <li><Link to="/refund"><i className="bi bi-arrow-return-left" /> Returns & Refunds</Link></li>
                         </ul>
                     </div>

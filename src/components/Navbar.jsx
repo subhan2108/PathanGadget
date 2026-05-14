@@ -16,7 +16,7 @@ export default function Navbar() {
     const [menuOpen, setMenuOpen] = useState(false)
     const [cartOpen, setCartOpen] = useState(false)
 
-    const { cartItems, cartCount, cartTotal, removeFromCart, updateQty } = useCart()
+    const { cartItems, cartCount, cartTotal, removeFromCart, updateQty, checkout } = useCart()
     const { signOut } = useAuth()
     const location = useLocation()
 
@@ -105,9 +105,14 @@ export default function Navbar() {
                             </SignInButton>
                         </SignedOut>
 
-                        <Link to="/payment" id="nav-checkout" className="btn btn-primary navbar__cta">
+                        <button 
+                            id="nav-checkout" 
+                            className="btn btn-primary navbar__cta"
+                            onClick={() => checkout()}
+                            disabled={cartCount === 0}
+                        >
                             Buy Now <i className="bi bi-arrow-right" />
-                        </Link>
+                        </button>
 
                         <button
                             id="menu-toggle"
@@ -150,9 +155,15 @@ export default function Navbar() {
                         </SignInButton>
                     </SignedOut>
 
-                    <Link to="/payment" className="btn btn-primary btn-full mobile-menu__cta">
+                    <button 
+                        className="btn btn-primary btn-full mobile-menu__cta"
+                        onClick={() => {
+                            setMenuOpen(false);
+                            checkout();
+                        }}
+                    >
                         Buy Now <i className="bi bi-arrow-right" />
-                    </Link>
+                    </button>
                 </div>
             </header>
 
@@ -222,14 +233,16 @@ export default function Navbar() {
                                 </SignInButton> to save your cart & checkout
                             </p>
                         </SignedOut>
-                        <Link
-                            to="/payment"
+                        <button
                             className="btn btn-primary btn-lg btn-full"
-                            onClick={() => setCartOpen(false)}
+                            onClick={() => {
+                                setCartOpen(false);
+                                checkout();
+                            }}
                             id="proceed-checkout"
                         >
                             Proceed to Checkout <i className="bi bi-arrow-right" />
-                        </Link>
+                        </button>
                     </div>
                 )}
             </aside>

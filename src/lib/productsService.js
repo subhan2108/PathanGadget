@@ -40,6 +40,13 @@ export async function fetchProducts(filters = {}, sortBy = 'featured') {
                 }
               }
             }
+            variants(first: 1) {
+              edges {
+                node {
+                  id
+                }
+              }
+            }
             collections(first: 1) {
               edges {
                 node {
@@ -69,7 +76,7 @@ export async function fetchProducts(filters = {}, sortBy = 'featured') {
       price: parseFloat(p.priceRange?.minVariantPrice?.amount || '0'),
       image_url: flattenConnection(p.images)[0]?.url || 'https://via.placeholder.com/300',
       in_stock: p.availableForSale,
-      variantId: flattenConnection(p.variants)[0]?.id, // Ensure variant ID is captured for checkout
+      variantId: flattenConnection(p.variants)[0]?.id,
       rating: 5,
       review_count: 0
     }));
@@ -193,6 +200,7 @@ export async function fetchProductById(id) {
     in_stock: product.availableForSale,
     product_images: flattenConnection(product.images).map((img, i) => ({ id: i, image_url: img.url })),
     variants: flattenConnection(product.variants),
+    variantId: flattenConnection(product.variants)[0]?.id,
     rating: 5,
     review_count: 0,
     highlights: [],

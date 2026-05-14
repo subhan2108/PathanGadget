@@ -243,20 +243,24 @@ export default function AdminPage() {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {orders.map(o => (
-                                                <tr key={o.id}>
-                                                    <td><strong>{o.order_number}</strong></td>
-                                                    <td>{o.profiles?.full_name || 'Guest'}</td>
-                                                    <td>₹{o.total}</td>
-                                                    <td><span className={`badge badge-${o.status === 'delivered' ? 'success' : o.status === 'processing' ? 'warning' : o.status === 'shipped' ? 'info' : 'primary'}`}>{o.status}</span></td>
-                                                    <td>{new Date(o.created_at).toLocaleDateString()}</td>
-                                                    <td>
-                                                        <button className="btn btn-sm btn-primary" onClick={() => openOrderModal(o.id)}>
-                                                            <i className="bi bi-gear" /> Manage Order
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            ))}
+                                            {orders.map(o => {
+                                                const shipping = o.shipping_address || {};
+                                                const customerName = shipping.firstName ? `${shipping.firstName} ${shipping.lastName}` : 'Guest';
+                                                return (
+                                                    <tr key={o.id}>
+                                                        <td><strong>{o.order_number}</strong></td>
+                                                        <td>{customerName}</td>
+                                                        <td>₹{o.total}</td>
+                                                        <td><span className={`badge badge-${o.status === 'delivered' ? 'success' : o.status === 'processing' ? 'warning' : o.status === 'shipped' ? 'info' : 'primary'}`}>{o.status}</span></td>
+                                                        <td>{new Date(o.created_at).toLocaleDateString()}</td>
+                                                        <td>
+                                                            <button className="btn btn-sm btn-primary" onClick={() => openOrderModal(o.id)}>
+                                                                <i className="bi bi-gear" /> Manage Order
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
                                         </tbody>
                                     </table>
                                 </div>
@@ -366,7 +370,7 @@ export default function AdminPage() {
 
                                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 15 }}>
                                         <div>
-                                            <p style={{ margin: '0 0 5px 0' }}><strong>Customer:</strong> {selectedOrder.profiles?.full_name || 'Guest'} {selectedOrder.profiles?.phone ? `(${selectedOrder.profiles.phone})` : ''}</p>
+                                            <p style={{ margin: '0 0 5px 0' }}><strong>Customer:</strong> {selectedOrder.shipping_address?.firstName} {selectedOrder.shipping_address?.lastName} ({selectedOrder.shipping_address?.phone || 'No Phone'})</p>
                                             <p style={{ margin: '0 0 5px 0' }}><strong>Payment:</strong> {selectedOrder.payment_method?.toUpperCase()}
                                                 <span className={`badge badge-${selectedOrder.payment_status === 'paid' ? 'success' : 'warning'}`} style={{ marginLeft: 6 }}>
                                                     {selectedOrder.payment_status}

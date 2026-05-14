@@ -136,7 +136,7 @@ function ZoomImage({ src, alt }) {
 export default function ProductDetailPage() {
     const { id } = useParams()
     const navigate = useNavigate()
-    const { addToCart } = useCart()
+    const { addToCart, checkout } = useCart()
 
     // ── Live Data from Supabase ──
     const { product, loading: productLoading, error: productError, similarProducts } = useProductDetail(id)
@@ -211,7 +211,7 @@ export default function ProductDetailPage() {
             image: product.image_url ?? product.image,
             originalPrice: originalPrice
         }, qty)
-        navigate('/payment')
+        checkout()
     }
 
     return (
