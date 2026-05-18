@@ -68,7 +68,7 @@ function SimilarProductCard({ product }) {
 
     return (
         <div className="similar-card" id={`similar-${product.id}`}>
-            <div className="similar-card__img-wrap" onClick={() => navigate(`/products/${product.handle || product.id}`)}>
+            <div className="similar-card__img-wrap" onClick={() => navigate(`/products/${product.id}`)}>
                 <img src={product.image_url ?? product.image} alt={product.name} loading="lazy" />
                 {product.badge && <span className="similar-card__badge">{product.badge}</span>}
                 {discount > 0 && <span className="similar-card__discount">-{discount}%</span>}
