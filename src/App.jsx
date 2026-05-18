@@ -9,6 +9,7 @@ import OrderTrackingPage from './pages/OrderTrackingPage'
 import ProductDetailPage from './pages/ProductDetailPage'
 import ProductsPage from './pages/ProductsPage'
 import AdminPage from './pages/AdminPage'
+import PaymentPage from './pages/PaymentPage'
 import { CartProvider } from './context/CartContext'
 import { AuthProvider } from './context/AuthContext'
 import TermsPage from './pages/TermsPage'
@@ -40,6 +41,7 @@ export default function App() {
                             <Route path="/orders/:id" element={<OrderDetailsPage />} />
                             <Route path="/track/:id" element={<OrderTrackingPage />} />
                             <Route path="/admin" element={<AdminPage />} />
+                            <Route path="/payment" element={<PaymentPage />} />
                             <Route path="/terms" element={<TermsPage />} />
                             <Route path="/privacy" element={<PrivacyPage />} />
                             <Route path="/shipping" element={<ShippingPage />} />
