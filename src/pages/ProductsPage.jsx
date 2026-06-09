@@ -149,14 +149,14 @@ function ProductCard({ product: raw }) {
                                 : <><i className="bi bi-cart-plus" /> Add to Cart</>
                         }
                     </button>
-                    <button
+                    {/* <button
                         id={`plp-view-${product.id}`}
                         className="btn btn-outline plp-view-btn"
                         onClick={() => navigate(`/products/${product.id}`)}
                         title="View Details"
                     >
                         <i className="bi bi-eye" />
-                    </button>
+                    </button> */}
                 </div>
             </div>
         </article>
