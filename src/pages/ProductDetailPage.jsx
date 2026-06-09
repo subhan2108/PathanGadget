@@ -1,161 +1,72 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
-import { useProductDetail, useReviews } from '../hooks/useProducts'
+import { useProductDetail, useReviews, useAllProducts } from '../hooks/useProducts'
 import { formatPrice, submitReview } from '../lib/productsService'
 import { useCart } from '../context/CartContext'
 import { useAuth } from '../context/AuthContext'
 import './ProductDetailPage.css'
 
-/* ─── Star Row Component ─────────────────────────── */
-function Stars({ rating, size = '0.875rem' }) {
-    const r = rating || 0
-    return (
-        <span className="stars-row" style={{ fontSize: size }}>
-            {[1, 2, 3, 4, 5].map(i => (
-                <i key={i} className={`bi ${i <= Math.floor(r) ? 'bi-star-fill' : i - r < 1 ? 'bi-star-half' : 'bi-star'}`} />
-            ))}
-        </span>
-    )
-}
-
-/* ─── Rating Breakdown Bar ───────────────────────── */
-function RatingBar({ label, pct }) {
-    return (
-        <div className="rating-bar-row">
-            <span className="rb-label">{label} <i className="bi bi-star-fill" /></span>
-            <div className="rb-track"><div className="rb-fill" style={{ width: `${pct}%` }} /></div>
-            <span className="rb-pct">{pct}%</span>
-        </div>
-    )
-}
-
-/* ─── Review Card ────────────────────────────────── */
-function ReviewCard({ review }) {
-    // review.profiles is joined from Supabase; fallback for mock data
-    const user = review.profiles?.full_name || review.user || 'Anonymous'
-    const avatar = review.avatar || (user).charAt(0)
-
-    return (
-        <div className="review-card" id={`review-${review.id}`}>
-            <div className="review-header">
-                <div className="review-avatar">{avatar}</div>
-                <div className="review-meta">
-                    <span className="review-user">{user}</span>
-                    {review.verified && (
-                        <span className="review-verified"><i className="bi bi-patch-check-fill" /> Verified Purchase</span>
-                    )}
-                </div>
-                <span className="review-date">
-                    <i className="bi bi-calendar3" /> {review.created_at ? new Date(review.created_at).toLocaleDateString() : (review.date || 'Recent')}
-                </span>
-            </div>
-            <div className="review-rating">
-                <Stars rating={review.rating} />
-                <strong className="review-title">{review.title}</strong>
-            </div>
-            <p className="review-body">{review.body}</p>
-        </div>
-    )
-}
-
-/* ─── Similar Product Card ───────────────────────── */
-function SimilarProductCard({ product }) {
-    const { addToCart } = useCart()
-    const navigate = useNavigate()
-    const originalPrice = Number(product.original_price || product.price)
-    const price = Number(product.price)
-    const discount = Math.round(((originalPrice - price) / originalPrice) * 100)
-
-    return (
-        <div className="similar-card" id={`similar-${product.id}`}>
-            <div className="similar-card__img-wrap" onClick={() => navigate(`/products/${product.id}`)}>
-                <img src={product.image_url ?? product.image} alt={product.name} loading="lazy" />
-                {product.badge && <span className="similar-card__badge">{product.badge}</span>}
-                {discount > 0 && <span className="similar-card__discount">-{discount}%</span>}
-            </div>
-            <div className="similar-card__body">
-                <p className="similar-card__name">{product.name}</p>
-                <div className="similar-card__rating">
-                    <Stars rating={product.rating} size="0.75rem" />
-                    <span className="similar-rating-count">({product.review_count ?? (Array.isArray(product.reviews) ? product.reviews.length : product.reviews) ?? 0})</span>
-                </div>
-                <div className="similar-card__pricing">
-                    <span className="similar-price">{formatPrice(price)}</span>
-                    <span className="similar-orig">{formatPrice(originalPrice)}</span>
-                </div>
-                <button className="btn btn-primary btn-sm btn-full" onClick={() => addToCart({
-                    ...product,
-                    image: product.image_url ?? product.image,
-                    originalPrice: product.original_price ?? product.originalPrice
-                })}>
-                    <i className="bi bi-cart-plus" /> Add to Cart
-                </button>
-            </div>
-        </div>
-    )
-}
-
-/* ─── Image Zoom Component ───────────────────────── */
-function ZoomImage({ src, alt }) {
-    const [style, setStyle] = useState({ transformOrigin: 'center center', transform: 'scale(1)' })
-    const [zoomed, setZoomed] = useState(false)
-
-    const handleMouseMove = (e) => {
-        const { left, top, width, height } = e.currentTarget.getBoundingClientRect()
-        // Default to center if dimensions somehow fail
-        if (!width || !height) return;
-        const x = ((e.clientX - left) / width) * 100
-        const y = ((e.clientY - top) / height) * 100
-        setStyle({ transformOrigin: `${x}% ${y}%`, transform: 'scale(2.2)' }) // Zoom strength 2.2x
-    }
-
-    const handleMouseLeave = () => {
-        setZoomed(false)
-        setStyle({ transformOrigin: 'center center', transform: 'scale(1)' })
-    }
-
-    return (
-        <div
-            className="zoom-container"
-            onMouseEnter={() => setZoomed(true)}
-            onMouseLeave={handleMouseLeave}
-            onMouseMove={handleMouseMove}
-        >
-            <img
-                src={src}
-                alt={alt}
-                className={`main-product-img ${zoomed ? 'is-zoomed' : ''}`}
-                style={style}
-            />
-        </div>
-    )
-}
-
-
-/* ─── Main Page ──────────────────────────────────── */
 export default function ProductDetailPage() {
     const { id } = useParams()
     const navigate = useNavigate()
     const { addToCart, checkout } = useCart()
 
-    // ── Live Data from Supabase ──
     const { product, loading: productLoading, error: productError, similarProducts } = useProductDetail(id)
     const { reviews, loading: reviewsLoading, refresh: refreshReviews } = useReviews(id)
     const { user } = useAuth()
+    const { products: allProducts } = useAllProducts()
 
     const [activeImg, setActiveImg] = useState(0)
-    const [activeColor, setActiveColor] = useState(0)
-    const [qty, setQty] = useState(1)
-    const [added, setAdded] = useState(false)
-    const [activeTab, setActiveTab] = useState('overview')
+    const [selectedVariant, setSelectedVariant] = useState('buy1')
+    const [timeLeft, setTimeLeft] = useState({ hours: 1, minutes: 8, seconds: 30 })
+    const [activeTab, setActiveTab] = useState('reviews')
 
-    // Reset state on ID change
+    const [reviewRating, setReviewRating] = useState(5)
+    const [reviewTitle, setReviewTitle] = useState('')
+    const [reviewComment, setReviewComment] = useState('')
+    const [submittingReview, setSubmittingReview] = useState(false)
+
+    const handleReviewSubmit = async (e) => {
+        e.preventDefault()
+        if (!user) return
+        setSubmittingReview(true)
+        try {
+            await submitReview({
+                product_id: id,
+                user_id: user.id,
+                user_name: user.name || user.email?.split('@')[0] || 'User',
+                rating: reviewRating,
+                title: reviewTitle,
+                comment: reviewComment,
+            })
+            setReviewTitle('')
+            setReviewComment('')
+            setReviewRating(5)
+            if (refreshReviews) refreshReviews()
+        } catch (err) {
+            console.error('Failed to submit review:', err)
+        } finally {
+            setSubmittingReview(false)
+        }
+    }
+
     useEffect(() => {
         window.scrollTo(0, 0)
         setActiveImg(0)
-        setActiveColor(0)
-        setQty(1)
+        setSelectedVariant('buy1')
     }, [id])
+
+    useEffect(() => {
+        const timer = setInterval(() => {
+            setTimeLeft(prev => {
+                if (prev.seconds > 0) return { ...prev, seconds: prev.seconds - 1 }
+                if (prev.minutes > 0) return { ...prev, minutes: prev.minutes - 1, seconds: 59 }
+                if (prev.hours > 0) return { hours: prev.hours - 1, minutes: 59, seconds: 59 }
+                return prev
+            })
+        }, 1000)
+        return () => clearInterval(timer)
+    }, [])
 
     if (productLoading) return (
         <div className="container" style={{ padding: '100px 0', textAlign: 'center' }}>
@@ -172,422 +83,488 @@ export default function ProductDetailPage() {
         </div>
     )
 
-    // Normalize fields (Handle both Supabase snake_case and MockData camelCase)
-    const price = Number(product.price)
-    const originalPrice = Number(product.original_price ?? product.originalPrice ?? product.price)
-    const discount = Math.round(((originalPrice - price) / originalPrice) * 100)
+    // --- Backend Data Mapping ---
+    const basePrice = Number(product.price)
+    const baseOriginalPrice = Number(product.original_price ?? product.originalPrice ?? product.price)
 
-    const inStock = product.in_stock ?? product.inStock ?? true
-    const reviewCount = product.review_count ?? (Array.isArray(product.reviews) ? product.reviews.length : product.reviews) ?? 0
+    const reviewCount = product.review_count ?? (Array.isArray(product.reviews) ? product.reviews.length : product.reviews) ?? reviews.length ?? 0
+    const rating = product.rating || 4.8
 
-    const colors = product.colors || []
-
-    // Gallery: primary image first, then extra product_images if they exist
+    // Build Gallery from DB
     const mainImg = product.image_url ?? product.image;
-    const gallery = mainImg ? [mainImg] : [];
+    const gallery = mainImg ? [mainImg] : ["/pro1.jpg"];
     if (product.product_images && product.product_images.length > 0) {
         gallery.push(...[...product.product_images].sort((a, b) => a.sort_order - b.sort_order).map(img => img.image_url));
     }
 
-    // Specs/Description from 'details' (Supabase) or 'specs' (MockData)
+    // Features & Specs
     const details = product.details || {}
-    const highlights = Array.isArray(details.highlights) ? details.highlights : (product.highlights || [])
-    const specs = details.specifications || product.specs || {}
-    const longDescription = details.long_description || product.description || 'No detailed description available.'
+    let highlights = Array.isArray(details.highlights) && details.highlights.length > 0 ? details.highlights : (product.highlights || [])
+    let specsObj = details.specifications || product.specs || {}
+    let mappedSpecs = Object.keys(specsObj).length > 0
+        ? Object.entries(specsObj).map(([k, v]) => `${k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}: ${v}`)
+        : []
 
-    const handleAddToCart = () => {
-        addToCart({
-            ...product,
-            image: product.image_url ?? product.image,
-            originalPrice: originalPrice
-        }, qty)
-        setAdded(true)
-        setTimeout(() => setAdded(false), 2000)
+    // Dynamic Tags
+    const productTags = product.badge ? [product.badge] : []
+
+    // Fallbacks if DB has empty fields
+    const staticData = {
+        features: [
+            "Personalized Comfort: Adjustable 3-speed settings (Low/Medium/High)",
+            "Multi-Functional: Cools, humidifies, and purifies the air",
+            "7-Color LED Light: Built-in soft LED light with 7 colors",
+            "Eco-friendly & Energy Efficient: Low energy consumption",
+            "Portable & Lightweight: Compact design, easy to carry"
+        ],
+        details: [
+            "Water Tank Capacity: 1000ml",
+            "Cooling Power: 10W",
+            "Material: High-quality ABS+PC",
+            "Dimensions: 15 x 15 x 18 cm",
+            "Weight: 800g",
+            "Power Supply: USB plug-in"
+        ],
+        whyChooseUs: [
+            "100% Satisfaction Guarantee: We prioritize your satisfaction.",
+            "Premium Quality: Top-tier materials and build.",
+            "Fast & Free Shipping: Delivery directly to your door.",
+            "24/7 Customer Support: We're here to help anytime."
+        ]
     }
+
+    if (highlights.length === 0) highlights = staticData.features
+    if (mappedSpecs.length === 0) mappedSpecs = staticData.details
+
+    // Dynamic Variants based on DB Price
+    const dynamicVariants = [
+        { id: 'buy1', label: 'Buy 1', price: basePrice, originalPrice: baseOriginalPrice, tag: null },
+        { id: 'buy2', label: 'Buy 2', price: Math.round(basePrice * 2 * 0.9), originalPrice: baseOriginalPrice * 2, tag: 'Extra 10% Off' },
+        { id: 'buy3', label: 'Buy 3', price: Math.round(basePrice * 3 * 0.85), originalPrice: baseOriginalPrice * 3, tag: 'Best Value' }
+    ]
+
+    const currentVariant = dynamicVariants.find(v => v.id === selectedVariant) || dynamicVariants[0]
+    const selectedQty = parseInt(selectedVariant.replace('buy', '')) || 1
+
+    const discountPercentage = Math.round(((currentVariant.originalPrice - currentVariant.price) / currentVariant.originalPrice) * 100)
 
     const handleBuyNow = async () => {
         await addToCart({
             ...product,
-            image: product.image_url ?? product.image,
-            originalPrice: originalPrice
-        }, qty)
+            name: product.name,
+            price: currentVariant.price / selectedQty, // Store unit price for accurate cart math
+            image: gallery[0],
+            originalPrice: currentVariant.originalPrice / selectedQty
+        }, selectedQty)
         checkout()
     }
 
+    const handleAddToCart = async () => {
+        await addToCart({
+            ...product,
+            name: product.name,
+            price: currentVariant.price / selectedQty,
+            image: gallery[0],
+            originalPrice: currentVariant.originalPrice / selectedQty
+        }, selectedQty)
+    }
+
     return (
-        <div className="product-detail-page page-enter" id="product-detail-page">
+        <div style={{ backgroundColor: 'white', minHeight: '100vh' }}>
+            <div className="container" style={{ maxWidth: '1200px', margin: '0 auto', padding: '40px 20px' }}>
 
-            {/* ── Breadcrumb ── */}
-            <div className="pdp-breadcrumb-bar">
-                <div className="container">
-                    <nav className="breadcrumb">
-                        <Link to="/"><i className="bi bi-house" /> Home</Link><span>›</span>
-                        <Link to="/products">
-                            <i className="bi bi-grid" /> {product.category?.charAt(0).toUpperCase() + product.category?.slice(1)}
-                        </Link><span>›</span>
-                        <span>{product.name}</span>
-                    </nav>
-                </div>
-            </div>
+                {/* Two Column Layout */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '40px', alignItems: 'flex-start' }}>
 
-            {/* ── Main Product Section ── */}
-            <section className="pdp-main" id="pdp-main">
-                <div className="container pdp-main__inner">
-
-                    {/* Left: Image Gallery */}
-                    <div className="pdp-gallery" id="pdp-gallery">
-                        {/* Thumbnails */}
-                        <div className="pdp-thumbnails" id="pdp-thumbnails">
-                            {gallery.map((img, i) => (
-                                <button
-                                    key={i}
-                                    id={`thumb-${i}`}
-                                    className={`pdp-thumb ${activeImg === i ? 'active' : ''}`}
-                                    onClick={() => setActiveImg(i)}
-                                >
-                                    <img src={img} alt={`${product.name} view ${i + 1}`} />
-                                </button>
-                            ))}
-                        </div>
-
-                        {/* Main Image with Zoom */}
-                        <div className="pdp-main-image-wrap">
-                            <ZoomImage src={gallery[activeImg]} alt={product.name} />
-                            <div className="zoom-hint">
-                                <i className="bi bi-zoom-in" /> Hover to zoom
-                            </div>
-                            {gallery.length > 1 && (
-                                <>
-                                    <button className="img-nav img-nav--prev" id="img-prev" onClick={() => setActiveImg(i => (i - 1 + gallery.length) % gallery.length)}>
-                                        <i className="bi bi-chevron-left" />
-                                    </button>
-                                    <button className="img-nav img-nav--next" id="img-next" onClick={() => setActiveImg(i => (i + 1) % gallery.length)}>
-                                        <i className="bi bi-chevron-right" />
-                                    </button>
-                                </>
+                    {/* Left Column: Images (Sticky) */}
+                    <div style={{ flex: '1 1 400px', display: 'flex', flexDirection: 'column', gap: '16px', position: 'sticky', top: '100px' }}>
+                        <div style={{ backgroundColor: '#E5E7EB', borderRadius: '16px', aspectRatio: '1', overflow: 'hidden', position: 'relative' }}>
+                            {productTags.length > 0 && (
+                                <div style={{ position: 'absolute', top: '16px', left: '16px', display: 'flex', gap: '8px', flexWrap: 'wrap', zIndex: 10 }}>
+                                    {productTags.map((tag, idx) => (
+                                        <span key={idx} style={{ backgroundColor: '#007BFF', color: 'white', padding: '6px 16px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: '800' }}>
+                                            {tag}
+                                        </span>
+                                    ))}
+                                </div>
                             )}
-                            <div className="img-counter">{activeImg + 1} / {gallery.length}</div>
-                            {product.badge && <span className="pdp-badge">{product.badge}</span>}
+                            <img src={gallery[activeImg]} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         </div>
+                        {gallery.length > 1 && (
+                            <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '8px' }}>
+                                {gallery.map((img, idx) => (
+                                    <div
+                                        key={idx}
+                                        onClick={() => setActiveImg(idx)}
+                                        style={{
+                                            width: '80px', height: '80px', flexShrink: 0,
+                                            backgroundColor: '#E5E7EB', borderRadius: '8px', cursor: 'pointer',
+                                            border: `2px solid ${activeImg === idx ? 'var(--cta)' : 'transparent'}`,
+                                            overflow: 'hidden'
+                                        }}
+                                    >
+                                        <img src={img} alt={`Thumb ${idx}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
 
-                    {/* Right: Product Info */}
-                    <div className="pdp-info" id="pdp-info">
-                        <div className="pdp-brand">
-                            <span className="brand-name"><i className="bi bi-building" /> {product.brand}</span>
-                            <span className="pdp-sku"><i className="bi bi-upc" /> SKU: {details.sku || `PC-${product.id}`}</span>
-                        </div>
+                    {/* Right Column: Product Info & Extra Content (Scrollable) */}
+                    <div style={{ flex: '1 1 400px', display: 'flex', flexDirection: 'column', gap: '48px' }}>
 
-                        <h1 className="pdp-title">{product.name}</h1>
+                        {/* Section 1: Product Purchasing Info */}
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
 
-                        <div className="pdp-rating-row">
-                            <Stars rating={product.rating} size="1rem" />
-                            <span className="pdp-rating-val">{product.rating}</span>
-                            <span className="pdp-rating-count">({reviewCount} reviews)</span>
-                            <span className="pdp-rating-divider">·</span>
-                            <span className={`pdp-stock-badge ${inStock ? 'in-stock' : 'out-stock'}`}>
-                                <i className={`bi ${inStock ? 'bi-check-circle-fill' : 'bi-x-circle-fill'}`} />
-                                {inStock ? 'In Stock' : 'Out of Stock'}
-                            </span>
-                        </div>
+                            {/* Category Badge */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#007BFF', fontSize: '0.85rem', fontWeight: '800', textTransform: 'uppercase', marginBottom: '12px', letterSpacing: '0.5px' }}>
+                                <i className="bi bi-buildings"></i>
+                                <span>{product.category || 'Category'}</span>
+                            </div>
 
-                        <div className="pdp-price-block">
-                            <span className="pdp-price">{formatPrice(price)}</span>
-                            {discount > 0 && <span className="pdp-orig-price">{formatPrice(originalPrice)}</span>}
-                            {discount > 0 && (
-                                <span className="pdp-discount-pill">
-                                    <i className="bi bi-tag-fill" /> {discount}% OFF
-                                </span>
+                            <h1 style={{ fontSize: '2.5rem', fontWeight: '900', color: '#021422', margin: '0 0 16px 0', lineHeight: '1.2', letterSpacing: '-0.5px' }}>{product.name}</h1>
+
+                            {/* Reviews and In Stock */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '32px' }}>
+                                <div style={{ color: '#FBBF24', fontSize: '1.2rem', display: 'flex', gap: '2px' }}>
+                                    {[1, 2, 3, 4, 5].map(i => (
+                                        <i key={i} className={`bi ${i <= Math.floor(rating) ? 'bi-star-fill' : i - rating < 1 ? 'bi-star-half' : 'bi-star'}`}></i>
+                                    ))}
+                                </div>
+                                <div style={{ fontSize: '1.1rem', color: '#111827', fontWeight: '800' }}>
+                                    {rating} <span style={{ color: '#9CA3AF', fontWeight: '500', textDecoration: 'underline', textDecorationStyle: 'dotted', marginLeft: '4px' }}>({reviewCount} reviews)</span>
+                                </div>
+                                <div style={{ marginLeft: '12px', backgroundColor: '#D1FAE5', color: '#065F46', padding: '4px 12px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <i className="bi bi-check-circle-fill"></i> In Stock
+                                </div>
+                            </div>
+
+                            {/* Price */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '12px', flexWrap: 'wrap' }}>
+                                <span style={{ fontSize: '3rem', fontWeight: '900', color: '#007BFF', lineHeight: '1', letterSpacing: '-1px' }}>₹{currentVariant.price.toLocaleString()}</span>
+                                {currentVariant.originalPrice > currentVariant.price && (
+                                    <span style={{ fontSize: '1.5rem', color: '#9CA3AF', textDecoration: 'line-through', fontWeight: '600' }}>₹{currentVariant.originalPrice.toLocaleString()}</span>
+                                )}
+                                {discountPercentage > 0 && (
+                                    <span style={{ backgroundColor: '#FEF3C7', color: '#92400E', padding: '6px 12px', borderRadius: '20px', fontSize: '0.9rem', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <i className="bi bi-tag-fill"></i> {discountPercentage}% OFF
+                                    </span>
+                                )}
+                            </div>
+
+                            {/* You Save */}
+                            {currentVariant.originalPrice > currentVariant.price && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#059669', fontSize: '1rem', fontWeight: '600', marginBottom: '32px' }}>
+                                    <i className="bi bi-piggy-bank" style={{ fontSize: '1.2rem' }}></i>
+                                    <span>You save <span style={{ fontWeight: '800' }}>₹{(currentVariant.originalPrice - currentVariant.price).toLocaleString()}</span> on this purchase</span>
+                                </div>
                             )}
-                        </div>
-                        {discount > 0 && (
-                            <p className="pdp-savings">
-                                <i className="bi bi-piggy-bank" /> You save <strong>{formatPrice(originalPrice - price)}</strong> on this purchase
-                            </p>
-                        )}
 
-                        <hr className="pdp-divider" />
-
-                        {/* Colors */}
-                        {colors.length > 0 && (
-                            <div className="pdp-color-section" id="pdp-colors">
-                                <p className="pdp-option-label">
-                                    <i className="bi bi-palette" /> Color: <strong>{colors[activeColor]}</strong>
-                                </p>
-                                <div className="color-name-tags">
-                                    {colors.map((c, i) => (
-                                        <button
-                                            key={i}
-                                            className={`color-tag ${activeColor === i ? 'active' : ''}`}
-                                            onClick={() => setActiveColor(i)}
-                                        >
-                                            {c}
-                                        </button>
+                            {/* Timer */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '32px' }}>
+                                <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#374151' }}>HURRY! SALE ENDS IN:</span>
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                    {Object.entries(timeLeft).map(([unit, val]) => (
+                                        <div key={unit} style={{ backgroundColor: 'var(--cta)', color: 'white', padding: '6px 12px', borderRadius: '6px', textAlign: 'center', minWidth: '46px' }}>
+                                            <div style={{ fontSize: '1.1rem', fontWeight: '700', lineHeight: '1' }}>{String(val).padStart(2, '0')}</div>
+                                            <div style={{ fontSize: '0.6rem', textTransform: 'uppercase', marginTop: '2px' }}>{unit}</div>
+                                        </div>
                                     ))}
                                 </div>
                             </div>
-                        )}
 
-                        {/* Quantity */}
-                        <div className="pdp-qty-section">
-                            <p className="pdp-option-label"><i className="bi bi-layers" /> Quantity</p>
-                            <div className="qty-stepper">
-                                <button className="qty-btn" onClick={() => setQty(q => Math.max(1, q - 1))} disabled={qty <= 1}>
-                                    <i className="bi bi-dash" />
-                                </button>
-                                <span className="qty-val">{qty}</span>
-                                <button className="qty-btn" onClick={() => setQty(q => Math.min(10, q + 1))} disabled={qty >= 10}>
-                                    <i className="bi bi-plus" />
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* CTA Buttons */}
-                        <div className="pdp-cta-group">
-                            <button
-                                className={`btn btn-secondary btn-lg pdp-cart-btn ${added ? 'added' : ''}`}
-                                onClick={handleAddToCart}
-                                disabled={!inStock}
-                            >
-                                {added
-                                    ? <><i className="bi bi-check-circle-fill" /> Added to Cart!</>
-                                    : <><i className="bi bi-cart-plus" /> Add to Cart</>
-                                }
-                            </button>
-                            <button
-                                className="btn btn-primary btn-lg pdp-buy-btn"
-                                onClick={handleBuyNow}
-                                disabled={!inStock}
-                            >
-                                <i className="bi bi-lightning-charge-fill" /> Buy Now
-                            </button>
-                        </div>
-
-                        {/* Highlights */}
-                        <div className="pdp-highlights">
-                            {highlights.map((h, i) => (
-                                <div key={i} className="pdp-highlight-item">
-                                    <i className="bi bi-check-circle-fill" />
-                                    <span>{h}</span>
-                                </div>
-                            ))}
-                        </div>
-
-                        <div className="pdp-actions-row">
-                            <button className="text-action-btn"><i className="bi bi-heart" /> Wishlist</button>
-                            <button className="text-action-btn"><i className="bi bi-share" /> Share</button>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            {/* Delivery Banner */}
-            <div className="pdp-delivery-banner">
-                <div className="container pdp-delivery-inner">
-                    <div><i className="bi bi-truck" /><span>Free delivery in <strong>2 days</strong></span></div>
-                    <div><i className="bi bi-arrow-return-left" /><span><strong>7-day</strong> returns</span></div>
-                    <div><i className="bi bi-shield-check" /><span><strong>1-year</strong> warranty</span></div>
-                    <div><i className="bi bi-lock-fill" /><span><strong>Secure</strong> payment</span></div>
-                </div>
-            </div>
-
-            {/* Tabs */}
-            <div className="pdp-tabs-section">
-                <div className="container">
-                    <div className="pdp-tabs" role="tablist">
-                        {[
-                            { id: 'overview', label: 'Overview', icon: 'bi-info-circle' },
-                            { id: 'specs', label: 'Specifications', icon: 'bi-list-columns' },
-                            { id: 'reviews', label: `Reviews (${reviews.length})`, icon: 'bi-chat-quote' },
-                        ].map(tab => (
-                            <button
-                                key={tab.id}
-                                className={`pdp-tab ${activeTab === tab.id ? 'active' : ''}`}
-                                onClick={() => setActiveTab(tab.id)}
-                            >
-                                <i className={`bi ${tab.icon}`} /> {tab.label}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            </div>
-
-            {/* Tab Content */}
-            <div className="pdp-tab-content">
-                <div className="container">
-                    {activeTab === 'overview' && (
-                        <div className="tab-panel">
-                            <h2><i className="bi bi-info-circle" /> About this Product</h2>
-                            <p className="overview-long-desc">{longDescription}</p>
-                            <div className="overview-highlights-box">
-                                <h3><i className="bi bi-stars" /> Key Features</h3>
-                                <div className="features-grid-pdp">
-                                    {highlights.length > 0 ? highlights.map((h, i) => (
-                                        <div key={i} className="feature-tile">
-                                            <div className="feature-tile__icon"><i className="bi bi-check2-circle" /></div>
-                                            <p>{h}</p>
-                                        </div>
-                                    )) : (
-                                        <div className="feature-tile">
-                                            <div className="feature-tile__icon"><i className="bi bi-check2-circle" /></div>
-                                            <p>Premium quality guaranteed</p>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {activeTab === 'specs' && (
-                        <div className="tab-panel">
-                            <h2><i className="bi bi-list-columns" /> Technical Specifications</h2>
-                            <div className="specs-table-wrap">
-                                <table className="specs-table">
-                                    <tbody>
-                                        <tr className="spec-section-row"><td colSpan={2}>General</td></tr>
-                                        <tr><td>Brand</td><td>{product.brand}</td></tr>
-                                        <tr><td>Category</td><td>{product.category}</td></tr>
-                                        <tr><td>Model</td><td>{product.name}</td></tr>
-                                        {Object.keys(specs).length > 0 && (
-                                            <>
-                                                <tr className="spec-section-row"><td colSpan={2}>Details</td></tr>
-                                                {Object.entries(specs).map(([k, v]) => (
-                                                    <tr key={k}>
-                                                        <td>{k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</td>
-                                                        <td>{String(v)}</td>
-                                                    </tr>
-                                                ))}
-                                            </>
+                            {/* Variants */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '32px' }}>
+                                {dynamicVariants.map((v) => (
+                                    <div
+                                        key={v.id}
+                                        onClick={() => setSelectedVariant(v.id)}
+                                        style={{
+                                            position: 'relative', padding: '16px', borderRadius: '12px', cursor: 'pointer',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                            border: `2px solid ${selectedVariant === v.id ? 'var(--cta)' : '#E5E7EB'}`,
+                                            backgroundColor: selectedVariant === v.id ? 'rgba(0, 119, 255, 0.04)' : 'white'
+                                        }}
+                                    >
+                                        {v.tag && (
+                                            <div style={{ position: 'absolute', top: '-10px', right: '16px', backgroundColor: 'var(--cta)', color: 'white', fontSize: '0.6rem', fontWeight: '800', padding: '2px 8px', borderRadius: '10px', textTransform: 'uppercase' }}>
+                                                {v.tag}
+                                            </div>
                                         )}
-                                    </tbody>
-                                </table>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                            <div style={{ width: '20px', height: '20px', borderRadius: '50%', border: `2px solid ${selectedVariant === v.id ? 'var(--cta)' : '#D1D5DB'}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                {selectedVariant === v.id && <div style={{ width: '10px', height: '10px', backgroundColor: 'var(--cta)', borderRadius: '50%' }} />}
+                                            </div>
+                                            <span style={{ fontWeight: '700', color: '#111827' }}>{v.label}</span>
+                                        </div>
+                                        <div style={{ textAlign: 'right' }}>
+                                            <div style={{ fontWeight: '800', color: 'var(--cta)' }}>Rs. {v.price.toLocaleString()}</div>
+                                            <div style={{ fontSize: '0.75rem', color: '#9CA3AF', textDecoration: 'line-through' }}>Rs. {v.originalPrice.toLocaleString()}</div>
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
+
+                            {/* Buttons */}
+                            <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
+                                <button
+                                    onClick={handleAddToCart}
+                                    style={{
+                                        flex: '1', backgroundColor: 'white', color: 'var(--cta)', border: '2px solid var(--cta)', padding: '16px', borderRadius: '12px',
+                                        fontSize: '1.2rem', fontWeight: '800', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px',
+                                        transition: 'transform 0.2s'
+                                    }}
+                                    onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#F0F7FF'; e.currentTarget.style.transform = 'translateY(-2px)' }}
+                                    onMouseOut={(e) => { e.currentTarget.style.backgroundColor = 'white'; e.currentTarget.style.transform = 'translateY(0)' }}
+                                >
+                                    <i className="bi bi-cart-plus"></i> Add to Cart
+                                </button>
+                                <button
+                                    onClick={handleBuyNow}
+                                    style={{
+                                        flex: '1', backgroundColor: 'var(--cta)', color: 'white', border: 'none', padding: '16px', borderRadius: '12px',
+                                        fontSize: '1.2rem', fontWeight: '800', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px',
+                                        boxShadow: '0 4px 14px rgba(0, 119, 255, 0.3)', transition: 'transform 0.2s'
+                                    }}
+                                    onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+                                    onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+                                >
+                                    <i className="bi bi-lightning-fill"></i> Buy Now
+                                </button>
+                            </div>
+
+                            {/* Trust Badges */}
+                            <div style={{ display: 'flex', justifyContent: 'center', gap: '32px', padding: '20px 0', borderTop: '1px solid #E5E7EB', borderBottom: '1px solid #E5E7EB' }}>
+                                {[
+                                    { icon: 'bi-truck', label: 'Free\nShipping' },
+                                    { icon: 'bi-shield-check', label: '1 Year\nWarranty' },
+                                    { icon: 'bi-arrow-return-left', label: '7 Days\nReturn' }
+                                ].map((badge, i) => (
+                                    <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', color: '#4B5563' }}>
+                                        <i className={`bi ${badge.icon}`} style={{ fontSize: '1.5rem', color: 'var(--cta)' }} />
+                                        <span style={{ fontSize: '0.65rem', fontWeight: '800', textTransform: 'uppercase', textAlign: 'center', whiteSpace: 'pre-line' }}>{badge.label}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Section 2: Extended Content */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '48px', paddingBottom: '60px' }}>
+
+                            <div style={{ textAlign: 'center' }}>
+                                <h2 style={{ fontSize: '1.8rem', fontWeight: '800', color: '#111827', margin: '0 0 24px 0', lineHeight: '1.3' }}>
+                                    Stay Cool & Say Goodbye<br />TO HEAT THIS SUMMER!
+                                </h2>
+                                <div style={{ backgroundColor: '#E5E7EB', aspectRatio: '4/3', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9CA3AF', marginBottom: '24px', overflow: 'hidden' }}>
+                                    <img src={gallery[0]} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                </div>
+                            </div>
+
+                            {/* Features block */}
+                            <div style={{ backgroundColor: 'white', padding: '32px', borderRadius: '24px', border: '1px solid #F3F4F6', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                                <h3 style={{ fontSize: '1.5rem', fontWeight: '800', color: '#111827', margin: '0 0 24px 0' }}>Key Features</h3>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                    {highlights.map((feature, idx) => (
+                                        <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                                            <i className="bi bi-check-circle-fill" style={{ color: 'var(--cta)', marginTop: '2px', fontSize: '1.1rem' }} />
+                                            <span style={{ color: '#4B5563', lineHeight: '1.5' }}>{feature}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Details block moved to tabs */}
+
+                            {/* Why Choose Us block */}
+                            <div style={{ backgroundColor: 'white', padding: '32px', borderRadius: '24px', border: '1px solid #F3F4F6', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                                <h3 style={{ fontSize: '1.5rem', fontWeight: '800', color: '#111827', margin: '0 0 24px 0' }}>Why Choose Us?</h3>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                    {staticData.whyChooseUs.map((reason, idx) => (
+                                        <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                                            <i className="bi bi-check-circle-fill" style={{ color: '#059669', marginTop: '2px', fontSize: '1.1rem' }} />
+                                            <span style={{ color: '#4B5563', lineHeight: '1.5' }}>{reason}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Experience Image */}
+                            <div style={{ textAlign: 'center' }}>
+                                <h2 style={{ fontSize: '1.8rem', fontWeight: '800', color: '#111827', margin: '0 0 24px 0' }}>
+                                    Experience the Difference
+                                </h2>
+                                <div style={{ backgroundColor: '#E5E7EB', aspectRatio: '16/9', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9CA3AF', marginBottom: '24px', overflow: 'hidden' }}>
+                                    <img src={gallery[1] || gallery[0]} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            </div> {/* End main container to go full width */}
+
+            {/* Tabs Section (Full Width) */}
+            <div style={{ marginTop: '60px', borderTop: '1px solid #E5E7EB', backgroundColor: '#F8FAFC' }}>
+                {/* Tab Headers */}
+                <div style={{ backgroundColor: 'white', borderBottom: '1px solid #E5E7EB' }}>
+                    <div className="container" style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', gap: '32px', padding: '0 20px' }}>
+                        <button onClick={() => setActiveTab('overview')} style={{ padding: '16px 0', backgroundColor: 'transparent', border: 'none', borderBottom: `3px solid ${activeTab === 'overview' ? '#007BFF' : 'transparent'}`, color: activeTab === 'overview' ? '#007BFF' : '#6B7280', fontWeight: '700', fontSize: '1.05rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', transition: 'all 0.2s' }}>
+                            <i className="bi bi-info-circle"></i> Overview
+                        </button>
+                        <button onClick={() => setActiveTab('reviews')} style={{ padding: '16px 0', backgroundColor: 'transparent', border: 'none', borderBottom: `3px solid ${activeTab === 'reviews' ? '#007BFF' : 'transparent'}`, color: activeTab === 'reviews' ? '#007BFF' : '#6B7280', fontWeight: '700', fontSize: '1.05rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', transition: 'all 0.2s' }}>
+                            <i className="bi bi-chat-dots"></i> Reviews ({reviews?.length || 0})
+                        </button>
+                    </div>
+                </div>
+
+                {/* Tab Content */}
+                <div className="container" style={{ maxWidth: '1200px', margin: '0 auto', padding: '40px 20px', minHeight: '300px' }}>
+                    
+                    {activeTab === 'overview' && (
+                        <div style={{ color: '#4B5563', lineHeight: '1.8', fontSize: '1.05rem', maxWidth: '800px', backgroundColor: 'white', padding: '40px', borderRadius: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                            {product.description ? (
+                                <div dangerouslySetInnerHTML={{ __html: product.description }} />
+                            ) : (
+                                <p>Discover the ultimate blend of innovation and convenience with this highly-rated product. Crafted using premium materials and engineered for maximum durability, it's designed to seamlessly integrate into your daily routine. Enjoy industry-leading performance combined with a sleek aesthetic that perfectly complements any setup.</p>
+                            )}
                         </div>
                     )}
 
                     {activeTab === 'reviews' && (
-                        <div className="tab-panel">
-                            <div className="reviews-layout">
-                                <div className="reviews-summary">
-                                    <div className="rs-score-block">
-                                        <span className="rs-big-score">{product.rating || '0.0'}</span>
-                                        <Stars rating={product.rating || 0} size="1.25rem" />
-                                        <span className="rs-count">{reviewCount} ratings</span>
+                        <div>
+                            <h3 style={{ fontSize: '1.5rem', fontWeight: '800', color: '#111827', marginBottom: '24px' }}>Customer Reviews</h3>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '32px', alignItems: 'flex-start' }}>
+                                
+                                {/* Left Card: Summary & Write Review */}
+                                <div style={{ flex: '1 1 300px', backgroundColor: 'white', padding: '32px', borderRadius: '16px', border: '1px solid #E5E7EB', textAlign: 'center' }}>
+                                    <div style={{ fontSize: '4rem', fontWeight: '900', color: '#111827', lineHeight: '1' }}>{product.rating ? Number(product.rating).toFixed(1) : '5.0'}</div>
+                                    <div style={{ color: '#FBBF24', fontSize: '1.5rem', margin: '16px 0' }}>
+                                        {[1,2,3,4,5].map(i => <i key={i} className={`bi bi-star${i <= Math.round(product.rating || 5) ? '-fill' : ''}`}></i>)}
                                     </div>
-                                    <ReviewForm productId={product.id} onSubmitted={refreshReviews} />
+                                    <div style={{ color: '#9CA3AF', marginBottom: '24px' }}>{product.review_count || 100} ratings</div>
+                                    
+                                    {!user ? (
+                                        <p style={{ color: '#6B7280', fontSize: '0.95rem' }}>Please log in to write a review.</p>
+                                    ) : (
+                                        <form onSubmit={handleReviewSubmit} style={{ marginTop: '32px', textAlign: 'left', borderTop: '1px solid #E5E7EB', paddingTop: '24px' }}>
+                                            <h4 style={{ fontSize: '1.1rem', fontWeight: '700', marginBottom: '16px' }}>Write a Review</h4>
+                                            
+                                            <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', color: '#FBBF24', fontSize: '1.5rem', cursor: 'pointer' }}>
+                                                {[1,2,3,4,5].map(i => (
+                                                    <i key={i} onClick={() => setReviewRating(i)} className={`bi bi-star${i <= reviewRating ? '-fill' : ''}`}></i>
+                                                ))}
+                                            </div>
+
+                                            <input 
+                                                type="text" 
+                                                placeholder="Review Title"
+                                                value={reviewTitle}
+                                                onChange={(e) => setReviewTitle(e.target.value)}
+                                                required
+                                                style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #D1D5DB', marginBottom: '12px', fontFamily: 'inherit' }}
+                                            />
+
+                                            <textarea 
+                                                placeholder="Write your review here..."
+                                                value={reviewComment}
+                                                onChange={(e) => setReviewComment(e.target.value)}
+                                                required
+                                                rows="4"
+                                                style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #D1D5DB', marginBottom: '16px', fontFamily: 'inherit', resize: 'vertical' }}
+                                            />
+
+                                            <button 
+                                                type="submit" 
+                                                disabled={submittingReview}
+                                                style={{ width: '100%', padding: '12px', backgroundColor: 'var(--cta)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: submittingReview ? 'not-allowed' : 'pointer', opacity: submittingReview ? 0.7 : 1 }}
+                                            >
+                                                {submittingReview ? 'Submitting...' : 'Submit Review'}
+                                            </button>
+                                        </form>
+                                    )}
                                 </div>
-                                <div className="reviews-list-col">
-                                    <h2>Customer Reviews</h2>
-                                    <div className="reviews-list">
-                                        {reviews.length > 0
-                                            ? reviews.map(r => <ReviewCard key={r.id} review={r} />)
-                                            : <p>No reviews yet. Be the first to review!</p>
-                                        }
-                                    </div>
+
+                                {/* Right Card: Review List */}
+                                <div style={{ flex: '2 1 500px', backgroundColor: 'white', padding: '32px', borderRadius: '16px', border: '1px solid #E5E7EB' }}>
+                                    {reviewsLoading ? (
+                                        <div style={{ textAlign: 'center', padding: '40px 0', color: '#9CA3AF' }}>Loading reviews...</div>
+                                    ) : reviews && reviews.length > 0 ? (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+                                            {reviews.slice(0, 5).map((rev, idx) => (
+                                                <div key={rev.id || idx} style={{ borderBottom: idx !== reviews.slice(0,5).length - 1 ? '1px solid #E5E7EB' : 'none', paddingBottom: idx !== reviews.slice(0,5).length - 1 ? '32px' : '0' }}>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                            <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#007BFF', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800', fontSize: '1.2rem' }}>
+                                                                {(rev.user_name || rev.author || 'A')[0].toUpperCase()}
+                                                            </div>
+                                                            <div style={{ fontWeight: '700', color: '#111827' }}>{rev.user_name || rev.author || 'Anonymous'}</div>
+                                                        </div>
+                                                        <div style={{ fontSize: '0.85rem', color: '#9CA3AF', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                            <i className="bi bi-calendar3"></i>
+                                                            {rev.created_at ? new Date(rev.created_at).toLocaleDateString() : '5/21/2026'}
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                                                        <div style={{ color: '#FBBF24', fontSize: '0.9rem', display: 'flex', gap: '2px' }}>
+                                                            {[1,2,3,4,5].map(i => <i key={i} className={`bi bi-star${i <= (rev.rating || 5) ? '-fill' : ''}`}></i>)}
+                                                        </div>
+                                                        {rev.title && <div style={{ fontWeight: '700', color: '#111827', fontSize: '0.95rem' }}>{rev.title}</div>}
+                                                    </div>
+                                                    
+                                                    <p style={{ color: '#4B5563', lineHeight: '1.6', margin: '0' }}>{rev.comment || rev.content}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div style={{ textAlign: 'center', padding: '40px 0' }}>
+                                            <i className="bi bi-chat-square-text" style={{ fontSize: '2rem', color: '#D1D5DB', marginBottom: '12px', display: 'block' }}></i>
+                                            <h4 style={{ fontWeight: '700', color: '#4B5563', marginBottom: '8px' }}>No Reviews Yet</h4>
+                                            <p style={{ color: '#6B7280', fontSize: '0.9rem' }}>Be the first to share your thoughts on this product!</p>
+                                        </div>
+                                    )}
                                 </div>
+
                             </div>
                         </div>
                     )}
-
                 </div>
             </div>
 
-            {/* Similar Products */}
-            {similarProducts.length > 0 && (
-                <section className="pdp-similar">
-                    <div className="container">
-                        <div className="pdp-similar__header">
-                            <span className="section-label"><i className="bi bi-stars" /> Related Items</span>
-                            <h2>Similar Products</h2>
-                        </div>
-                        <div className="similar-grid">
-                            {similarProducts.map(p => <SimilarProductCard key={p.id} product={p} />)}
-                        </div>
+            {/* Re-open main container for Suggested Products */}
+            <div className="container" style={{ maxWidth: '1200px', margin: '0 auto', padding: '40px 20px' }}>
+                
+                {/* Suggested Products Section */}
+                <div style={{ marginTop: '80px', paddingTop: '40px', borderTop: '1px solid #E5E7EB' }}>
+                    <h2 style={{ fontSize: '1.5rem', fontWeight: '800', color: '#111827', marginBottom: '32px' }}>
+                        You may also like
+                    </h2>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '24px' }}>
+                        {(similarProducts?.length > 0 ? similarProducts : (allProducts?.filter(p => String(p.id) !== String(id)) || [])).slice(0, 4).map((prod) => (
+                            <div 
+                                key={prod.id} 
+                                onClick={() => navigate(`/products/${prod.id}`)} 
+                                style={{ display: 'flex', flexDirection: 'column', gap: '12px', cursor: 'pointer', transition: 'all 0.3s ease' }}
+                                onMouseOver={(e) => {
+                                    e.currentTarget.style.transform = 'scale(1.04) translateY(-4px)';
+                                }}
+                                onMouseOut={(e) => {
+                                    e.currentTarget.style.transform = 'scale(1) translateY(0)';
+                                }}
+                            >
+                                <div style={{ backgroundColor: '#E5E7EB', aspectRatio: '1', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 4px 10px rgba(0,0,0,0.05)' }}>
+                                    <img src={prod.image_url ?? prod.image ?? "/pro1.jpg"} alt={prod.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                </div>
+                                <div>
+                                    <h4 style={{ fontSize: '0.9rem', fontWeight: '700', color: '#111827', margin: '0 0 4px 0', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{prod.name}</h4>
+                                    <div style={{ fontWeight: '800', color: 'var(--cta)' }}>Rs. {Number(prod.price).toLocaleString()}</div>
+                                </div>
+                            </div>
+                        ))}
                     </div>
-                </section>
-            )}
-        </div>
-    )
-}
-
-/**
- * Form to submit a new review.
- */
-function ReviewForm({ productId, onSubmitted }) {
-    const { user } = useAuth()
-    const [rating, setRating] = useState(5)
-    const [title, setTitle] = useState('')
-    const [body, setBody] = useState('')
-    const [loading, setLoading] = useState(false)
-    const [success, setSuccess] = useState(false)
-
-    if (!user) return (
-        <div className="review-form-login">
-            <p className="alert alert-info" style={{ fontSize: '0.875rem' }}>Please log in to write a review.</p>
-        </div>
-    )
-
-    if (success) return (
-        <div className="review-form-success">
-            <i className="bi bi-check-circle-fill" /> Review submitted!
-        </div>
-    )
-
-    const handleSubmit = async (e) => {
-        e.preventDefault()
-        setLoading(true)
-        try {
-            await submitReview({ productId, userId: user.id, rating, title, body })
-            setSuccess(true)
-            if (onSubmitted) onSubmitted()
-        } catch (err) {
-            alert('Error submitting review: ' + err.message)
-        } finally {
-            setLoading(false)
-        }
-    }
-
-    return (
-        <form className="review-form" onSubmit={handleSubmit}>
-            <h3>Write a Review</h3>
-            <div className="form-group" style={{ marginBottom: 15 }}>
-                <label style={{ display: 'block', marginBottom: 5, fontWeight: 600 }}>Rating</label>
-                <div className="star-rating-input">
-                    {[1, 2, 3, 4, 5].map(s => (
-                        <i
-                            key={s}
-                            className={`bi ${s <= rating ? 'bi-star-fill' : 'bi-star'}`}
-                            onClick={() => setRating(s)}
-                            style={{ cursor: 'pointer', color: '#f39c12', fontSize: '1.25rem', marginRight: 4 }}
-                        />
-                    ))}
                 </div>
+
             </div>
-            <div className="form-group" style={{ marginBottom: 15 }}>
-                <label style={{ display: 'block', marginBottom: 5, fontWeight: 600 }}>Headline</label>
-                <input
-                    type="text"
-                    className="form-control"
-                    placeholder="Briefly summarize your experience"
-                    value={title}
-                    onChange={e => setTitle(e.target.value)}
-                    required
-                />
-            </div>
-            <div className="form-group" style={{ marginBottom: 15 }}>
-                <label style={{ display: 'block', marginBottom: 5, fontWeight: 600 }}>Your Review</label>
-                <textarea
-                    className="form-control"
-                    placeholder="What did you like or dislike?"
-                    value={body}
-                    onChange={e => setBody(e.target.value)}
-                    required
-                    style={{ minHeight: 80 }}
-                />
-            </div>
-            <button className="btn btn-primary btn-sm btn-full" disabled={loading}>
-                {loading ? 'Submitting...' : 'Post Review'}
-            </button>
-        </form>
+        </div>
     )
 }

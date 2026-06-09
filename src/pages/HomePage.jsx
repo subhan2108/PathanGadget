@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom'
 import { formatPrice } from '../data/mockData'
 import { useProducts, useCategories } from '../hooks/useProducts'
 import { useCart } from '../context/CartContext'
+import { motion } from "framer-motion"
+import { LampContainer } from "../components/lamp"
 import './HomePage.css'
 
 const FEATURES = [
@@ -143,61 +145,21 @@ export default function HomePage() {
         <div className="home-page page-enter" id="home-page">
 
             {/* ── Hero ── */}
-            <section className="hero" id="hero-section">
-                <div className="hero__bg-gradient" />
-                <div className="hero__floating-orb hero__floating-orb--1" />
-                <div className="hero__floating-orb hero__floating-orb--2" />
-                <div className="container hero__inner">
-                    <div className="hero__content">
-                        <span className="section-label hero__label">
-                            <i className="bi bi-fire" /> New Arrivals 2024
-                        </span>
-                        <h1 className="hero__title">
-                            Premium Tech<br />
-                            <span className="hero__title-accent">Unbeatable Prices</span>
-                        </h1>
-                        <p className="hero__subtitle">
-                            Shop the finest watches, AirPods, and headphones. Free delivery on orders above ₹999. Guaranteed authentic.
-                        </p>
-                        <div className="hero__actions">
-                            <a href="#featured" className="btn btn-primary btn-lg" id="hero-shop-now">
-                                <i className="bi bi-bag-fill" /> Shop Now
-                            </a>
-                            <Link to="/orders" className="btn btn-secondary btn-lg" id="hero-my-orders">
-                                <i className="bi bi-box-seam" /> My Orders
-                            </Link>
-                        </div>
-                        <div className="hero__trust">
-                            <span><i className="bi bi-shield-fill-check" /> 1-Year Warranty</span>
-                            <span><i className="bi bi-arrow-return-left" /> Free Returns</span>
-                            <span><i className="bi bi-lock-fill" /> Secure Pay</span>
-                        </div>
-                    </div>
-                    <div className="hero__visual">
-                        <div className="hero__product-showcase">
-                            <div className="hero__showcase-ring" />
-                            <img
-                                src="https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=520&h=520&fit=crop"
-                                alt="Premium Smart Watch"
-                                className="hero__showcase-img"
-                            />
-                            <div className="hero__floating-card hero__floating-card--1">
-                                <i className="bi bi-smartwatch floating-card__icon" />
-                                <div>
-                                    <p className="floating-card__title">ProWatch Ultra</p>
-                                    <p className="floating-card__price">₹24,999</p>
-                                </div>
-                            </div>
-                            <div className="hero__floating-card hero__floating-card--2">
-                                <i className="bi bi-trophy-fill floating-card__icon" />
-                                <div>
-                                    <p className="floating-card__title">Best Seller</p>
-                                    <p className="floating-card__price">4.8 ★ Rating</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+            <section id="hero-section" className="bg-slate-950">
+                <LampContainer>
+                    <motion.h1
+                        initial={{ opacity: 0.5, y: 100 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        transition={{
+                            delay: 0.3,
+                            duration: 0.8,
+                            ease: "easeInOut",
+                        }}
+                        className="mt-8 bg-gradient-to-br from-slate-300 to-slate-500 py-4 bg-clip-text text-center text-4xl font-medium tracking-tight text-transparent md:text-7xl"
+                    >
+                        Build your tech <br /> the right way
+                    </motion.h1>
+                </LampContainer>
             </section>
 
             {/* ── Stats ── */}
