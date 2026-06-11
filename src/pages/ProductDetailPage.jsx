@@ -128,14 +128,17 @@ export default function ProductDetailPage() {
     const marketingHeading = details.marketingHeading || "Stay Cool & Say Goodbye\nTO HEAT THIS SUMMER!"
 
     // Dynamic Variants based on DB Price
+    const hasOffer = details.hasOffer !== false; // defaults to true
     const buy2Discount = details.discounts?.buy2 || 10;
     const buy3Discount = details.discounts?.buy3 || 15;
 
-    const dynamicVariants = [
+    const dynamicVariants = hasOffer ? [
         { id: 'buy1', label: 'Buy 1', price: basePrice, originalPrice: baseOriginalPrice, tag: null, discountApplied: 0 },
         { id: 'buy2', label: 'Buy 2', price: Math.round(basePrice * 2 * (1 - buy2Discount/100)), originalPrice: baseOriginalPrice * 2, tag: `Extra ${buy2Discount}% Off`, discountApplied: buy2Discount },
         { id: 'buy3', label: 'Buy 3', price: Math.round(basePrice * 3 * (1 - buy3Discount/100)), originalPrice: baseOriginalPrice * 3, tag: 'Best Value', discountApplied: buy3Discount }
-    ]
+    ] : [
+        { id: 'buy1', label: 'Quantity 1', price: basePrice, originalPrice: baseOriginalPrice, tag: null, discountApplied: 0 }
+    ];
 
     const currentVariant = dynamicVariants.find(v => v.id === selectedVariant) || dynamicVariants[0]
     const selectedQty = parseInt(selectedVariant.replace('buy', '')) || 1
@@ -259,49 +262,53 @@ export default function ProductDetailPage() {
                             )}
 
                             {/* Timer */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '32px' }}>
-                                <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#374151' }}>HURRY! SALE ENDS IN:</span>
-                                <div style={{ display: 'flex', gap: '8px' }}>
-                                    {Object.entries(timeLeft).map(([unit, val]) => (
-                                        <div key={unit} style={{ backgroundColor: 'var(--cta)', color: 'white', padding: '6px 12px', borderRadius: '6px', textAlign: 'center', minWidth: '46px' }}>
-                                            <div style={{ fontSize: '1.1rem', fontWeight: '700', lineHeight: '1' }}>{String(val).padStart(2, '0')}</div>
-                                            <div style={{ fontSize: '0.6rem', textTransform: 'uppercase', marginTop: '2px' }}>{unit}</div>
+                            {hasOffer && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '32px' }}>
+                                    <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#374151' }}>HURRY! SALE ENDS IN:</span>
+                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                        {Object.entries(timeLeft).map(([unit, val]) => (
+                                            <div key={unit} style={{ backgroundColor: 'var(--cta)', color: 'white', padding: '6px 12px', borderRadius: '6px', textAlign: 'center', minWidth: '46px' }}>
+                                                <div style={{ fontSize: '1.1rem', fontWeight: '700', lineHeight: '1' }}>{String(val).padStart(2, '0')}</div>
+                                                <div style={{ fontSize: '0.6rem', textTransform: 'uppercase', marginTop: '2px' }}>{unit}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Variants */}
+                            {hasOffer && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '32px' }}>
+                                    {dynamicVariants.map((v) => (
+                                        <div
+                                            key={v.id}
+                                            onClick={() => setSelectedVariant(v.id)}
+                                            style={{
+                                                position: 'relative', padding: '16px', borderRadius: '12px', cursor: 'pointer',
+                                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                                border: `2px solid ${selectedVariant === v.id ? 'var(--cta)' : '#E5E7EB'}`,
+                                                backgroundColor: selectedVariant === v.id ? 'rgba(0, 119, 255, 0.04)' : 'white'
+                                            }}
+                                        >
+                                            {v.tag && (
+                                                <div style={{ position: 'absolute', top: '-10px', right: '16px', backgroundColor: 'var(--cta)', color: 'white', fontSize: '0.6rem', fontWeight: '800', padding: '2px 8px', borderRadius: '10px', textTransform: 'uppercase' }}>
+                                                    {v.tag}
+                                                </div>
+                                            )}
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                <div style={{ width: '20px', height: '20px', borderRadius: '50%', border: `2px solid ${selectedVariant === v.id ? 'var(--cta)' : '#D1D5DB'}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                    {selectedVariant === v.id && <div style={{ width: '10px', height: '10px', backgroundColor: 'var(--cta)', borderRadius: '50%' }} />}
+                                                </div>
+                                                <span style={{ fontWeight: '700', color: '#111827' }}>{v.label}</span>
+                                            </div>
+                                            <div style={{ textAlign: 'right' }}>
+                                                <div style={{ fontWeight: '800', color: 'var(--cta)' }}>Rs. {v.price.toLocaleString()}</div>
+                                                <div style={{ fontSize: '0.75rem', color: '#9CA3AF', textDecoration: 'line-through' }}>Rs. {v.originalPrice.toLocaleString()}</div>
+                                            </div>
                                         </div>
                                     ))}
                                 </div>
-                            </div>
-
-                            {/* Variants */}
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '32px' }}>
-                                {dynamicVariants.map((v) => (
-                                    <div
-                                        key={v.id}
-                                        onClick={() => setSelectedVariant(v.id)}
-                                        style={{
-                                            position: 'relative', padding: '16px', borderRadius: '12px', cursor: 'pointer',
-                                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                                            border: `2px solid ${selectedVariant === v.id ? 'var(--cta)' : '#E5E7EB'}`,
-                                            backgroundColor: selectedVariant === v.id ? 'rgba(0, 119, 255, 0.04)' : 'white'
-                                        }}
-                                    >
-                                        {v.tag && (
-                                            <div style={{ position: 'absolute', top: '-10px', right: '16px', backgroundColor: 'var(--cta)', color: 'white', fontSize: '0.6rem', fontWeight: '800', padding: '2px 8px', borderRadius: '10px', textTransform: 'uppercase' }}>
-                                                {v.tag}
-                                            </div>
-                                        )}
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                            <div style={{ width: '20px', height: '20px', borderRadius: '50%', border: `2px solid ${selectedVariant === v.id ? 'var(--cta)' : '#D1D5DB'}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                {selectedVariant === v.id && <div style={{ width: '10px', height: '10px', backgroundColor: 'var(--cta)', borderRadius: '50%' }} />}
-                                            </div>
-                                            <span style={{ fontWeight: '700', color: '#111827' }}>{v.label}</span>
-                                        </div>
-                                        <div style={{ textAlign: 'right' }}>
-                                            <div style={{ fontWeight: '800', color: 'var(--cta)' }}>Rs. {v.price.toLocaleString()}</div>
-                                            <div style={{ fontSize: '0.75rem', color: '#9CA3AF', textDecoration: 'line-through' }}>Rs. {v.originalPrice.toLocaleString()}</div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
+                            )}
 
                             {/* Buttons */}
                             <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>

@@ -74,13 +74,14 @@ export default function AdminPage() {
             whyChooseUs: (detailsObj.whyChooseUs || []).join('\n'),
             marketingHeading: detailsObj.marketingHeading || '',
             buy2Discount: detailsObj.discounts?.buy2 || 0,
-            buy3Discount: detailsObj.discounts?.buy3 || 0
+            buy3Discount: detailsObj.discounts?.buy3 || 0,
+            hasOffer: detailsObj.hasOffer !== false // default to true
         } : {
             name: '', price: 0, original_price: 0, category: 'smartphones', brand: '',
             description: '', image_url: '', badge: '', in_stock: true,
             rating: 0, review_count: 0, colors: '', 
             extraImages: '', highlights: '', specifications: '', whyChooseUs: '', 
-            marketingHeading: '', buy2Discount: 0, buy3Discount: 0
+            marketingHeading: '', buy2Discount: 0, buy3Discount: 0, hasOffer: true
         })
         setShowProductModal(true)
     }
@@ -90,7 +91,7 @@ export default function AdminPage() {
         try {
             const { 
                 extraImages, highlights, specifications, whyChooseUs, 
-                marketingHeading, buy2Discount, buy3Discount, 
+                marketingHeading, buy2Discount, buy3Discount, hasOffer,
                 ...restForm 
             } = productForm;
             
@@ -113,6 +114,7 @@ export default function AdminPage() {
                 specifications: specsObj,
                 whyChooseUs: whyChooseUs ? whyChooseUs.split('\n').map(u => u.trim()).filter(Boolean) : [],
                 marketingHeading: marketingHeading || '',
+                hasOffer: hasOffer !== false, // explicitly save boolean
                 discounts: {
                     buy2: Number(buy2Discount) || 0,
                     buy3: Number(buy3Discount) || 0
@@ -372,8 +374,19 @@ export default function AdminPage() {
                                 <textarea className="form-control" rows="5" placeholder="Detailed product description..." value={productForm.description || ''} onChange={e => setProductForm({ ...productForm, description: e.target.value })} />
                             </div>
                             
-                            <hr style={{margin: '20px 0', borderColor: '#eee'}} />
-                            <h5 style={{marginBottom: 15}}>Dynamic Content</h5>
+                            <h5 style={{marginBottom: 15, display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                                Dynamic Content
+                                <div className="form-check form-switch" style={{ fontSize: '1rem', fontWeight: 'normal' }}>
+                                    <input 
+                                        className="form-check-input" 
+                                        type="checkbox" 
+                                        id="hasOfferToggle" 
+                                        checked={productForm.hasOffer !== false} 
+                                        onChange={e => setProductForm({ ...productForm, hasOffer: e.target.checked })} 
+                                    />
+                                    <label className="form-check-label" htmlFor="hasOfferToggle">Enable Offer (Timer & Bundles)</label>
+                                </div>
+                            </h5>
 
                             <div className="form-group mb-3">
                                 <label>Marketing Heading</label>
