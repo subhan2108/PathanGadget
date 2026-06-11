@@ -108,39 +108,33 @@ export default function ProductDetailPage() {
     // Dynamic Tags
     const productTags = product.badge ? [product.badge] : []
 
-    // Fallbacks if DB has empty fields
-    const staticData = {
-        features: [
-            "Personalized Comfort: Adjustable 3-speed settings (Low/Medium/High)",
-            "Multi-Functional: Cools, humidifies, and purifies the air",
-            "7-Color LED Light: Built-in soft LED light with 7 colors",
-            "Eco-friendly & Energy Efficient: Low energy consumption",
-            "Portable & Lightweight: Compact design, easy to carry"
-        ],
-        details: [
-            "Water Tank Capacity: 1000ml",
-            "Cooling Power: 10W",
-            "Material: High-quality ABS+PC",
-            "Dimensions: 15 x 15 x 18 cm",
-            "Weight: 800g",
-            "Power Supply: USB plug-in"
-        ],
-        whyChooseUs: [
-            "100% Satisfaction Guarantee: We prioritize your satisfaction.",
-            "Premium Quality: Top-tier materials and build.",
-            "Fast & Free Shipping: Delivery directly to your door.",
-            "24/7 Customer Support: We're here to help anytime."
-        ]
-    }
+    const whyChooseUs = Array.isArray(details.whyChooseUs) && details.whyChooseUs.length > 0 ? details.whyChooseUs : [
+        "100% Satisfaction Guarantee: We prioritize your satisfaction.",
+        "Premium Quality: Top-tier materials and build.",
+        "Fast & Free Shipping: Delivery directly to your door.",
+        "24/7 Customer Support: We're here to help anytime."
+    ]
 
-    if (highlights.length === 0) highlights = staticData.features
-    if (mappedSpecs.length === 0) mappedSpecs = staticData.details
+    if (highlights.length === 0) highlights = [
+        "Personalized Comfort: Adjustable 3-speed settings (Low/Medium/High)",
+        "Multi-Functional: Cools, humidifies, and purifies the air",
+        "Eco-friendly & Energy Efficient: Low energy consumption"
+    ]
+    if (mappedSpecs.length === 0) mappedSpecs = [
+        "Material: High-quality ABS+PC",
+        "Power Supply: USB plug-in"
+    ]
+
+    const marketingHeading = details.marketingHeading || "Stay Cool & Say Goodbye\nTO HEAT THIS SUMMER!"
 
     // Dynamic Variants based on DB Price
+    const buy2Discount = details.discounts?.buy2 || 10;
+    const buy3Discount = details.discounts?.buy3 || 15;
+
     const dynamicVariants = [
-        { id: 'buy1', label: 'Buy 1', price: basePrice, originalPrice: baseOriginalPrice, tag: null },
-        { id: 'buy2', label: 'Buy 2', price: Math.round(basePrice * 2 * 0.9), originalPrice: baseOriginalPrice * 2, tag: 'Extra 10% Off' },
-        { id: 'buy3', label: 'Buy 3', price: Math.round(basePrice * 3 * 0.85), originalPrice: baseOriginalPrice * 3, tag: 'Best Value' }
+        { id: 'buy1', label: 'Buy 1', price: basePrice, originalPrice: baseOriginalPrice, tag: null, discountApplied: 0 },
+        { id: 'buy2', label: 'Buy 2', price: Math.round(basePrice * 2 * (1 - buy2Discount/100)), originalPrice: baseOriginalPrice * 2, tag: `Extra ${buy2Discount}% Off`, discountApplied: buy2Discount },
+        { id: 'buy3', label: 'Buy 3', price: Math.round(basePrice * 3 * (1 - buy3Discount/100)), originalPrice: baseOriginalPrice * 3, tag: 'Best Value', discountApplied: buy3Discount }
     ]
 
     const currentVariant = dynamicVariants.find(v => v.id === selectedVariant) || dynamicVariants[0]
@@ -154,7 +148,9 @@ export default function ProductDetailPage() {
             name: product.name,
             price: currentVariant.price / selectedQty, // Store unit price for accurate cart math
             image: gallery[0],
-            originalPrice: currentVariant.originalPrice / selectedQty
+            originalPrice: currentVariant.originalPrice / selectedQty,
+            variantId: currentVariant.discountApplied > 0 ? `Buy ${selectedQty} (${currentVariant.discountApplied}% Off)` : `Buy ${selectedQty}`,
+            appliedOffer: currentVariant.discountApplied > 0 ? `Buy ${selectedQty} (${currentVariant.discountApplied}% Off)` : null
         }, selectedQty)
         checkout()
     }
@@ -165,7 +161,9 @@ export default function ProductDetailPage() {
             name: product.name,
             price: currentVariant.price / selectedQty,
             image: gallery[0],
-            originalPrice: currentVariant.originalPrice / selectedQty
+            originalPrice: currentVariant.originalPrice / selectedQty,
+            variantId: currentVariant.discountApplied > 0 ? `Buy ${selectedQty} (${currentVariant.discountApplied}% Off)` : `Buy ${selectedQty}`,
+            appliedOffer: currentVariant.discountApplied > 0 ? `Buy ${selectedQty} (${currentVariant.discountApplied}% Off)` : null
         }, selectedQty)
     }
 
@@ -352,8 +350,8 @@ export default function ProductDetailPage() {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '48px', paddingBottom: '60px' }}>
 
                             <div style={{ textAlign: 'center' }}>
-                                <h2 style={{ fontSize: '1.8rem', fontWeight: '800', color: '#111827', margin: '0 0 24px 0', lineHeight: '1.3' }}>
-                                    Stay Cool & Say Goodbye<br />TO HEAT THIS SUMMER!
+                                <h2 style={{ fontSize: '1.8rem', fontWeight: '800', color: '#111827', margin: '0 0 24px 0', lineHeight: '1.3', whiteSpace: 'pre-line' }}>
+                                    {marketingHeading}
                                 </h2>
                                 <div style={{ backgroundColor: '#E5E7EB', aspectRatio: '4/3', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9CA3AF', marginBottom: '24px', overflow: 'hidden' }}>
                                     <img src={gallery[0]} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -379,7 +377,7 @@ export default function ProductDetailPage() {
                             <div style={{ backgroundColor: 'white', padding: '32px', borderRadius: '24px', border: '1px solid #F3F4F6', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
                                 <h3 style={{ fontSize: '1.5rem', fontWeight: '800', color: '#111827', margin: '0 0 24px 0' }}>Why Choose Us?</h3>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                                    {staticData.whyChooseUs.map((reason, idx) => (
+                                    {whyChooseUs.map((reason, idx) => (
                                         <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
                                             <i className="bi bi-check-circle-fill" style={{ color: '#059669', marginTop: '2px', fontSize: '1.1rem' }} />
                                             <span style={{ color: '#4B5563', lineHeight: '1.5' }}>{reason}</span>

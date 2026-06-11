@@ -179,13 +179,9 @@ export async function fetchProductById(id) {
     
     return {
       ...product,
-      product_images: [{ id: 1, image_url: product.image_url }],
-      highlights: [
-        'Free delivery in 2 days',
-        '1-Year Brand Warranty',
-        '7-Day Easy Returns',
-        '100% Genuine Product'
-      ],
+      // Map details.extraImages to the legacy product_images format for backward compatibility
+      product_images: (product.details?.extraImages || []).map((url, i) => ({ id: i+1, image_url: url, sort_order: i })),
+      highlights: product.details?.highlights || [],
       longDescription: product.description,
       variants: product.colors.map((c, index) => ({ id: `${product.id}-${index}`, title: c, availableForSale: product.inStock }))
     };

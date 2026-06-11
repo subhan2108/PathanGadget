@@ -122,7 +122,8 @@ export default function PaymentPage() {
                 quantity: item.quantity,
                 image_url: item.image || item.image_url,
                 image: item.image || item.image_url,
-                color: item.color || null
+                color: item.color || null,
+                variant_id: item.variantId || null
             }))
         }
 
@@ -508,6 +509,7 @@ export default function PaymentPage() {
                                         <img src={item.image} alt={item.name} />
                                         <div>
                                             <p className="summary-item__name">{item.name}</p>
+                                            {item.variantId && <p className="summary-item__variant" style={{ fontSize: '0.8rem', color: 'var(--cta)', fontWeight: 600, margin: '2px 0 4px' }}>Offer: {item.variantId}</p>}
                                             <p className="summary-item__qty">
                                                 <i className="bi bi-layers" /> Qty: {item.quantity}
                                             </p>

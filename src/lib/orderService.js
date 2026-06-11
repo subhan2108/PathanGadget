@@ -100,7 +100,7 @@ export async function placeOrder(orderData) {
                     ${item.price},
                     ${item.quantity},
                     ${item.image_url || item.image},
-                    ${item.color || null}
+                    ${item.variant_id || item.color || null}
                 )
             `;
         }

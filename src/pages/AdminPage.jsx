@@ -62,16 +62,25 @@ export default function AdminPage() {
 
     const openProductModal = (prod = null) => {
         setEditingProductId(prod ? prod.id : null)
-        const sortedImages = prod?.product_images ? [...prod.product_images].sort((a, b) => a.sort_order - b.sort_order).map(i => i.url) : []
+        
+        const detailsObj = prod?.details || {};
+        
         setProductForm(prod ? {
             ...prod,
             colors: prod.colors?.join(', ') || '',
-            details: prod.details ? JSON.stringify(prod.details, null, 2) : '{}',
-            extraImages: sortedImages.join('\n')
+            extraImages: (detailsObj.extraImages || []).join('\n'),
+            highlights: (detailsObj.highlights || []).join('\n'),
+            specifications: Object.entries(detailsObj.specifications || {}).map(([k,v]) => `${k}: ${v}`).join('\n'),
+            whyChooseUs: (detailsObj.whyChooseUs || []).join('\n'),
+            marketingHeading: detailsObj.marketingHeading || '',
+            buy2Discount: detailsObj.discounts?.buy2 || 0,
+            buy3Discount: detailsObj.discounts?.buy3 || 0
         } : {
             name: '', price: 0, original_price: 0, category: 'smartphones', brand: '',
             description: '', image_url: '', badge: '', in_stock: true,
-            rating: 0, review_count: 0, colors: '', details: '{}', extraImages: ''
+            rating: 0, review_count: 0, colors: '', 
+            extraImages: '', highlights: '', specifications: '', whyChooseUs: '', 
+            marketingHeading: '', buy2Discount: 0, buy3Discount: 0
         })
         setShowProductModal(true)
     }
@@ -79,20 +88,41 @@ export default function AdminPage() {
     const handleProductSubmit = async (e) => {
         e.preventDefault()
         try {
-            let parsedDetails = {};
-            try {
-                parsedDetails = JSON.parse(productForm.details || '{}');
-            } catch (e) {
-                alert("Invalid JSON format in Details field");
-                return;
+            const { 
+                extraImages, highlights, specifications, whyChooseUs, 
+                marketingHeading, buy2Discount, buy3Discount, 
+                ...restForm 
+            } = productForm;
+            
+            // Parse specifications (Key: Value)
+            const specsObj = {};
+            if (specifications) {
+                specifications.split('\n').forEach(line => {
+                    const idx = line.indexOf(':');
+                    if (idx > -1) {
+                        const k = line.slice(0, idx).trim();
+                        const v = line.slice(idx + 1).trim();
+                        if (k) specsObj[k] = v;
+                    }
+                });
             }
 
-            const { extraImages, ...restForm } = productForm;
+            const parsedDetails = {
+                extraImages: extraImages ? extraImages.split('\n').map(u => u.trim()).filter(Boolean) : [],
+                highlights: highlights ? highlights.split('\n').map(u => u.trim()).filter(Boolean) : [],
+                specifications: specsObj,
+                whyChooseUs: whyChooseUs ? whyChooseUs.split('\n').map(u => u.trim()).filter(Boolean) : [],
+                marketingHeading: marketingHeading || '',
+                discounts: {
+                    buy2: Number(buy2Discount) || 0,
+                    buy3: Number(buy3Discount) || 0
+                }
+            };
+
             const formattedForm = {
                 ...restForm,
                 colors: restForm.colors ? restForm.colors.split(',').map(c => c.trim()).filter(Boolean) : [],
                 details: parsedDetails,
-                extraImages: extraImages ? extraImages.split('\n').map(u => u.trim()).filter(Boolean) : []
             };
 
             if (editingProductId) {
@@ -336,13 +366,45 @@ export default function AdminPage() {
                                 <label>Extra Gallery Images (1 URL per line)</label>
                                 <textarea className="form-control" rows="3" placeholder="https://..." value={productForm.extraImages || ''} onChange={e => setProductForm({ ...productForm, extraImages: e.target.value })} />
                             </div>
+
                             <div className="form-group mb-3">
-                                <label>Description</label>
-                                <textarea className="form-control" rows="3" value={productForm.description || ''} onChange={e => setProductForm({ ...productForm, description: e.target.value })} />
+                                <label>Description (HTML allowed)</label>
+                                <textarea className="form-control" rows="5" placeholder="Detailed product description..." value={productForm.description || ''} onChange={e => setProductForm({ ...productForm, description: e.target.value })} />
                             </div>
+                            
+                            <hr style={{margin: '20px 0', borderColor: '#eee'}} />
+                            <h5 style={{marginBottom: 15}}>Dynamic Content</h5>
+
                             <div className="form-group mb-3">
-                                <label>Advanced Details (JSON) — e.g. {`{"highlights": ["item 1"]}`}</label>
-                                <textarea className="form-control" rows="5" style={{ fontFamily: 'monospace' }} value={productForm.details || ''} onChange={e => setProductForm({ ...productForm, details: e.target.value })} />
+                                <label>Marketing Heading</label>
+                                <input type="text" className="form-control" placeholder="e.g. Stay Cool & Say Goodbye TO HEAT THIS SUMMER!" value={productForm.marketingHeading || ''} onChange={e => setProductForm({ ...productForm, marketingHeading: e.target.value })} />
+                            </div>
+
+                            <div className="form-row mb-3" style={{ display: 'flex', gap: 15 }}>
+                                <div className="form-group" style={{ flex: 1 }}>
+                                    <label>Key Features (1 per line)</label>
+                                    <textarea className="form-control" rows="4" placeholder="Eco-friendly & Energy Efficient..." value={productForm.highlights || ''} onChange={e => setProductForm({ ...productForm, highlights: e.target.value })} />
+                                </div>
+                                <div className="form-group" style={{ flex: 1 }}>
+                                    <label>Why Choose Us (1 per line)</label>
+                                    <textarea className="form-control" rows="4" placeholder="100% Satisfaction Guarantee..." value={productForm.whyChooseUs || ''} onChange={e => setProductForm({ ...productForm, whyChooseUs: e.target.value })} />
+                                </div>
+                            </div>
+
+                            <div className="form-group mb-3">
+                                <label>Specifications (Key: Value per line)</label>
+                                <textarea className="form-control" rows="4" placeholder="Water Tank Capacity: 1000ml&#10;Weight: 800g" style={{ fontFamily: 'monospace' }} value={productForm.specifications || ''} onChange={e => setProductForm({ ...productForm, specifications: e.target.value })} />
+                            </div>
+
+                            <div className="form-row mb-3" style={{ display: 'flex', gap: 15, backgroundColor: '#f8fafc', padding: '15px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                                <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
+                                    <label style={{ color: 'var(--cta)' }}><strong>Buy 2 Discount (%)</strong></label>
+                                    <input type="number" className="form-control" placeholder="e.g. 10" value={productForm.buy2Discount || ''} onChange={e => setProductForm({ ...productForm, buy2Discount: Number(e.target.value) })} />
+                                </div>
+                                <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
+                                    <label style={{ color: 'var(--cta)' }}><strong>Buy 3 Discount (%)</strong></label>
+                                    <input type="number" className="form-control" placeholder="e.g. 15" value={productForm.buy3Discount || ''} onChange={e => setProductForm({ ...productForm, buy3Discount: Number(e.target.value) })} />
+                                </div>
                             </div>
                             <div className="form-check" style={{ marginBottom: 20 }}>
                                 <input type="checkbox" id="stockCheck" className="form-check-input" checked={productForm.in_stock || false} onChange={e => setProductForm({ ...productForm, in_stock: e.target.checked })} />
@@ -406,7 +468,10 @@ export default function AdminPage() {
                                         <div key={item.id} style={{ display: 'flex', gap: 15, padding: '10px 0', borderBottom: '1px solid #f1f5f9' }}>
                                             <img src={item.image_url} alt={item.name} width={50} height={50} style={{ objectFit: 'contain', borderRadius: 4, border: '1px solid #eee' }} />
                                             <div>
-                                                <p style={{ margin: 0, fontWeight: 600 }}>{item.name} {item.color ? <span style={{ color: '#666', fontWeight: 400 }}>({item.color})</span> : ''}</p>
+                                                <p style={{ margin: 0, fontWeight: 600 }}>
+                                                    {item.name} 
+                                                    {item.color ? <span style={{ color: '#666', fontWeight: 400, marginLeft: 6 }}>({item.color})</span> : null}
+                                                </p>
                                                 <p style={{ margin: 0, fontSize: '0.85rem', color: '#666', marginTop: 4 }}>Qty: {item.quantity} × ₹{item.price}</p>
                                             </div>
                                         </div>
