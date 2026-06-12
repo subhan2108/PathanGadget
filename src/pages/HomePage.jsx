@@ -76,9 +76,6 @@ function ProductCard({ product: raw, loading }) {
                 {product.badge && <span className="product-card__badge">{product.badge}</span>}
                 {!product.inStock && <div className="product-card__out-of-stock"><i className="bi bi-x-circle" /> Out of Stock</div>}
                 {discount > 0 && <span className="product-card__discount">-{discount}%</span>}
-                <div className="product-card__img-overlay">
-                    <span><i className="bi bi-eye" /> View Details</span>
-                </div>
             </div>
             <div className="product-card__body">
                 <p className="product-card__category">

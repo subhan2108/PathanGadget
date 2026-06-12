@@ -48,10 +48,10 @@ export function BentoHero() {
               <div className="flex items-center gap-6">
                 <button
                   onClick={() => navigate('/products')}
-                  className="bg-[#D1FF4D] hover:bg-[#bce640] text-[var(--text-primary)] px-5 py-2.5 rounded-full text-sm font-semibold flex items-center gap-2 transition-colors shadow-sm"
+                  className="bg-[var(--cta)] hover:opacity-90 text-white px-5 py-2.5 rounded-full text-sm font-semibold flex items-center gap-2 transition-opacity shadow-sm"
                 >
                   View All Products
-                  <div className="bg-black text-white w-7 h-7 flex items-center justify-center rounded-full shrink-0">
+                  <div className="bg-white text-[var(--cta)] w-7 h-7 flex items-center justify-center rounded-full shrink-0">
                     <ArrowUpRight size={14} />
                   </div>
                 </button>
@@ -91,7 +91,7 @@ export function BentoHero() {
                   <h3 className="text-[var(--text-primary)] font-semibold text-lg">More Products</h3>
                   <p className="text-[var(--text-secondary)] text-sm">460 plus items.</p>
                 </div>
-                <div className="bg-[var(--primary-bg)] p-2 rounded-full cursor-pointer hover:bg-[var(--border)] transition-colors text-red-500">
+                <div className="bg-[var(--primary-bg)] w-9 h-9 flex items-center justify-center rounded-full cursor-pointer hover:bg-[var(--border)] transition-colors text-red-500 shrink-0">
                   <Heart size={16} className="fill-red-500" />
                 </div>
               </div>
