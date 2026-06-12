@@ -193,12 +193,16 @@
     border-radius: var(--radius-md);
     border: 1px solid var(--border);
     overflow: hidden;
-    transition: transform 200ms ease, box-shadow 200ms ease;
+    transition: transform 300ms ease, box-shadow 300ms ease;
     display: flex;
     flex-direction: column;
 }
 
-
+.product-card:hover {
+    transform: scale(1.04) translateY(-4px);
+    box-shadow: var(--shadow-md);
+    z-index: 2;
+}
 
 .product-card--skeleton {
     pointer-events: none;
