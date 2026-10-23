@@ -115,7 +115,7 @@ export function BentoHero() {
                   <img key={i} className="w-12 h-12 rounded-full border-2 border-white z-10 shadow-sm" src={`https://i.pravatar.cc/100?img=${i + 10}`} alt="Avatar" />
                 ))}
               </div>
-              <div className="bg-[var(--cta)] w-[85%] max-w-[220px] mx-auto rounded-2xl py-3 mb-3 shadow-[0_4px_14px_rgba(0,119,255,0.35)] shrink-0">
+              <div className="bg-[var(--cta)] w-[85%] max-w-[220px] mx-auto rounded-2xl py-3 mb-3 shadow-[0_4px_14px_rgba(184,132,36,0.35)] shrink-0">
                 <h2 className="text-white font-bold text-2xl mb-0">5m+</h2>
                 <p className="text-white/90 text-xs font-medium">Downloads</p>
               </div>
@@ -160,7 +160,7 @@ export function BentoHero() {
           <div className="bg-[var(--white)] border border-[var(--border)] rounded-[2rem] px-6 py-5 shadow-sm shrink-0">
             <h3 className="text-[var(--text-primary)] font-medium mb-3 text-[13px]">Popular Colors</h3>
             <div className="flex justify-between items-center w-full">
-              <div className="w-8 h-8 rounded-full bg-blue-600 border-[3px] border-[var(--white)] shadow-md cursor-pointer hover:scale-110 transition-transform" />
+              <div className="w-8 h-8 rounded-full bg-[#C99738] border-[3px] border-[var(--white)] shadow-md cursor-pointer hover:scale-110 transition-transform" />
               <div className="w-8 h-8 rounded-full bg-orange-500 border-[3px] border-[var(--white)] shadow-md cursor-pointer hover:scale-110 transition-transform" />
               <div className="w-8 h-8 rounded-full bg-[#00C853] border-[3px] border-[var(--white)] shadow-md cursor-pointer hover:scale-110 transition-transform" />
               <div className="w-8 h-8 rounded-full bg-rose-500 border-[3px] border-[var(--white)] shadow-md cursor-pointer hover:scale-110 transition-transform" />

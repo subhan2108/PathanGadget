@@ -3,23 +3,92 @@ import { Link, useNavigate } from 'react-router-dom'
 import { formatPrice } from '../data/mockData'
 import { useProducts, useCategories } from '../hooks/useProducts'
 import { useCart } from '../context/CartContext'
-import { motion } from "framer-motion"
-import { BentoHero } from '../components/ui/BentoHero'
+import { HeroCarousel } from '@/components/ui/hero-carousel'
 import './HomePage.css'
 
 const FEATURES = [
-    { icon: 'bi-rocket-takeoff', title: 'Express Delivery', desc: '24–48 hr delivery to all major cities in India.', color: '#0077FF' },
-    { icon: 'bi-shield-check', title: '1-Year Warranty', desc: 'Every product comes with full brand warranty.', color: '#2EA8FF' },
-    { icon: 'bi-arrow-return-left', title: '7-Day Returns', desc: 'Hassle-free returns — no questions asked.', color: '#6C5CE7' },
-    { icon: 'bi-lock-fill', title: 'Secure Payments', desc: 'UPI, Card, NetBanking — 100% encrypted.', color: '#00B894' },
+    { icon: 'bi-rocket-takeoff', title: 'Express Delivery', desc: '24–48 hr delivery to all major cities in India.', color: '#C99738' },
+    { icon: 'bi-shield-check', title: '1-Year Warranty', desc: 'Every product comes with full brand warranty.', color: '#B88424' },
+    { icon: 'bi-arrow-return-left', title: '7-Day Returns', desc: 'Hassle-free returns — no questions asked.', color: '#916312' },
+    { icon: 'bi-lock-fill', title: 'Secure Payments', desc: 'UPI, Card, NetBanking — 100% encrypted.', color: '#A07018' },
 ]
 
-const STATS = [
-    { value: '50K+', label: 'Happy Customers', icon: 'bi-people-fill' },
-    { value: '200+', label: 'Products', icon: 'bi-grid-fill' },
-    { value: '4.9★', label: 'Avg Rating', icon: 'bi-star-fill' },
-    { value: '99%', label: 'On-Time Delivery', icon: 'bi-clock-fill' },
+const HERO_SLIDES = [
+    {
+        id: 'apex-watch',
+        title: "Apex Ultra\nSmartwatch",
+        image: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=1400&auto=format&fit=crop",
+        accent: "#C99738",
+        link: "/products?category=watches",
+        price: "₹3,499",
+        originalPrice: "₹6,999",
+        discount: "50% OFF",
+        rating: "4.9",
+        reviews: "2,450",
+    },
+    {
+        id: 'studio-headphones',
+        title: "Acoustic Pure\nHeadphones",
+        image: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?q=80&w=1400&auto=format&fit=crop",
+        accent: "#B88424",
+        link: "/products?category=headphones",
+        price: "₹2,999",
+        originalPrice: "₹5,499",
+        discount: "45% OFF",
+        rating: "4.8",
+        reviews: "1,890",
+    },
+    {
+        id: 'aeropods-wireless',
+        title: "AeroPods Pro\nWireless",
+        image: "https://images.unsplash.com/photo-1590658268037-6bf12165a8df?q=80&w=1400&auto=format&fit=crop",
+        accent: "#00c8ff",
+        link: "/products?category=airpods",
+        price: "₹1,899",
+        originalPrice: "₹3,999",
+        discount: "52% OFF",
+        rating: "4.9",
+        reviews: "3,120",
+    },
+    {
+        id: 'flagship-phone',
+        title: "Cyber Optics\nUltra 5G",
+        image: "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?q=80&w=1400&auto=format&fit=crop",
+        accent: "#e5231b",
+        link: "/products?category=smartphones",
+        price: "₹18,999",
+        originalPrice: "₹24,999",
+        discount: "24% OFF",
+        rating: "4.7",
+        reviews: "980",
+    },
+    {
+        id: 'spatial-vr',
+        title: "Horizon VR\nVision",
+        image: "https://images.unsplash.com/photo-1593508512255-86ab42a8e620?q=80&w=1400&auto=format&fit=crop",
+        accent: "#7c3aed",
+        link: "/products",
+        price: "₹12,499",
+        originalPrice: "₹19,999",
+        discount: "37% OFF",
+        rating: "4.9",
+        reviews: "750",
+    },
+    {
+        id: 'ambient-speaker',
+        title: "Monolith Bass\nSpeaker",
+        image: "https://images.unsplash.com/photo-1545454675-3531b543be5d?q=80&w=1400&auto=format&fit=crop",
+        accent: "#DFAC46",
+        link: "/products",
+        price: "₹4,299",
+        originalPrice: "₹7,999",
+        discount: "46% OFF",
+        rating: "4.8",
+        reviews: "1,420",
+    },
 ]
+
+
 
 const CATEGORY_ICONS = {
     watches: 'bi-smartwatch',
@@ -133,21 +202,19 @@ export default function HomePage() {
     return (
         <div className="home-page page-enter" id="home-page">
 
-            {/* ── Hero ── */}
-            <BentoHero />
-
-            {/* ── Stats ── */}
-            <section className="stats-bar" id="stats-section">
-                <div className="container stats-bar__inner">
-                    {STATS.map((s, i) => (
-                        <div key={i} className="stat-item">
-                            <i className={`bi ${s.icon} stat-bi-icon`} />
-                            <span className="stat-value">{s.value}</span>
-                            <span className="stat-label">{s.label}</span>
-                        </div>
-                    ))}
-                </div>
+            {/* ── Editorial Hero Carousel ── */}
+            <section className="relative w-full h-[100dvh] min-h-[580px] overflow-hidden bg-black" id="hero-section">
+                <HeroCarousel
+                    items={HERO_SLIDES}
+                    defaultIndex={0}
+                    onShopNow={(item) => navigate(item?.link || '/products')}
+                    autoplay={true}
+                    autoplayDelay={4500}
+                    className="h-[100dvh] min-h-[580px] w-full"
+                />
             </section>
+
+
 
             {/* ── Categories ── */}
             <section className="section categories-section" id="categories-section">
@@ -242,7 +309,7 @@ export default function HomePage() {
             <section className="section features-section" id="features-section">
                 <div className="container">
                     <div className="section-header">
-                        <span className="section-label"><i className="bi bi-patch-check-fill" /> Why Pathan Gadgets</span>
+                        <span className="section-label"><i className="bi bi-patch-check-fill" /> Why Smiley N Traders</span>
                         <h2>Built for Trust & Speed</h2>
                         <p>Every purchase backed by our premium guarantee</p>
                     </div>

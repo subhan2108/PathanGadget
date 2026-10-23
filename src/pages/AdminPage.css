@@ -1,5 +1,11 @@
 /* AdminPage.css */
 
+:root {
+    --primary-color: var(--cta);
+    --border-color: var(--border);
+    --bg-hover: var(--primary-bg);
+}
+
 .admin-container {
     max-width: 1200px;
     margin: 40px auto;
@@ -179,7 +185,7 @@
     outline: none;
     border-color: var(--primary-color);
     background-color: #fff;
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    box-shadow: 0 0 0 3px rgba(184, 132, 36, 0.2);
 }
 
 .mb-2 { margin-bottom: 15px; }

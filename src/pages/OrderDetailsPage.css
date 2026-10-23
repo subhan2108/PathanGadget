@@ -122,7 +122,7 @@
     background: linear-gradient(135deg, var(--cta), var(--accent));
     border-color: var(--cta);
     color: white;
-    box-shadow: 0 4px 12px rgba(0, 119, 255, 0.3);
+    box-shadow: 0 4px 12px rgba(184, 132, 36, 0.35);
 }
 
 .timeline-step-inline__label {

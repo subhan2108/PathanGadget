@@ -24,7 +24,7 @@ export function loadRazorpayScript() {
 export async function openRazorpayCheckout({
     orderId = null, // Optional if no backend
     amount,
-    name = "ElectroCart",
+    name = "Smiley N Traders",
     description = "Premium Electronics Purchase",
     user = {},
     onSuccess,

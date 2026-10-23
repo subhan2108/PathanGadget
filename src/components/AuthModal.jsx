@@ -174,7 +174,7 @@ export default function AuthModal({ isOpen, onClose, initialTab = 'login' }) {
                         {tab === 'forgot' && 'Reset Password'}
                     </h2>
                     <p>
-                        {tab === 'login' && 'Sign in to your ElectroCart account'}
+                        {tab === 'login' && 'Sign in to your Smiley N Traders account'}
                         {tab === 'register' && 'Join 50,000+ happy customers'}
                         {tab === 'forgot' && "We'll send you a reset link"}
                     </p>

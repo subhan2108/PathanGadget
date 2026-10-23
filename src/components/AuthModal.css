@@ -96,7 +96,7 @@
     font-size: 1.6rem;
     color: white;
     margin-bottom: 14px;
-    box-shadow: 0 8px 24px rgba(0, 119, 255, 0.3);
+    box-shadow: 0 8px 24px rgba(184, 132, 36, 0.35);
 }
 
 .auth-modal__header h2 {
@@ -257,7 +257,7 @@
 .auth-field__wrap input:focus {
     border-color: var(--cta);
     background: var(--white);
-    box-shadow: 0 0 0 3px rgba(0, 119, 255, 0.12);
+    box-shadow: 0 0 0 3px rgba(184, 132, 36, 0.18);
 }
 
 .auth-field--error .auth-field__wrap input {

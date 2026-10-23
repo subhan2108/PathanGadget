@@ -2,10 +2,10 @@ import React, { useState, useEffect, useRef } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useCart } from '../context/CartContext'
 import { useAuth } from '../context/AuthContext'
-import { 
-    SignedIn, 
-    SignedOut, 
-    SignInButton, 
+import {
+    SignedIn,
+    SignedOut,
+    SignInButton,
     UserButton,
     useClerk
 } from '@clerk/clerk-react'
@@ -19,18 +19,21 @@ export default function Navbar() {
     const { cartItems, cartCount, cartTotal, removeFromCart, updateQty, checkout } = useCart()
     const { signOut } = useAuth()
     const location = useLocation()
+    const isHome = location.pathname === '/'
+    const isTransparent = isHome && !scrolled && !menuOpen
 
     useEffect(() => {
         const handler = () => setScrolled(window.scrollY > 20)
-        window.addEventListener('scroll', handler)
+        handler()
+        window.addEventListener('scroll', handler, { passive: true })
         return () => window.removeEventListener('scroll', handler)
     }, [])
 
-    /* Close drawers on route change */
-    /* Close drawers on route change */
+    /* Close drawers and sync scroll on route change */
     useEffect(() => {
         setMenuOpen(false)
         setCartOpen(false)
+        setScrolled(window.scrollY > 20)
     }, [location])
 
     const formatPrice = (p) =>
@@ -44,13 +47,16 @@ export default function Navbar() {
 
     return (
         <>
-            <header id="navbar" className={`navbar ${scrolled ? 'navbar--scrolled' : ''}`}>
+            <header
+                id="navbar"
+                className={`navbar ${isHome ? 'navbar--home' : ''} ${isTransparent ? 'navbar--transparent' : ''} ${scrolled ? 'navbar--scrolled' : ''}`}
+            >
                 <div className="container navbar__inner">
 
                     {/* Logo */}
                     <Link to="/" className="navbar__logo" id="nav-logo">
-                        <i className="bi bi-lightning-charge-fill logo-icon" />
-                        <span className="logo-text">Pathan<span className="logo-accent">Gadgets</span></span>
+                        <img src="/logo.png" alt="Smiley N Traders" className="navbar__logo-img" />
+                        <span className="logo-text">Smiley N <span className="logo-accent">Traders</span></span>
                     </Link>
 
                     {/* Desktop Nav */}
@@ -84,8 +90,8 @@ export default function Navbar() {
                         {/* Auth: Clerk handles SignedIn and SignedOut states */}
                         <SignedIn>
                             <div className="nav-profile">
-                                <UserButton 
-                                    afterSignOutUrl="/" 
+                                <UserButton
+                                    afterSignOutUrl="/"
                                     appearance={{
                                         elements: {
                                             userButtonAvatarBox: 'nav-avatar-img-clerk'
@@ -105,8 +111,8 @@ export default function Navbar() {
                             </SignInButton>
                         </SignedOut>
 
-                        <button 
-                            id="nav-checkout" 
+                        <button
+                            id="nav-checkout"
                             className="btn btn-primary navbar__cta"
                             onClick={() => checkout()}
                             disabled={cartCount === 0}
@@ -155,7 +161,7 @@ export default function Navbar() {
                         </SignInButton>
                     </SignedOut>
 
-                    <button 
+                    <button
                         className="btn btn-primary btn-full mobile-menu__cta"
                         onClick={() => {
                             setMenuOpen(false);

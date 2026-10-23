@@ -138,7 +138,7 @@ export default function PaymentPage() {
             try {
                 await openRazorpayCheckout({
                     amount: total,
-                    name: "Pathan Gadgets",
+                    name: "Smiley N Traders",
                     description: `Checkout payment for Order #${orderNumber}`,
                     user: {
                         firstName: shipping.firstName,
@@ -211,7 +211,7 @@ export default function PaymentPage() {
                         </div>
                     </div>
                     <h2>Order Confirmed!</h2>
-                    <p>Thank you for shopping with Pathan Gadgets. Your order has been placed and is being processed.</p>
+                    <p>Thank you for shopping with Smiley N Traders. Your order has been placed and is being processed.</p>
                     
                     <div className="success-details">
                         <div className="success-detail-row">

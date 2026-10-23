@@ -3,37 +3,39 @@
 @tailwind utilities;
 
 /* ===================================================
-   ElectroCart – Global Design System
+   Smiley N Traders – Luxury Gold Design System
    =================================================== */
 
 /* ---------- CSS Variables ---------- */
 :root {
-  --primary-bg: #E6F4FF;
-  --accent: #2EA8FF;
-  --cta: #0077FF;
-  --cta-dark: #0055CC;
-  --neutral-bg: #F7F9FC;
-  --order-bg: #F4FAFF;
-  --text-primary: #0A1628;
-  --text-secondary: #4A5568;
-  --text-muted: #8FA3B8;
-  --border: #D6E8F7;
+  --primary-bg: #FAF5EB;
+  --accent: #F9D949;
+  --cta: #E5B824;
+  --cta-dark: #8C5E0F;
+  --neutral-bg: #F5EFE3;
+  --order-bg: #FCF9F3;
+  --text-primary: #1C1814;
+  --text-secondary: #5E5549;
+  --text-muted: #9E9180;
+  --border: #E8DEC9;
   --white: #FFFFFF;
-  --shadow-sm: 0 1px 3px rgba(14, 100, 200, 0.08);
-  --shadow-md: 0 4px 16px rgba(14, 100, 200, 0.12);
-  --shadow-lg: 0 8px 32px rgba(14, 100, 200, 0.16);
+  --shadow-sm: 0 1px 3px rgba(138, 96, 25, 0.08);
+  --shadow-md: 0 4px 16px rgba(138, 96, 25, 0.12);
+  --shadow-lg: 0 8px 32px rgba(138, 96, 25, 0.16);
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 20px;
   --transition: 200ms ease-in-out;
-  --status-processing-bg: #EBF5FF;
-  --status-processing-text: #2EA8FF;
-  --status-shipped-bg: #DBF0FF;
-  --status-shipped-text: #0077FF;
+  --status-processing-bg: #FEF7E6;
+  --status-processing-text: #B88424;
+  --status-shipped-bg: #F8EED6;
+  --status-shipped-text: #8C5E0F;
   --status-delivered-bg: #D1FAE5;
   --status-delivered-text: #059669;
   --status-cancelled-bg: #FEE2E2;
   --status-cancelled-text: #DC2626;
+  --gold-gradient: linear-gradient(135deg, #F9D949 0%, #E5B824 50%, #B88424 100%);
+  --gold-glow: 0 0 20px rgba(249, 217, 73, 0.45);
 }
 
 /* ---------- Reset ---------- */
@@ -124,14 +126,14 @@ p {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--cta), #005ECC);
+  background: linear-gradient(135deg, var(--accent), var(--cta-dark));
   color: var(--white);
-  box-shadow: 0 4px 14px rgba(0, 119, 255, 0.35);
+  box-shadow: 0 4px 14px rgba(184, 132, 36, 0.35);
 }
 
 .btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(0, 119, 255, 0.45);
+  box-shadow: 0 8px 20px rgba(184, 132, 36, 0.45);
 }
 
 .btn-secondary {
@@ -231,7 +233,7 @@ p {
 }
 
 .skeleton {
-  background: linear-gradient(90deg, #dce8f5 25%, #eaf3fc 50%, #dce8f5 75%);
+  background: linear-gradient(90deg, #F0E6D4 25%, #FAF4E8 50%, #F0E6D4 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
   border-radius: var(--radius-sm);
@@ -328,7 +330,7 @@ p {
 .form-group select:focus,
 .form-group textarea:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(46, 168, 255, 0.15);
+  box-shadow: 0 0 0 3px rgba(201, 151, 56, 0.2);
 }
 
 .form-group input.error,
@@ -374,7 +376,7 @@ p {
 .form-field input:focus,
 .form-field select:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(46, 168, 255, 0.15);
+  box-shadow: 0 0 0 3px rgba(201, 151, 56, 0.2);
 }
 
 .form-field.error input,

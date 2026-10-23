@@ -192,7 +192,7 @@ export default function AdminPage() {
         <div className="admin-container page-enter">
             <header className="admin-header">
                 <div>
-                    <h1><i className="bi bi-shield-lock" /> ElectroCart Admin Panel</h1>
+                    <h1><i className="bi bi-shield-lock" /> Smiley N Traders Admin Panel</h1>
                     <p>Manage products, orders, and real-time shipment updates.</p>
                 </div>
             </header>

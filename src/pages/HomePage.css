@@ -178,7 +178,7 @@
     background: var(--cta);
     border-color: var(--cta);
     color: white;
-    box-shadow: 0 4px 14px rgba(0, 119, 255, 0.3);
+    box-shadow: 0 4px 14px rgba(184, 132, 36, 0.35);
 }
 
 /* ── Products Grid ── */
@@ -440,7 +440,7 @@
 
 /* ── CTA Banner ── */
 .cta-banner {
-    background: linear-gradient(135deg, #0055CC, #0077FF, #2EA8FF);
+    background: linear-gradient(135deg, #6B4508, #A4731B, #D4A346);
     padding: 64px 0;
     position: relative;
     overflow: hidden;

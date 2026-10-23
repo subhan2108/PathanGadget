@@ -99,7 +99,7 @@
     background: var(--cta);
     border-color: var(--cta);
     color: white;
-    box-shadow: 0 4px 14px rgba(0, 119, 255, 0.28);
+    box-shadow: 0 4px 14px rgba(184, 132, 36, 0.35);
 }
 
 .tab-count {

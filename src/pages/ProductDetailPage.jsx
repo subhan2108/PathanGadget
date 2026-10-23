@@ -287,7 +287,7 @@ export default function ProductDetailPage() {
                                                 position: 'relative', padding: '16px', borderRadius: '12px', cursor: 'pointer',
                                                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                                                 border: `2px solid ${selectedVariant === v.id ? 'var(--cta)' : '#E5E7EB'}`,
-                                                backgroundColor: selectedVariant === v.id ? 'rgba(0, 119, 255, 0.04)' : 'white'
+                                                backgroundColor: selectedVariant === v.id ? 'rgba(184, 132, 36, 0.06)' : 'white'
                                             }}
                                         >
                                             {v.tag && (
@@ -319,7 +319,7 @@ export default function ProductDetailPage() {
                                         fontSize: '1.2rem', fontWeight: '800', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px',
                                         transition: 'transform 0.2s'
                                     }}
-                                    onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#F0F7FF'; e.currentTarget.style.transform = 'translateY(-2px)' }}
+                                    onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#FAF5EB'; e.currentTarget.style.transform = 'translateY(-2px)' }}
                                     onMouseOut={(e) => { e.currentTarget.style.backgroundColor = 'white'; e.currentTarget.style.transform = 'translateY(0)' }}
                                 >
                                     <i className="bi bi-cart-plus"></i> Add to Cart
@@ -329,7 +329,7 @@ export default function ProductDetailPage() {
                                     style={{
                                         flex: '1', backgroundColor: 'var(--cta)', color: 'white', border: 'none', padding: '16px', borderRadius: '12px',
                                         fontSize: '1.2rem', fontWeight: '800', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px',
-                                        boxShadow: '0 4px 14px rgba(0, 119, 255, 0.3)', transition: 'transform 0.2s'
+                                        boxShadow: '0 4px 14px rgba(184, 132, 36, 0.35)', transition: 'transform 0.2s'
                                     }}
                                     onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
                                     onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}

@@ -56,7 +56,7 @@
 }
 
 .policy-container a {
-    color: #0b63e5;
+    color: var(--cta);
     text-decoration: none;
 }
 

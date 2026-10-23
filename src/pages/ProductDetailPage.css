@@ -74,7 +74,7 @@
 
 .pdp-thumb.active {
     border-color: var(--cta);
-    box-shadow: 0 0 0 3px rgba(0, 119, 255, 0.18);
+    box-shadow: 0 0 0 3px rgba(184, 132, 36, 0.2);
 }
 
 /* Main Image + Zoom */
@@ -403,7 +403,7 @@
 
 .color-swatch.active {
     border-color: var(--cta);
-    box-shadow: 0 0 0 3px rgba(0, 119, 255, 0.25), 0 2px 8px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 0 0 3px rgba(184, 132, 36, 0.25), 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .color-swatch.active::after {
@@ -572,7 +572,7 @@
 
 /* ── Delivery Banner ─────────────────────────────────────── */
 .pdp-delivery-banner {
-    background: linear-gradient(to right, #E6F4FF, #F0F8FF);
+    background: linear-gradient(to right, #FAF5EB, #FBF8F2);
     border-top: 1px solid var(--border);
     border-bottom: 1px solid var(--border);
     padding: 16px 0;

@@ -13,7 +13,7 @@
 .tracking-header__bg {
     position: absolute;
     inset: 0;
-    background: linear-gradient(135deg, #0044AA 0%, #0077FF 45%, #2EA8FF 100%);
+    background: linear-gradient(135deg, #684307 0%, #A4731B 45%, #D4A346 100%);
 }
 
 .tracking-header__bg::after {
@@ -309,14 +309,14 @@
 .tracking-step.done .step-icon-wrap {
     background: linear-gradient(135deg, var(--cta), var(--accent));
     border-color: var(--cta);
-    box-shadow: 0 4px 14px rgba(0, 119, 255, 0.35);
+    box-shadow: 0 4px 14px rgba(184, 132, 36, 0.35);
     color: white;
 }
 
 .tracking-step.active .step-icon-wrap {
-    background: linear-gradient(135deg, #0055CC, var(--cta));
+    background: linear-gradient(135deg, var(--cta-dark), var(--cta));
     border-color: var(--cta);
-    box-shadow: 0 6px 20px rgba(0, 119, 255, 0.45);
+    box-shadow: 0 6px 20px rgba(184, 132, 36, 0.45);
     color: white;
 }
 
@@ -450,7 +450,7 @@
 /* Map Placeholder */
 .tracking-map-placeholder {
     min-height: 200px;
-    background: linear-gradient(135deg, #E6F4FF, #D6ECFF);
+    background: linear-gradient(135deg, #FAF5EB, #F2E8D4);
     border: 1.5px dashed var(--accent);
     border-radius: var(--radius-md);
     display: flex;
@@ -464,7 +464,7 @@
     content: '';
     position: absolute;
     inset: 0;
-    background: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%232EA8FF' fill-opacity='0.07'%3E%3Ccircle cx='20' cy='20' r='2'/%3E%3C/g%3E%3C/svg%3E");
+    background: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23C99738' fill-opacity='0.08'%3E%3Ccircle cx='20' cy='20' r='2'/%3E%3C/g%3E%3C/svg%3E");
 }
 
 .map-placeholder__content {
@@ -568,7 +568,7 @@
 
 /* Support */
 .tracking-support {
-    background: linear-gradient(135deg, #0055CC, #0077FF);
+    background: linear-gradient(135deg, #7C5310, #B88424);
     border-radius: var(--radius-md);
     padding: 28px 24px;
     text-align: center;

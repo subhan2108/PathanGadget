@@ -11,8 +11,8 @@ export default function Footer() {
                     {/* Brand */}
                     <div className="footer__brand">
                         <Link to="/" className="footer__logo">
-                            <i className="bi bi-lightning-charge-fill" />
-                            <span>Pathan<strong>Gadgets</strong></span>
+                            <img src="/logo.png" alt="Smiley N Traders" className="footer__logo-img" />
+                            <span>Smiley N <strong>Traders</strong></span>
                         </Link>
                         <p className="footer__tagline">Premium wearable tech delivered to your doorstep. Curated. Trusted. Fast.</p>
                         <div className="footer__social">
@@ -57,7 +57,7 @@ export default function Footer() {
                 </div>
 
                 <div className="footer__bottom">
-                    <p>© {year} PathanGadgets. All rights reserved.</p>
+                    <p>© {year} Smiley N Traders. All rights reserved.</p>
                     <div className="footer__payments">
                         <span className="payment-pill"><i className="bi bi-phone" /> UPI</span>
                         <span className="payment-pill"><i className="bi bi-credit-card" /> Visa</span>
