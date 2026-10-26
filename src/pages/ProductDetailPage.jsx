@@ -4,6 +4,7 @@ import { useProductDetail, useReviews, useAllProducts } from '../hooks/useProduc
 import { formatPrice, submitReview } from '../lib/productsService'
 import { useCart } from '../context/CartContext'
 import { useAuth } from '../context/AuthContext'
+import { ProductCard } from '@/components/ui/product-card-2'
 import './ProductDetailPage.css'
 
 export default function ProductDetailPage() {
@@ -20,6 +21,7 @@ export default function ProductDetailPage() {
     const [selectedColor, setSelectedColor] = useState(null)
     const [quantity, setQuantity] = useState(1)
     const [selectedVariant, setSelectedVariant] = useState('buy1')
+    const [added, setAdded] = useState(false)
 
     const [reviewRating, setReviewRating] = useState(5)
     const [reviewTitle, setReviewTitle] = useState('')
@@ -123,9 +125,6 @@ export default function ProductDetailPage() {
         ? details.whyChooseUs.filter(w => typeof w === 'string' && w.trim())
         : []
 
-    const marketingHeading = (typeof details.marketingHeading === 'string' && details.marketingHeading.trim())
-        ? details.marketingHeading.trim()
-        : null
 
     // Trust Badges strictly from backend
     const trustBadges = (Array.isArray(details.trustBadges) && details.trustBadges.length > 0)
@@ -170,6 +169,8 @@ export default function ProductDetailPage() {
             variantId: activeVariant?.discountApplied > 0 ? `Buy ${activeVariant.qty} (${activeVariant.discountApplied}% Off)` : (selectedColor ? `Color: ${selectedColor}` : undefined),
             appliedOffer: activeVariant?.discountApplied > 0 ? `Buy ${activeVariant.qty} (${activeVariant.discountApplied}% Off)` : null
         }, finalQty)
+        setAdded(true)
+        setTimeout(() => setAdded(false), 1600)
     }
 
     const handleBuyNow = async () => {
@@ -194,8 +195,29 @@ export default function ProductDetailPage() {
     )
 
     return (
-        <div style={{ backgroundColor: 'white', minHeight: '100vh' }}>
-            <div className="container" style={{ maxWidth: '1200px', margin: '0 auto', padding: '40px 20px' }}>
+        <div className="product-detail-page" style={{ backgroundColor: '#FFFFFF', minHeight: '100vh' }}>
+            {/* Breadcrumb Bar */}
+            <div className="pdp-breadcrumb-bar">
+                <div className="container" style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 20px' }}>
+                    <nav className="breadcrumb">
+                        <Link to="/"><i className="bi bi-house" /> Home</Link>
+                        <span>›</span>
+                        <Link to="/products">Products</Link>
+                        {product?.category && (
+                            <>
+                                <span>›</span>
+                                <Link to={`/products?category=${encodeURIComponent(product.category)}`} style={{ textTransform: 'capitalize' }}>
+                                    {product.category}
+                                </Link>
+                            </>
+                        )}
+                        <span>›</span>
+                        <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{product.name}</span>
+                    </nav>
+                </div>
+            </div>
+
+            <div className="container" style={{ maxWidth: '1200px', margin: '0 auto', padding: '32px 20px 48px' }}>
 
                 {/* Two Column Layout */}
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '48px', alignItems: 'flex-start' }}>
@@ -302,8 +324,9 @@ export default function ProductDetailPage() {
                                         display: 'inline-flex',
                                         alignItems: 'center',
                                         gap: '6px',
-                                        background: '#F3F4F6',
-                                        color: '#374151',
+                                        background: 'rgba(36, 113, 229, 0.08)',
+                                        color: 'rgb(36, 113, 229)',
+                                        border: '1px solid rgba(36, 113, 229, 0.25)',
                                         padding: '4px 12px',
                                         borderRadius: '20px',
                                         fontSize: '0.8rem',
@@ -317,7 +340,7 @@ export default function ProductDetailPage() {
                         )}
 
                         {/* Product Name */}
-                        <h1 style={{ fontSize: '2.4rem', fontWeight: '900', color: '#111827', margin: '0 0 16px 0', lineHeight: '1.2', letterSpacing: '-0.5px' }}>
+                        <h1 style={{ fontSize: '2rem', fontWeight: '800', color: '#111827', margin: '0 0 14px 0', lineHeight: '1.25', letterSpacing: '-0.5px' }}>
                             {product.name}
                         </h1>
 
@@ -478,86 +501,69 @@ export default function ProductDetailPage() {
 
                         {/* Quantity Stepper (When no bundle variants configured) */}
                         {!hasRealBundleOffer && (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '24px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '20px' }}>
                                 <span style={{ fontSize: '0.875rem', fontWeight: '700', color: '#374151' }}>Quantity:</span>
-                                <div style={{ display: 'inline-flex', alignItems: 'center', border: '1.5px solid #E5E7EB', borderRadius: '10px', overflow: 'hidden' }}>
+                                <div style={{ display: 'inline-flex', alignItems: 'center', border: '1.5px solid #E5E7EB', borderRadius: '10px', overflow: 'hidden', height: '38px', background: '#FFFFFF' }}>
                                     <button
                                         type="button"
                                         onClick={() => setQuantity(q => Math.max(1, q - 1))}
-                                        style={{ width: '38px', height: '38px', border: 'none', background: '#F9FAFB', cursor: 'pointer', fontSize: '1.1rem', fontWeight: 'bold' }}
+                                        style={{ width: '36px', height: '100%', border: 'none', background: '#F9FAFB', cursor: 'pointer', fontSize: '1rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4B5563', transition: 'background 0.2s' }}
+                                        onMouseOver={e => e.currentTarget.style.background = '#F3F4F6'}
+                                        onMouseOut={e => e.currentTarget.style.background = '#F9FAFB'}
+                                        aria-label="Decrease quantity"
                                     >
-                                        -
+                                        <i className="bi bi-dash" />
                                     </button>
-                                    <span style={{ minWidth: '42px', textAlign: 'center', fontWeight: '700', fontSize: '0.95rem' }}>{quantity}</span>
+                                    <span style={{ minWidth: '40px', textAlign: 'center', fontWeight: '700', fontSize: '0.95rem', color: '#111827' }}>{quantity}</span>
                                     <button
                                         type="button"
                                         onClick={() => setQuantity(q => q + 1)}
-                                        style={{ width: '38px', height: '38px', border: 'none', background: '#F9FAFB', cursor: 'pointer', fontSize: '1.1rem', fontWeight: 'bold' }}
+                                        style={{ width: '36px', height: '100%', border: 'none', background: '#F9FAFB', cursor: 'pointer', fontSize: '1rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4B5563', transition: 'background 0.2s' }}
+                                        onMouseOver={e => e.currentTarget.style.background = '#F3F4F6'}
+                                        onMouseOut={e => e.currentTarget.style.background = '#F9FAFB'}
+                                        aria-label="Increase quantity"
                                     >
-                                        +
+                                        <i className="bi bi-plus" />
                                     </button>
                                 </div>
                             </div>
                         )}
 
                         {/* Action Buttons */}
-                        <div style={{ display: 'flex', gap: '16px' }}>
+                        <div className="pdp-action-buttons">
                             <button
+                                type="button"
+                                id="pdp-add-to-cart"
+                                className={`pdp-btn-cart ${added ? 'added' : ''}`}
                                 onClick={handleAddToCart}
                                 disabled={!isInStock}
-                                style={{
-                                    flex: '1',
-                                    backgroundColor: 'white',
-                                    color: isInStock ? 'var(--cta)' : '#9CA3AF',
-                                    border: `2px solid ${isInStock ? 'var(--cta)' : '#D1D5DB'}`,
-                                    padding: '16px',
-                                    borderRadius: '12px',
-                                    fontSize: '1.15rem',
-                                    fontWeight: '800',
-                                    cursor: isInStock ? 'pointer' : 'not-allowed',
-                                    display: 'flex',
-                                    justifyContent: 'center',
-                                    alignItems: 'center',
-                                    gap: '8px',
-                                    transition: 'all 0.2s',
-                                    opacity: isInStock ? 1 : 0.6
-                                }}
                             >
-                                <i className="bi bi-cart-plus" /> Add to Cart
+                                {!isInStock ? (
+                                    <><i className="bi bi-x-circle" /> Out of Stock</>
+                                ) : added ? (
+                                    <><i className="bi bi-check-circle-fill" /> Added to Cart!</>
+                                ) : (
+                                    <><i className="bi bi-cart-plus" /> Add to Cart</>
+                                )}
                             </button>
                             <button
+                                type="button"
+                                id="pdp-buy-now"
+                                className="pdp-btn-buy"
                                 onClick={handleBuyNow}
                                 disabled={!isInStock}
-                                style={{
-                                    flex: '1',
-                                    backgroundColor: isInStock ? 'var(--cta)' : '#E5E7EB',
-                                    color: isInStock ? 'white' : '#9CA3AF',
-                                    border: 'none',
-                                    padding: '16px',
-                                    borderRadius: '12px',
-                                    fontSize: '1.15rem',
-                                    fontWeight: '800',
-                                    cursor: isInStock ? 'pointer' : 'not-allowed',
-                                    display: 'flex',
-                                    justifyContent: 'center',
-                                    alignItems: 'center',
-                                    gap: '8px',
-                                    boxShadow: isInStock ? '0 4px 14px rgba(184, 132, 36, 0.35)' : 'none',
-                                    transition: 'all 0.2s',
-                                    opacity: isInStock ? 1 : 0.6
-                                }}
                             >
                                 <i className="bi bi-lightning-fill" /> Buy Now
                             </button>
                         </div>
 
-                        {/* Trust Badges (STRICTLY ONLY IF PROVIDED BY BACKEND) */}
+                        {/* Trust Badges (Only rendered if present in backend) */}
                         {trustBadges.length > 0 && (
-                            <div style={{ display: 'flex', justifyContent: 'center', gap: '32px', padding: '20px 0', borderTop: '1px solid #E5E7EB', borderBottom: '1px solid #E5E7EB', marginTop: '24px' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '16px', padding: '18px 0', borderTop: '1px solid #E5E7EB', borderBottom: '1px solid #E5E7EB', marginTop: '16px', marginBottom: '20px' }}>
                                 {trustBadges.map((badge, i) => (
-                                    <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', color: '#4B5563' }}>
-                                        <i className={`bi ${badge.icon || 'bi-patch-check'}`} style={{ fontSize: '1.5rem', color: 'var(--cta)' }} />
-                                        <span style={{ fontSize: '0.65rem', fontWeight: '800', textTransform: 'uppercase', textAlign: 'center', whiteSpace: 'pre-line' }}>{badge.label}</span>
+                                    <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', color: '#4B5563', textAlign: 'center' }}>
+                                        <i className={`bi ${badge.icon || 'bi-patch-check'}`} style={{ fontSize: '1.35rem', color: 'var(--cta)' }} />
+                                        <span style={{ fontSize: '0.6875rem', fontWeight: '700', textTransform: 'uppercase', lineHeight: '1.3', letterSpacing: '0.3px', whiteSpace: 'pre-line' }}>{badge.label}</span>
                                     </div>
                                 ))}
                             </div>
@@ -578,14 +584,6 @@ export default function ProductDetailPage() {
                             </div>
                         )}
 
-                        {/* 2. Marketing Heading from Backend (If present) */}
-                        {marketingHeading && (
-                            <div style={{ marginTop: '28px', paddingTop: '20px', borderTop: '1px solid #E5E7EB' }}>
-                                <h3 style={{ fontSize: '1.35rem', fontWeight: '800', color: '#111827', margin: '0', lineHeight: '1.4' }}>
-                                    {marketingHeading}
-                                </h3>
-                            </div>
-                        )}
 
                         {/* 3. Specifications from Backend (If present) */}
                         {mappedSpecs.length > 0 && (
@@ -643,24 +641,34 @@ export default function ProductDetailPage() {
             </div>
 
             {/* Customer Reviews Section */}
-            <div style={{ marginTop: '60px', borderTop: '1px solid #E5E7EB', backgroundColor: '#F8FAFC', padding: '60px 0' }}>
+            <div style={{ marginTop: '60px', borderTop: '1px solid #F3F4F6', backgroundColor: '#FFFFFF', padding: '60px 0' }}>
                 <div className="container" style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 20px' }}>
                     <h3 style={{ fontSize: '1.8rem', fontWeight: '900', color: '#111827', marginBottom: '32px' }}>Customer Reviews</h3>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '32px', alignItems: 'flex-start' }}>
 
                         {/* Left Card: Summary & Write Review */}
                         <div style={{ flex: '1 1 300px', backgroundColor: 'white', padding: '32px', borderRadius: '16px', border: '1px solid #E5E7EB', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
-                            <div style={{ fontSize: '3.75rem', fontWeight: '900', color: '#111827', lineHeight: '1' }}>
-                                {computedAvgRating || '0.0'}
-                            </div>
-                            <div style={{ color: '#FBBF24', fontSize: '1.4rem', margin: '14px 0' }}>
-                                {[1, 2, 3, 4, 5].map(i => (
-                                    <i key={i} className={`bi bi-star${i <= Math.round(Number(computedAvgRating) || 0) ? '-fill' : ''}`} />
-                                ))}
-                            </div>
-                            <div style={{ color: '#6B7280', marginBottom: '24px', fontSize: '0.95rem' }}>
-                                {reviewCount > 0 ? `${reviewCount} verified ratings` : 'No ratings yet'}
-                            </div>
+                            {hasRatingOrReviews ? (
+                                <>
+                                    <div style={{ fontSize: '3.75rem', fontWeight: '900', color: '#111827', lineHeight: '1' }}>
+                                        {computedAvgRating}
+                                    </div>
+                                    <div style={{ color: '#FBBF24', fontSize: '1.4rem', margin: '14px 0' }}>
+                                        {[1, 2, 3, 4, 5].map(i => (
+                                            <i key={i} className={`bi bi-star${i <= Math.round(Number(computedAvgRating) || 0) ? '-fill' : ''}`} />
+                                        ))}
+                                    </div>
+                                    <div style={{ color: '#6B7280', marginBottom: '24px', fontSize: '0.95rem' }}>
+                                        {reviewCount > 0 ? `${reviewCount} verified ratings` : 'Ratings recorded'}
+                                    </div>
+                                </>
+                            ) : (
+                                <div style={{ padding: '8px 0 20px', color: '#6B7280' }}>
+                                    <i className="bi bi-star" style={{ fontSize: '2.5rem', color: '#D1D5DB', display: 'block', marginBottom: '8px' }} />
+                                    <div style={{ fontWeight: '700', color: '#374151', fontSize: '1.1rem' }}>No Ratings Yet</div>
+                                    <div style={{ fontSize: '0.875rem', marginTop: '4px' }}>Be the first customer to rate this product!</div>
+                                </div>
+                            )}
 
                             {!user ? (
                                 <p style={{ color: '#6B7280', fontSize: '0.95rem' }}>Please log in to write a review.</p>
@@ -764,30 +772,17 @@ export default function ProductDetailPage() {
             {similarProducts && similarProducts.length > 0 && (
                 <div className="container" style={{ maxWidth: '1200px', margin: '0 auto', padding: '40px 20px 80px' }}>
                     <div style={{ marginTop: '40px', paddingTop: '40px', borderTop: '1px solid #E5E7EB' }}>
-                        <h2 style={{ fontSize: '1.5rem', fontWeight: '800', color: '#111827', marginBottom: '28px' }}>
-                            You May Also Like
-                        </h2>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '24px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+                            <h2 style={{ fontSize: '1.5rem', fontWeight: '800', color: '#111827', margin: 0 }}>
+                                You May Also Like
+                            </h2>
+                            <Link to="/products" style={{ color: 'var(--cta)', fontWeight: '700', fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                View All <i className="bi bi-arrow-right" />
+                            </Link>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '24px' }}>
                             {similarProducts.slice(0, 4).map((prod) => (
-                                <div
-                                    key={prod.id}
-                                    onClick={() => navigate(`/products/${prod.id}`)}
-                                    style={{ display: 'flex', flexDirection: 'column', gap: '12px', cursor: 'pointer', transition: 'all 0.3s ease' }}
-                                    onMouseOver={(e) => {
-                                        e.currentTarget.style.transform = 'translateY(-4px)';
-                                    }}
-                                    onMouseOut={(e) => {
-                                        e.currentTarget.style.transform = 'translateY(0)';
-                                    }}
-                                >
-                                    <div style={{ backgroundColor: '#FFFFFF', aspectRatio: '1', borderRadius: '14px', overflow: 'hidden', border: '1px solid #E5E7EB', padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                        <img src={prod.image_url ?? prod.image ?? "/pro1.jpg"} alt={prod.name} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-                                    </div>
-                                    <div>
-                                        <h4 style={{ fontSize: '0.9rem', fontWeight: '700', color: '#111827', margin: '0 0 4px 0', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{prod.name}</h4>
-                                        <div style={{ fontWeight: '800', color: 'var(--cta)' }}>₹{Number(prod.price).toLocaleString()}</div>
-                                    </div>
-                                </div>
+                                <ProductCard key={prod.id} id={`similar-card-${prod.id}`} product={prod} />
                             ))}
                         </div>
                     </div>

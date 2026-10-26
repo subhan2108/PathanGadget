@@ -1,5 +1,11 @@
 const { neon } = require('@neondatabase/serverless');
-const sql = neon('postgresql://neondb_owner:npg_5oCSnwNp8TDR@ep-wild-water-aoshjb2o-pooler.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require');
+require('dotenv').config({ path: '.env.local' });
+const dbUrl = process.env.VITE_DATABASE_URL || process.env.DATABASE_URL;
+if (!dbUrl) {
+  console.error('Error: VITE_DATABASE_URL is not set in .env.local');
+  process.exit(1);
+}
+const sql = neon(dbUrl);
 
 async function check() {
   try {

@@ -47,18 +47,18 @@ const ProductCard = React.forwardRef<HTMLDivElement, ProductCardProps>(
     const { addToCart } = useCart() || {};
     const [added, setAdded] = useState(false);
 
-    // Normalize product data whether passed as a full object or individual props
     const raw = rawProduct || {};
     const id = raw.id;
     const name = propName || raw.name || "Product";
-    const brand = raw.brand || "Smiley";
-    const category = raw.category || "electronics";
-    const description = raw.description || tagline || "Premium high fidelity electronics";
+    const brand = raw.brand || null;
+    const category = raw.category || null;
+    const description = raw.description || tagline || null;
     const image = imageUrl || raw.image_url || raw.image || "";
     const price = propPrice ?? raw.price ?? 0;
     const originalPrice = propOriginalPrice ?? raw.original_price ?? raw.originalPrice ?? price;
-    const rating = raw.rating ?? 4.8;
-    const reviewCount = raw.review_count ?? raw.reviewCount ?? raw.reviews ?? 120;
+    const rating = (raw.rating !== undefined && raw.rating !== null && Number(raw.rating) > 0) ? Number(raw.rating) : 0;
+    const reviewCount = raw.review_count ?? raw.reviewCount ?? raw.reviews ?? 0;
+    const hasRating = rating > 0 || reviewCount > 0;
     const badge = raw.badge || (offerText && !offerText.includes("%") ? offerText : null);
     const inStock = raw.in_stock ?? raw.inStock ?? true;
 
@@ -153,47 +153,57 @@ const ProductCard = React.forwardRef<HTMLDivElement, ProductCardProps>(
         {/* Card Body Content */}
         <div className="flex flex-col flex-1 w-full justify-between">
           {/* Brand & Category Row */}
-          <div className="flex items-center justify-between w-full mb-1">
-            <span
-              className="flex items-center gap-1.5 text-xs font-semibold text-[#2471E5]"
-              style={{ color: 'rgb(36, 113, 229)' }}
-            >
-              <i className="bi bi-building" /> {brand}
-            </span>
-            <span className="flex items-center gap-1 rounded-full bg-neutral-100/90 border border-neutral-200/80 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[#5E5549]">
-              <i className={`bi ${CATEGORY_ICONS[category] || "bi-box"}`} /> {category}
-            </span>
-          </div>
+          {(brand || category) && (
+            <div className="flex items-center justify-between w-full mb-1">
+              {brand ? (
+                <span
+                  className="flex items-center gap-1.5 text-xs font-semibold text-[#2471E5]"
+                  style={{ color: 'rgb(36, 113, 229)' }}
+                >
+                  <i className="bi bi-building" /> {brand}
+                </span>
+              ) : <span />}
+              {category && (
+                <span className="flex items-center gap-1 rounded-full bg-neutral-100/90 border border-neutral-200/80 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[#5E5549]">
+                  <i className={`bi ${CATEGORY_ICONS[category.toLowerCase()] || "bi-box"}`} /> {category}
+                </span>
+              )}
+            </div>
+          )}
 
           {/* Product Title */}
           <h3 className="font-bold text-base sm:text-lg text-[#1C1814] tracking-wide text-left w-full line-clamp-1 transition-colors duration-200 group-hover:text-[#B88424] mb-1">
             {name}
           </h3>
 
-          {/* Product Description */}
-          <p className="text-xs text-[#5E5549] line-clamp-2 text-left w-full font-normal leading-relaxed mb-2">
-            {description}
-          </p>
+          {/* Product Description (Strictly from backend) */}
+          {description && (
+            <p className="text-xs text-[#5E5549] line-clamp-2 text-left w-full font-normal leading-relaxed mb-2">
+              {description}
+            </p>
+          )}
 
-          {/* Rating Stars & Count */}
-          <div className="flex items-center gap-1.5 w-full text-left mb-2.5">
-            <span className="flex items-center gap-0.5 text-[#F9D949] text-xs">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <i
-                  key={i}
-                  className={`bi ${
-                    i <= Math.floor(rating)
-                      ? "bi-star-fill"
-                      : i - rating < 1
-                      ? "bi-star-half"
-                      : "bi-star text-neutral-300"
-                  }`}
-                />
-              ))}
-            </span>
-            <span className="text-xs font-bold text-[#1C1814]">{rating}</span>
-            <span className="text-xs text-[#6B7280]">({reviewCount.toLocaleString()})</span>
-          </div>
+          {/* Rating Stars & Count (Only if real rating or reviews exist) */}
+          {hasRating && (
+            <div className="flex items-center gap-1.5 w-full text-left mb-2.5">
+              <span className="flex items-center gap-0.5 text-[#F9D949] text-xs">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <i
+                    key={i}
+                    className={`bi ${
+                      i <= Math.floor(rating)
+                        ? "bi-star-fill"
+                        : i - rating < 1
+                        ? "bi-star-half"
+                        : "bi-star text-neutral-300"
+                    }`}
+                  />
+                ))}
+              </span>
+              {rating > 0 && <span className="text-xs font-bold text-[#1C1814]">{rating.toFixed(1)}</span>}
+              {reviewCount > 0 && <span className="text-xs text-[#6B7280]">({reviewCount.toLocaleString()})</span>}
+            </div>
+          )}
 
           {/* Pricing Row */}
           <div className="flex items-baseline gap-2 w-full pt-1 mb-3">
