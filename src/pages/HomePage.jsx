@@ -4,11 +4,11 @@ import { formatPrice } from '../data/mockData'
 import { useProducts, useCategories } from '../hooks/useProducts'
 import { useCart } from '../context/CartContext'
 import { HeroCarousel } from '@/components/ui/hero-carousel'
+import { ProductCard } from '@/components/ui/product-card-2'
 import './HomePage.css'
 
 const FEATURES = [
     { icon: 'bi-rocket-takeoff', title: 'Express Delivery', desc: '24–48 hr delivery to all major cities in India.', color: '#C99738' },
-    { icon: 'bi-shield-check', title: '1-Year Warranty', desc: 'Every product comes with full brand warranty.', color: '#B88424' },
     { icon: 'bi-arrow-return-left', title: '7-Day Returns', desc: 'Hassle-free returns — no questions asked.', color: '#916312' },
     { icon: 'bi-lock-fill', title: 'Secure Payments', desc: 'UPI, Card, NetBanking — 100% encrypted.', color: '#A07018' },
 ]
@@ -97,92 +97,15 @@ const CATEGORY_ICONS = {
     smartphones: 'bi-phone',
 }
 
-function ProductCard({ product: raw, loading }) {
-    const { addToCart } = useCart()
-    const navigate = useNavigate()
-    const [added, setAdded] = useState(false)
-
-    if (loading || !raw) {
-        return (
-            <div className="product-card product-card--skeleton">
-                <div className="skeleton product-card__img-wrap" />
-                <div className="product-card__body">
-                    <div className="skeleton" style={{ height: 16, width: '70%', marginBottom: 8 }} />
-                    <div className="skeleton" style={{ height: 14, width: '50%', marginBottom: 16 }} />
-                    <div className="skeleton" style={{ height: 36, width: '100%' }} />
-                </div>
-            </div>
-        )
-    }
-
-    const product = {
-        ...raw,
-        originalPrice: raw.original_price ?? raw.originalPrice ?? raw.price,
-        inStock: raw.in_stock ?? raw.inStock ?? true,
-        reviewCount: raw.review_count ?? raw.reviewCount ?? raw.reviews ?? 0,
-        image: raw.image_url ?? raw.image ?? '',
-    }
-
-    const handleAdd = (e) => {
-        e.stopPropagation()
-        addToCart(product)
-        setAdded(true)
-        setTimeout(() => setAdded(false), 1500)
-    }
-
-    const discount = product.originalPrice > product.price
-        ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
-        : 0
-
+function ProductCardSkeleton() {
     return (
-        <div className="product-card" id={`product-card-${product.id}`}>
-            <div
-                className="product-card__img-wrap"
-                onClick={() => navigate(`/products/${product.id}`)}
-                style={{ cursor: 'pointer' }}
-            >
-                <img src={product.image} alt={product.name} className="product-card__img" loading="lazy" />
-                {product.badge && <span className="product-card__badge">{product.badge}</span>}
-                {!product.inStock && <div className="product-card__out-of-stock"><i className="bi bi-x-circle" /> Out of Stock</div>}
-                {discount > 0 && <span className="product-card__discount">-{discount}%</span>}
-            </div>
-            <div className="product-card__body">
-                <p className="product-card__category">
-                    <i className={`bi ${CATEGORY_ICONS[product.category] || 'bi-box'}`} />
-                    {product.category}
-                </p>
-                <h3
-                    className="product-card__title"
-                    onClick={() => navigate(`/products/${product.id}`)}
-                    style={{ cursor: 'pointer' }}
-                >{product.name}</h3>
-                <div className="product-card__rating">
-                    {[...Array(5)].map((_, i) => (
-                        <i key={i} className={`bi ${i < Math.floor(product.rating) ? 'bi-star-fill' : 'bi-star'}`} />
-                    ))}
-                    <span className="rating-val">{product.rating}</span>
-                    <span className="rating-count">({product.reviewCount.toLocaleString()})</span>
-                </div>
-                <div className="product-card__pricing">
-                    <span className="price-current">{formatPrice(product.price)}</span>
-                    <span className="price-original">{formatPrice(product.originalPrice)}</span>
-                </div>
-                <div className="product-card__cta-group">
-                    <button
-                        id={`add-to-cart-${product.id}`}
-                        className={`btn btn-primary product-card__cta ${added ? 'added' : ''}`}
-                        onClick={handleAdd}
-                        disabled={!product.inStock}
-                    >
-                        {!product.inStock
-                            ? <><i className="bi bi-x-circle" /> Out of Stock</>
-                            : added
-                                ? <><i className="bi bi-check-circle-fill" /> Added!</>
-                                : <><i className="bi bi-cart-plus" /> Add to Cart</>
-                        }
-                    </button>
-                </div>
-            </div>
+        <div className="glass-card relative flex h-full w-full flex-col items-center justify-between p-6 text-center animate-pulse min-h-[440px]">
+            <div className="mb-4 h-44 w-full rounded-xl bg-black/5" />
+            <div className="h-5 w-3/4 rounded bg-black/5 mb-2" />
+            <div className="h-4 w-1/2 rounded bg-black/5 mb-4" />
+            <div className="h-7 w-24 rounded bg-black/5 mb-2" />
+            <div className="h-6 w-32 rounded-full bg-black/5 mb-4" />
+            <div className="w-full h-10 rounded-full bg-black/10 mt-2" />
         </div>
     )
 }
@@ -225,42 +148,46 @@ export default function HomePage() {
                         <p>Curated electronics for the modern lifestyle</p>
                     </div>
                     <div className="categories-grid" id="categories-grid">
-                        {categories.map(cat => (
-                            <div
-                                key={cat.id}
-                                id={`category-${cat.id}`}
-                                className="category-card"
-                                onClick={() => navigate(`/products?category=${cat.id}`)}
-                                role="button"
-                                tabIndex={0}
-                                onKeyDown={e => {
-                                    if (e.key === 'Enter' || e.key === ' ') {
-                                        e.preventDefault()
-                                        navigate(`/products?category=${cat.id}`)
-                                    }
-                                }}                            >
-                                <div className="category-card__img-wrap">
-                                    <img src={cat.image} alt={cat.name} className="category-card__img" loading="lazy" />
-                                    <div className="category-card__overlay" />
-                                </div>
-                                <div className="category-card__glass">
-                                    <i className={`bi ${CATEGORY_ICONS[cat.id]} category-card__icon`} />
-                                    <div>
-                                        <h3 className="category-card__name">{cat.name}</h3>
-                                        <p className="category-card__desc">{cat.description}</p>
+                        {categories.map((cat, index) => {
+                            const isTall = (categories.length === 5 && index === 2) || (categories.length % 3 === 2 && index === 2);
+                            return (
+                                <div
+                                    key={cat.id}
+                                    id={`category-${cat.id}`}
+                                    className={`category-card ${isTall ? 'category-card--tall' : ''}`}
+                                    onClick={() => navigate(`/products?category=${cat.id}`)}
+                                    role="button"
+                                    tabIndex={0}
+                                    onKeyDown={e => {
+                                        if (e.key === 'Enter' || e.key === ' ') {
+                                            e.preventDefault()
+                                            navigate(`/products?category=${cat.id}`)
+                                        }
+                                    }}
+                                >
+                                    <div className="category-card__img-wrap">
+                                        <img src={cat.image} alt={cat.name} className="category-card__img" loading="lazy" />
+                                        <div className="category-card__overlay" />
                                     </div>
-                                    <span className="category-card__count">
-                                        <i className="bi bi-box-seam" /> {cat.count} items
-                                    </span>
+                                    <div className="category-card__glass">
+                                        <i className={`bi ${CATEGORY_ICONS[cat.id]} category-card__icon`} />
+                                        <div>
+                                            <h3 className="category-card__name">{cat.name}</h3>
+                                            <p className="category-card__desc">{cat.description}</p>
+                                        </div>
+                                        <span className="category-card__count">
+                                            <i className="bi bi-box-seam" /> {cat.count} items
+                                        </span>
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
+                            )
+                        })}
                     </div>
                 </div>
             </section>
 
             {/* ── Featured Products ── */}
-            <section className="section featured-section" id="featured" style={{ background: 'var(--neutral-bg)' }}>
+            <section className="section featured-section" id="featured">
                 <div className="container">
                     <div className="section-header">
                         <span className="section-label"><i className="bi bi-stars" /> Handpicked for You</span>
@@ -290,8 +217,29 @@ export default function HomePage() {
                     {/* Products Grid */}
                     <div className="products-grid" id="products-grid">
                         {loading
-                            ? Array(8).fill(null).map((_, i) => <ProductCard key={i} loading />)
-                            : displayed.map(p => <ProductCard key={p.id} product={p} />)
+                            ? Array(8).fill(null).map((_, i) => <ProductCardSkeleton key={i} />)
+                            : displayed.map(raw => {
+                                const product = {
+                                    ...raw,
+                                    originalPrice: raw.original_price ?? raw.originalPrice ?? raw.price,
+                                    inStock: raw.in_stock ?? raw.inStock ?? true,
+                                    reviewCount: raw.review_count ?? raw.reviewCount ?? raw.reviews ?? 0,
+                                    image: raw.image_url ?? raw.image ?? '',
+                                }
+                                const discount = product.originalPrice > product.price
+                                    ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
+                                    : 0
+                                const offerText = product.badge || (discount > 0 ? `${discount}% Off` : 'Special Deal')
+                                const tagline = product.tagline || product.description || (product.category ? `${product.category.toUpperCase()} Collection` : 'Premium Audio & Wearables')
+
+                                return (
+                                    <ProductCard
+                                        key={product.id}
+                                        id={`product-card-${product.id}`}
+                                        product={product}
+                                    />
+                                )
+                            })
                         }
                     </div>
 
@@ -328,19 +276,68 @@ export default function HomePage() {
             </section>
 
             {/* ── CTA Banner ── */}
-            <section className="cta-banner" id="cta-banner">
-                <div className="container cta-banner__inner">
-                    <div>
-                        <h2><i className="bi bi-lightning-charge-fill" /> Ready to Elevate Your Tech?</h2>
-                        <p>Join 50,000+ happy customers. Free shipping on your first order.</p>
-                    </div>
-                    <div className="cta-banner__actions">
-                        <a href="#featured" className="btn btn-primary btn-lg" id="cta-shop-now">
-                            <i className="bi bi-bag-fill" /> Shop Now
-                        </a>
-                        <Link to="/track/ORD-2024-002" className="btn btn-lg cta-ghost" id="cta-track">
-                            <i className="bi bi-geo-alt-fill" /> Track Order
-                        </Link>
+            <section className="cta-section cta-banner" id="cta-banner">
+                <div className="container">
+                    <div className="cta-card">
+                        {/* Ambient background glow elements */}
+                        <div className="cta-card__glow-mesh" aria-hidden="true">
+                            <div className="cta-glow-orb cta-glow-orb--gold" />
+                            <div className="cta-glow-orb cta-glow-orb--amber" />
+                            <div className="cta-glow-orb cta-glow-orb--white" />
+                        </div>
+
+                        {/* Subtle decorative dot pattern */}
+                        <div className="cta-card__pattern" aria-hidden="true" />
+
+                        <div className="cta-card__content">
+                            {/* Circular border transparent badge */}
+                            <div className="cta-badge">
+                                <span className="cta-badge__dot">
+                                    <span className="cta-badge__ping" />
+                                </span>
+                                <i className="bi bi-lightning-charge-fill cta-badge__icon" />
+                                <span>VIP Member Privileges</span>
+                            </div>
+
+                            <h2 className="cta-card__title">
+                                Ready to Elevate <br className="hidden sm:inline" />
+                                <span className="cta-card__title-highlight">Your Tech Lifestyle?</span>
+                            </h2>
+
+                            <p className="cta-card__desc">
+                                Join 50,000+ satisfied customers. Experience authentic luxury audio, smartwatches & guaranteed fast delivery with free priority shipping on your first order.
+                            </p>
+
+                            <div className="cta-card__trust">
+                                <div className="cta-trust-item">
+                                    <i className="bi bi-patch-check-fill" />
+                                    <span>100% Authentic Tech</span>
+                                </div>
+                                <div className="cta-trust-divider" />
+                                <div className="cta-trust-item">
+                                    <i className="bi bi-truck" />
+                                    <span>Free Express Shipping</span>
+                                </div>
+                                <div className="cta-trust-divider" />
+                                <div className="cta-trust-item">
+                                    <i className="bi bi-arrow-repeat" />
+                                    <span>7-Day Return Guarantee</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="cta-card__actions">
+                            <a href="#featured" className="cta-btn cta-btn--primary" id="cta-shop-now">
+                                <span className="cta-btn__text">Shop Collection</span>
+                                <span className="cta-btn__circle">
+                                    <i className="bi bi-arrow-right" />
+                                </span>
+                            </a>
+                            <Link to="/track/ORD-2024-002" className="cta-btn cta-btn--glass" id="cta-track">
+                                <i className="bi bi-geo-alt-fill" />
+                                <span>Track Order</span>
+                            </Link>
+                        </div>
                     </div>
                 </div>
             </section>

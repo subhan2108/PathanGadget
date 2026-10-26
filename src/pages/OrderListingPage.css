@@ -3,13 +3,13 @@
    ============================================ */
 .order-listing-page {
     min-height: 100vh;
-    background: var(--order-bg, #F4F8FF);
+    background: #FFFFFF;
 }
 
 /* ── Header ── */
 .order-listing-header {
-    background: linear-gradient(135deg, var(--primary-bg), #fff);
-    border-bottom: 1px solid var(--border);
+    background: #FFFFFF;
+    border-bottom: 1px solid #E5E7EB;
     padding: 48px 0 40px;
 }
 
@@ -76,9 +76,9 @@
     align-items: center;
     gap: 7px;
     padding: 9px 18px;
-    border: 1.5px solid var(--border);
+    border: 1.5px solid #E5E7EB;
     border-radius: 50px;
-    background: var(--white);
+    background: #FFFFFF;
     font-size: 0.875rem;
     font-weight: 500;
     color: var(--text-secondary);
@@ -127,8 +127,8 @@
 }
 
 .order-card {
-    background: var(--white);
-    border: 1px solid var(--border);
+    background: #FFFFFF;
+    border: 1px solid #E5E7EB;
     border-radius: var(--radius-md);
     overflow: hidden;
     transition: box-shadow 200ms ease, transform 200ms ease;
@@ -144,8 +144,8 @@
     align-items: center;
     justify-content: space-between;
     padding: 16px 20px;
-    border-bottom: 1px solid var(--border);
-    background: var(--neutral-bg);
+    border-bottom: 1px solid #E5E7EB;
+    background: #FFFFFF;
     flex-wrap: wrap;
     gap: 10px;
 }
@@ -202,8 +202,10 @@
     width: 72px;
     height: 72px;
     border-radius: 10px;
-    object-fit: cover;
-    border: 1px solid var(--border);
+    object-fit: contain;
+    background: #FFFFFF;
+    border: 1px solid #E5E7EB;
+    padding: 4px;
     flex-shrink: 0;
 }
 
@@ -236,8 +238,8 @@
     align-items: center;
     justify-content: space-between;
     padding: 14px 20px;
-    border-top: 1px solid var(--border);
-    background: var(--neutral-bg);
+    border-top: 1px solid #E5E7EB;
+    background: #FFFFFF;
     flex-wrap: wrap;
     gap: 12px;
 }
@@ -269,6 +271,50 @@
     display: flex;
     gap: 10px;
     flex-wrap: wrap;
+}
+
+/* Filled yellow theme buttons on Orders Page */
+.order-listing-page .btn-secondary,
+.order-card__actions .btn-secondary,
+#track-order-btn.btn-secondary {
+    background: var(--cta, #E5B824);
+    color: #FFFFFF !important;
+    border: 1.5px solid var(--cta, #E5B824);
+    font-weight: 700;
+    box-shadow: 0 2px 8px rgba(184, 132, 36, 0.25);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 200ms ease;
+}
+
+.order-listing-page .btn-secondary i,
+.order-card__actions .btn-secondary i,
+#track-order-btn.btn-secondary i {
+    color: #FFFFFF !important;
+}
+
+.order-listing-page .btn-secondary:hover:not(:disabled),
+.order-card__actions .btn-secondary:hover:not(:disabled),
+#track-order-btn.btn-secondary:hover:not(:disabled) {
+    background: var(--cta-dark, #8C5E0F);
+    border-color: var(--cta-dark, #8C5E0F);
+    color: #FFFFFF !important;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 14px rgba(184, 132, 36, 0.35);
+}
+
+.order-listing-page .btn-secondary:disabled {
+    background: #E5E7EB !important;
+    border-color: #E5E7EB !important;
+    color: #9CA3AF !important;
+    box-shadow: none !important;
+    cursor: not-allowed;
+    transform: none !important;
+}
+
+.order-listing-page .btn-secondary:disabled i {
+    color: #9CA3AF !important;
 }
 
 /* ── Empty State ── */

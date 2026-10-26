@@ -1,73 +1,92 @@
-"use client"
+import { ProductCard, ProductCardProps } from "@/components/ui/product-card-2";
+import { motion } from "framer-motion";
 
-import {   
-  HeroCarousel,
-  type HeroCarouselItem,
-} from "@/components/ui/hero-carousel"
+// Sample data for the product grid
+const products: ProductCardProps[] = [
+  {
+    imageUrl: "https://images.unsplash.com/photo-1590658268037-6bf12165a8df?q=80&w=800&auto=format&fit=crop", // Stock image
+    name: "realme Buds Wireless 5 ANC",
+    tagline: "Best ANC, Beast Battery Life",
+    price: 1399,
+    originalPrice: 2799,
+    offerText: "1400 Off",
+  },
+  {
+    imageUrl: "https://images.unsplash.com/photo-1606220588913-b3aacb4d2f46?q=80&w=800&auto=format&fit=crop", // Stock image
+    name: "realme Buds Air7",
+    tagline: "52dB Segment's Strongest ANC*",
+    price: 2699,
+    originalPrice: 4899,
+    isCouponPrice: true,
+    offerText: "Up to 100 Coupon",
+  },
+  {
+    imageUrl: "https://images.unsplash.com/photo-1572536147248-ac59a8abfa4b?q=80&w=800&auto=format&fit=crop", // Stock image
+    name: "realme Buds Air7 Pro",
+    tagline: "The Sound Of Ai",
+    price: 4499,
+    originalPrice: 8999,
+    offerText: "Up to 500 Bank Offer",
+  },
+  {
+    imageUrl: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?q=80&w=800&auto=format&fit=crop", // Stock image
+    name: "realme Techlife Studio H1",
+    tagline: "Style Your Sound",
+    price: 3999,
+    originalPrice: 7999,
+    offerText: "Up to 500 Bank Offer",
+  },
+];
 
-// Placeholder art served straight off the crafterui CDN so the demo works the
-// moment it is installed - no assets to copy into your public/. Swap the names
-// for your own art direction; each item's `accent` is the hue the whole
-// backdrop grades to when that card takes focus.
-const ART = (name: string) =>
-  `https://pub-45c4a3d9611041d08fe82d52599b72b0.r2.dev/primary-showcase-assets/${name}.jpg`
+// Animation variants for the container and items
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1, // Delay between each child animation
+    },
+  },
+};
 
-const LOOKS: HeroCarouselItem[] = [
-  {
-    title: "Titanium\nSmartwatch",
-    image: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=1200&auto=format&fit=crop",
-    credit: "BY SMILEY N TRADERS.",
-    meta: ["AMOLED 120HZ", "TITANIUM CASE", "48H BATTERY"],
-    accent: "#C99738",
+const itemVariants = {
+  hidden: { y: 20, opacity: 0 },
+  visible: {
+    y: 0,
+    opacity: 1,
+    transition: {
+      type: "spring",
+      stiffness: 100,
+      damping: 10,
+    },
   },
-  {
-    title: "Acoustic\nPrecision",
-    image: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?q=80&w=1200&auto=format&fit=crop",
-    credit: "BY STUDIO MASTER.",
-    meta: ["LOSSLESS AUDIO", "ACTIVE NC", "40H PLAYTIME"],
-    accent: "#b88424",
-  },
-  {
-    title: "Pure\nWireless",
-    image: "https://images.unsplash.com/photo-1590658268037-6bf12165a8df?q=80&w=1200&auto=format&fit=crop",
-    credit: "BY SONIC LAB.",
-    meta: ["SPATIAL AUDIO", "TOUCH CONTROLS", "IPX7"],
-    accent: "#00c8ff",
-  },
-  {
-    title: "Cyber\nOptics",
-    image: "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?q=80&w=1200&auto=format&fit=crop",
-    credit: "BY FLAGSHIP LABS.",
-    meta: ["OLED CINEMA", "108MP PRO", "5G SPEED"],
-    accent: "#e5231b",
-  },
-  {
-    title: "Immersive\nReality",
-    image: "https://images.unsplash.com/photo-1622979135225-d2ba269bc1df?q=80&w=1200&auto=format&fit=crop",
-    credit: "BY HORIZON LABS.",
-    meta: ["4K HDR", "120 FPS", "SPATIAL TRACK"],
-    accent: "#7c3aed",
-  },
-  {
-    title: "Monolith\nBass",
-    image: "https://images.unsplash.com/photo-1545454675-3531b543be5d?q=80&w=1200&auto=format&fit=crop",
-    credit: "BY ATELIER SOUND.",
-    meta: ["DOLBY ATMOS", "360 SOUND", "CAST AUDIO"],
-    accent: "#dfac46",
-  },
-]
+};
 
-// ONLY DEFAULT EXPORT WILL BE TREATED AS A DEMO
-export default function DemoOne() {
+export default function ProductGridDemo() {
   return (
-    <HeroCarousel
-      items={LOOKS}
-      defaultIndex={0}
-      brand="SMILEY N TRADERS"
-      onBack={() => {}}
-      onMenu={() => {}}
-      autoplay={true}
-      autoplayDelay={4500}
-    />
-  )
+    <div className="w-full bg-background px-4 py-16">
+      <div className="mx-auto max-w-7xl">
+        {/* Section Header */}
+        <div className="mb-12 text-center">
+          <h2 className="text-4xl font-bold tracking-tight" style={{ color: '#F5A623' }}>
+            Let's Groove
+          </h2>
+        </div>
+
+        {/* Responsive Product Grid with Staggered Animation */}
+        <motion.div
+          className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4"
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+        >
+          {products.map((product, index) => (
+            <motion.div key={index} variants={itemVariants}>
+              <ProductCard {...product} />
+            </motion.div>
+          ))}
+        </motion.div>
+      </div>
+    </div>
+  );
 }

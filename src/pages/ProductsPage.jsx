@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useCart } from '../context/CartContext'
 import { useProducts, useFilterMeta, useCategories } from '../hooks/useProducts'
 import { formatPrice } from '../lib/productsService'
+import { ProductCard } from '@/components/ui/product-card-2'
 import './ProductsPage.css'
 
 /* ─── Constants ────────────────────────────────── */
@@ -34,134 +35,6 @@ const SORT_OPTIONS = [
 ]
 
 // Colors/Brands/Price bounds are now fetched live from Supabase via useFilterMeta()
-
-/* ─── Star Row ─────────────────────────────────── */
-function Stars({ rating }) {
-    return (
-        <span className="stars-row">
-            {[1, 2, 3, 4, 5].map(i => (
-                <i key={i} className={`bi ${i <= Math.floor(rating) ? 'bi-star-fill' : i - rating < 1 ? 'bi-star-half' : 'bi-star'}`} />
-            ))}
-        </span>
-    )
-}
-
-/* ─── Product Card ─────────────────────────────── */
-function ProductCard({ product: raw }) {
-    // Normalise DB snake_case → camelCase used throughout the UI
-    const product = {
-        ...raw,
-        originalPrice: raw.original_price ?? raw.originalPrice ?? raw.price,
-        inStock: raw.in_stock ?? raw.inStock ?? true,
-        reviewCount: raw.review_count ?? raw.reviewCount ?? 0,
-        image: raw.image_url ?? raw.image ?? '',
-    }
-    const { addToCart } = useCart()
-    const navigate = useNavigate()
-    const [added, setAdded] = useState(false)
-    const discount = product.originalPrice > product.price
-        ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
-        : 0
-
-    const handleAdd = (e) => {
-        e.stopPropagation()
-        addToCart(product)
-        setAdded(true)
-        setTimeout(() => setAdded(false), 1600)
-    }
-
-    return (
-        <article className="plp-card" id={`plp-card-${product.id}`}>
-            <div
-                className="plp-card__img-wrap"
-                onClick={() => navigate(`/products/${product.id}`)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={e => e.key === 'Enter' && navigate(`/products/${product.id}`)}
-            >
-                <img src={product.image} alt={product.name} loading="lazy" />
-                {product.badge && <span className="plp-card__badge">{product.badge}</span>}
-                {discount > 0 && <span className="plp-card__discount">-{discount}%</span>}
-                {!product.inStock && <div className="plp-card__oos"><i className="bi bi-x-circle" /> Out of Stock</div>}
-                <div className="plp-card__overlay">
-                    <span><i className="bi bi-eye" /> View Details</span>
-                </div>
-            </div>
-
-            <div className="plp-card__body">
-                <div className="plp-card__top">
-                    <span className="plp-card__brand"><i className="bi bi-building" /> {product.brand}</span>
-                    <span className="plp-card__cat">
-                        <i className={`bi ${CATEGORY_ICONS[product.category] || 'bi-box'}`} />
-                        {product.category}
-                    </span>
-                </div>
-
-                <h3
-                    className="plp-card__name"
-                    onClick={() => navigate(`/products/${product.id}`)}
-                >
-                    {product.name}
-                </h3>
-
-                <p className="plp-card__desc">{product.description}</p>
-
-                <div className="plp-card__rating">
-                    <Stars rating={product.rating} />
-                    <span className="plp-rating-val">{product.rating}</span>
-                    <span className="plp-rating-cnt">({(product.review_count ?? product.reviews ?? 0).toLocaleString()})</span>
-                </div>
-
-                {/* Color dots */}
-                {product.colors?.length > 0 && (
-                    <div className="plp-card__colors">
-                        {product.colors.slice(0, 5).map(c => (
-                            <span
-                                key={c}
-                                className="plp-color-dot"
-                                style={{ background: COLOR_MAP[c] || '#888' }}
-                                title={c}
-                            />
-                        ))}
-                        {product.colors.length > 5 && (
-                            <span className="plp-color-more">+{product.colors.length - 5}</span>
-                        )}
-                    </div>
-                )}
-
-                <div className="plp-card__pricing">
-                    <span className="plp-price">{formatPrice(product.price)}</span>
-                    <span className="plp-orig">{formatPrice(product.originalPrice)}</span>
-                    {discount > 0 && <span className="plp-save">Save {formatPrice(product.originalPrice - product.price)}</span>}
-                </div>
-
-                <div className="plp-card__cta-row">
-                    <button
-                        id={`plp-cart-${product.id}`}
-                        className={`btn btn-primary plp-cart-btn ${added ? 'added' : ''}`}
-                        onClick={handleAdd}
-                        disabled={!product.inStock}
-                    >
-                        {!product.inStock
-                            ? <><i className="bi bi-x-circle" /> Out of Stock</>
-                            : added
-                                ? <><i className="bi bi-check-circle-fill" /> Added!</>
-                                : <><i className="bi bi-cart-plus" /> Add to Cart</>
-                        }
-                    </button>
-                    {/* <button
-                        id={`plp-view-${product.id}`}
-                        className="btn btn-outline plp-view-btn"
-                        onClick={() => navigate(`/products/${product.id}`)}
-                        title="View Details"
-                    >
-                        <i className="bi bi-eye" />
-                    </button> */}
-                </div>
-            </div>
-        </article>
-    )
-}
 
 /* ─── Price Range Slider ────────────────────────── */
 function PriceRangeSlider({ min, max, value, onChange }) {
@@ -661,7 +534,7 @@ export default function ProductsPage() {
                             </div>
                         ) : filtered.length > 0 ? (
                             <div className={`plp-grid ${viewMode === 'list' ? 'plp-grid--list' : ''}`} id="plp-grid">
-                                {filtered.map(p => <ProductCard key={p.id} product={p} />)}
+                                {filtered.map(p => <ProductCard key={p.id} id={`product-card-${p.id}`} product={p} />)}
                             </div>
                         ) : (
                             <div className="plp-empty" id="plp-empty">

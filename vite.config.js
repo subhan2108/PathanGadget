@@ -14,22 +14,7 @@ export default defineConfig({
   css: {
     postcss: {
       plugins: [
-        tailwindcss({
-          content: [
-            "./index.html",
-            "./src/**/*.{js,ts,jsx,tsx}",
-          ],
-          corePlugins: {
-            preflight: false,
-          },
-          theme: {
-            extend: {
-              backgroundImage: {
-                "gradient-conic": "conic-gradient(var(--tw-gradient-stops))",
-              },
-            },
-          },
-        }),
+        tailwindcss(),
         autoprefixer()
       ]
     }

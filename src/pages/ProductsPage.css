@@ -873,317 +873,23 @@
 /* List mode */
 .plp-grid--list {
     grid-template-columns: 1fr;
+    gap: 16px;
 }
 
-.plp-grid--list .plp-card {
-    display: grid;
-    grid-template-columns: 220px 1fr;
-    border-radius: var(--radius-md);
-}
-
-.plp-grid--list .plp-card__img-wrap {
-    aspect-ratio: 1;
-    height: 100%;
-    min-height: 200px;
-}
-
-.plp-grid--list .plp-card__body {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    padding: 20px 24px;
-}
-
-.plp-grid--list .plp-card__desc {
-    display: block;
-}
-
-.plp-grid--list .plp-card__cta-row {
-    margin-top: auto;
-}
-
-/* ── PLP Card ────────────────────────────────────────────── */
-.plp-card {
-    background: var(--white);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    transition: transform 220ms ease, box-shadow 220ms ease;
-}
-
-.plp-card:hover {
-    transform: translateY(-4px);
-    box-shadow: var(--shadow-md);
-}
-
-/* Card image */
-.plp-card__img-wrap {
-    position: relative;
-    aspect-ratio: 1;
-    overflow: hidden;
-    background: #FAFAFA;
-    cursor: pointer;
-}
-
-.plp-card__img-wrap img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-    transition: transform 400ms ease;
-}
-
-.plp-card:hover .plp-card__img-wrap img {
-    transform: scale(1.05);
-}
-
-/* Overlay */
-.plp-card__overlay {
-    display: none;
-}
-
-.plp-card__overlay span {
-    color: white;
-    font-size: 0.9rem;
-    font-weight: 700;
-    display: flex;
+.plp-grid--list .glass-card {
+    min-height: auto;
+    flex-direction: row;
     align-items: center;
-    gap: 7px;
-    background: rgba(255, 255, 255, 0.2);
-    border: 1.5px solid rgba(255, 255, 255, 0.5);
-    backdrop-filter: blur(4px);
-    padding: 8px 20px;
-    border-radius: 24px;
+    text-align: left;
+    padding: 18px 24px;
+    gap: 24px;
 }
 
-/* Badges */
-.plp-card__badge {
-    position: absolute;
-    top: 10px;
-    left: 10px;
-    background: var(--cta);
-    color: white;
-    font-size: 0.6875rem;
-    font-weight: 700;
-    padding: 4px 10px;
-    border-radius: 20px;
-    z-index: 2;
-}
-
-.plp-card__discount {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    background: #059669;
-    color: white;
-    font-size: 0.6875rem;
-    font-weight: 700;
-    padding: 4px 8px;
-    border-radius: 6px;
-    z-index: 2;
-}
-
-.plp-card__oos {
-    position: absolute;
-    inset: 0;
-    background: rgba(255, 255, 255, 0.72);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 700;
-    font-size: 0.9rem;
-    color: var(--text-secondary);
-    gap: 6px;
-    z-index: 2;
-}
-
-/* Card body */
-.plp-card__body {
-    padding: 14px 16px 16px;
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 7px;
-}
-
-.plp-card__top {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 6px;
-}
-
-.plp-card__brand {
-    font-size: 0.75rem;
-    font-weight: 700;
-    color: var(--cta);
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    letter-spacing: 0.3px;
-}
-
-.plp-card__cat {
-    font-size: 0.6875rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.6px;
-    color: #4B5563;
-    display: flex;
-    align-items: center;
-    gap: 3px;
-    background: #F3F4F6;
-    padding: 2px 8px;
-    border-radius: 10px;
-}
-
-.plp-card__name {
-    font-size: 0.9375rem;
-    font-weight: 700;
-    color: var(--text-primary);
-    line-height: 1.3;
-    cursor: pointer;
-    transition: color 200ms ease;
-}
-
-.plp-card__name:hover {
-    color: var(--cta);
-}
-
-.plp-card__desc {
-    font-size: 0.8125rem;
-    color: var(--text-muted);
-    line-height: 1.55;
-    display: none;
-    /* shown in list mode */
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-}
-
-/* Rating */
-.plp-card__rating {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
-
-.stars-row {
-    color: #FBBF24;
-    letter-spacing: 1px;
-    font-size: 0.8125rem;
-}
-
-.plp-rating-val {
-    font-size: 0.8125rem;
-    font-weight: 700;
-    color: var(--text-primary);
-}
-
-.plp-rating-cnt {
-    font-size: 0.75rem;
-    color: var(--text-muted);
-}
-
-/* Colors */
-.plp-card__colors {
-    display: none;
-}
-
-.plp-color-dot {
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    border: 1.5px solid rgba(0, 0, 0, 0.1);
-    display: inline-block;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
-}
-
-.plp-color-more {
-    font-size: 0.7rem;
-    font-weight: 700;
-    color: var(--text-muted);
-}
-
-/* Pricing */
-.plp-card__pricing {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex-wrap: wrap;
-    margin-top: 2px;
-}
-
-.plp-price {
-    font-size: 1.125rem;
-    font-weight: 900;
-    color: var(--cta);
-}
-
-.plp-orig {
-    font-size: 0.8125rem;
-    color: var(--text-muted);
-    text-decoration: line-through;
-}
-
-.plp-save {
-    font-size: 0.75rem;
-    font-weight: 700;
-    color: #059669;
-}
-
-/* CTA row */
-.plp-card__cta-row {
-    display: flex;
-    gap: 8px;
-    margin-top: auto;
-    padding-top: 4px;
-}
-
-.plp-cart-btn {
-    flex: 1;
-    justify-content: center;
-    font-size: 0.875rem;
-    padding: 10px 12px;
-    transition: all 200ms ease;
-}
-
-.plp-cart-btn.added {
-    background: linear-gradient(135deg, #059669, #047857);
-    border-color: #059669;
-}
-
-.plp-cart-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    transform: none !important;
-}
-
-.plp-view-btn {
-    width: 42px;
-    height: 42px;
-    padding: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1rem;
+.plp-grid--list .glass-card > div:first-child {
+    width: 220px;
+    height: 180px;
     flex-shrink: 0;
-}
-
-.plp-view-btn:hover {
-    background: var(--primary-bg);
-    color: var(--cta);
-    border-color: var(--cta);
-}
-
-.plp-view-btn:hover {
-    background: var(--primary-bg);
-    color: var(--cta);
-    border-color: var(--cta);
+    margin-bottom: 0;
 }
 
 /* ── Empty State ─────────────────────────────────────────── */
@@ -1341,12 +1047,15 @@
         grid-template-columns: 1fr;
     }
 
-    .plp-grid--list .plp-card {
-        grid-template-columns: 1fr;
+    .plp-grid--list .glass-card {
+        flex-direction: column;
+        min-height: 420px;
     }
 
-    .plp-grid--list .plp-card__img-wrap {
-        min-height: unset;
+    .plp-grid--list .glass-card > div:first-child {
+        width: 100%;
+        height: 192px;
+        margin-bottom: 12px;
     }
 }
 

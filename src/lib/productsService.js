@@ -231,9 +231,15 @@ export async function fetchReviews(productId) {
 
 export async function submitReview(review) {
   try {
+    const prodId = String(review.productId || review.product_id || '');
+    const uId = String(review.userId || review.user_id || 'anonymous');
+    const ratingVal = Number(review.rating) || 5;
+    const titleVal = String(review.title || '');
+    const bodyVal = String(review.body || review.comment || review.reviewComment || '');
+
     await sql`
       INSERT INTO reviews (product_id, user_id, rating, title, body)
-      VALUES (${review.productId.toString()}, ${review.userId}, ${review.rating}, ${review.title}, ${review.body})
+      VALUES (${prodId}, ${uId}, ${ratingVal}, ${titleVal}, ${bodyVal})
     `;
     return { success: true };
   } catch (err) {
