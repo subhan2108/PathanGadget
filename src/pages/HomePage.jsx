@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { formatPrice } from '../data/mockData'
+import { formatPrice } from '../lib/productsService'
 import { useProducts, useCategories } from '../hooks/useProducts'
 import { useCart } from '../context/CartContext'
 import { HeroCarousel } from '@/components/ui/hero-carousel'

@@ -9,16 +9,24 @@ export async function fetchCart(userId) {
     if (!userId) return [];
     try {
         const rows = await sql`
-            SELECT * FROM cart_items 
-            WHERE user_id = ${userId}
-            ORDER BY created_at DESC
+            SELECT c.*, p.sku as product_sku, p.category as product_category 
+            FROM cart_items c
+            LEFT JOIN products p ON c.product_id::text = p.id::text
+            WHERE c.user_id = ${userId}
+            ORDER BY c.created_at DESC
         `;
-        return rows.map(r => ({ 
-            ...r, 
-            id: r.product_id, // Map product_id back to id for the frontend
-            variantId: r.variant_id, 
-            image: r.image_url 
-        }));
+        return rows.map(r => {
+            const fallbackSku = r.product_category 
+                ? `SMN-${r.product_category.substring(0, 3).toUpperCase()}-${String(r.product_id).padStart(4, '0')}`
+                : `SMN-${r.product_id}`;
+            return {
+                ...r, 
+                id: r.product_id, // Map product_id back to id for the frontend
+                sku: r.product_sku || fallbackSku,
+                variantId: r.variant_id, 
+                image: r.image_url 
+            };
+        });
     } catch (err) {
         console.error('Error fetching cart:', err);
         return [];

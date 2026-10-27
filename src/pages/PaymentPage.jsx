@@ -4,8 +4,10 @@ import { useCart } from '../context/CartContext'
 import { useAuth } from '../context/AuthContext'
 import { placeOrder } from '../lib/orderService'
 import { formatPrice } from '../lib/productsService'
-import { loadRazorpayScript, openRazorpayCheckout } from '../lib/razorpayService'
 import './PaymentPage.css'
+
+const WHATSAPP_PHONE = '918178768308'
+const WHATSAPP_DISPLAY = '+91 81787 68308'
 
 export default function PaymentPage() {
     const { cartItems, cartTotal, clearCart } = useCart()
@@ -24,7 +26,7 @@ export default function PaymentPage() {
     })
     
     const [errors, setErrors] = useState({})
-    const [paymentMethod, setPaymentMethod] = useState('razorpay') // 'razorpay' or 'cod'
+    const [paymentMethod, setPaymentMethod] = useState('whatsapp') // 'whatsapp' or 'cod'
     const [loading, setLoading] = useState(false)
     const [successOrder, setSuccessOrder] = useState(null) // holds order info when successful
 
@@ -66,13 +68,13 @@ export default function PaymentPage() {
         if (!shipping.email.trim()) {
             newErrors.email = 'Email is required'
         } else if (!emailRegex.test(shipping.email)) {
-            newErrors.email = 'Please enter a valid email'
+            newErrors.email = 'Please enter a valid email address'
         }
 
         if (!shipping.phone.trim()) {
             newErrors.phone = 'Phone number is required'
         } else if (!phoneRegex.test(shipping.phone)) {
-            newErrors.phone = 'Please enter a valid phone number'
+            newErrors.phone = 'Please enter a valid 10-digit phone number'
         }
 
         if (!shipping.address.trim()) newErrors.address = 'Delivery address is required'
@@ -107,95 +109,130 @@ export default function PaymentPage() {
         const deliveryFee = 0 // Free shipping
         const total = subtotal + deliveryFee
 
+        // Map items with explicit sku, full image url, quantity, and name
+        const orderItems = cartItems.map(item => {
+            const sku = item.sku || (item.category ? `SMN-${item.category.substring(0, 3).toUpperCase()}-${String(item.id).padStart(4, '0')}` : `SMN-${String(item.id).padStart(4, '0')}`)
+            
+            // Build full absolute image URL for WhatsApp clicking
+            let fullImageUrl = item.image || item.image_url || ''
+            if (fullImageUrl && !fullImageUrl.startsWith('http://') && !fullImageUrl.startsWith('https://')) {
+                fullImageUrl = `${window.location.origin}${fullImageUrl.startsWith('/') ? '' : '/'}${fullImageUrl}`
+            } else if (!fullImageUrl) {
+                fullImageUrl = `${window.location.origin}/logo.png`
+            }
+
+            return {
+                id: item.id.toString(),
+                sku,
+                name: item.name,
+                price: Number(item.price),
+                quantity: Number(item.quantity) || 1,
+                image_url: fullImageUrl,
+                image: fullImageUrl,
+                color: item.selectedColor || item.color || null,
+                variant_id: item.variantId || null
+            }
+        })
+
+        // Build item text list for WhatsApp message
+        const itemsMessage = orderItems.map((item, idx) => {
+            const lineTotal = item.price * item.quantity
+            let details = `${idx + 1}️⃣ *${item.name}*\n`
+            details += `   • *SKU:* \`${item.sku}\`\n`
+            details += `   • *Quantity:* ${item.quantity}\n`
+            details += `   • *Price:* ${formatPrice(item.price)} each (Subtotal: ${formatPrice(lineTotal)})\n`
+            if (item.variant_id) details += `   • *Option:* ${item.variant_id}\n`
+            if (item.color) details += `   • *Color:* ${item.color}\n`
+            details += `   • *Image Link:* ${item.image_url}`
+            return details
+        }).join('\n\n')
+
+        const customerAddress = `${shipping.address}, ${shipping.city}, ${shipping.state} - ${shipping.pincode}`
+        const paymentMethodTitle = paymentMethod === 'whatsapp' 
+            ? 'Pay via WhatsApp (UPI / QR / Bank Transfer)' 
+            : 'Cash on Delivery (COD)'
+
+        // Complete WhatsApp message with all required details
+        const waMessage = 
+`🛍️ *NEW ORDER PLACED - #${orderNumber}*
+━━━━━━━━━━━━━━━━━━━━━━━━━
+👤 *CUSTOMER DETAILS*
+• *Full Name:* ${shipping.firstName} ${shipping.lastName}
+• *Phone Number:* ${shipping.phone}
+• *Email Address:* ${shipping.email}
+• *Delivery Address:* ${customerAddress}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━
+📦 *ORDERED PRODUCTS (${orderItems.length} items)*
+
+${itemsMessage}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━
+💰 *ORDER SUMMARY*
+• *Subtotal:* ${formatPrice(subtotal)}
+• *Shipping:* FREE Express Delivery
+• *Total Payable:* *${formatPrice(total)}*
+• *Payment Method:* ${paymentMethodTitle}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━
+💬 *Order Note:*
+Hello! I have placed this order on your website. Please confirm my order and share the payment details (UPI QR Code / Account info) so I can complete the payment. Thank you!`
+
+        const waUrl = `https://wa.me/${WHATSAPP_PHONE}?text=${encodeURIComponent(waMessage)}`
+
         const orderData = {
             order_number: orderNumber,
             user_id: userId,
             total,
             subtotal,
             delivery_fee: deliveryFee,
-            payment_method: paymentMethod === 'razorpay' ? 'Razorpay' : 'COD',
+            payment_method: paymentMethod === 'whatsapp' ? 'WhatsApp' : 'COD',
+            payment_id: paymentMethod === 'whatsapp' ? `WA-${Date.now()}` : `COD-${Date.now()}`,
             shipping,
-            items: cartItems.map(item => ({
-                id: item.id.toString(),
-                name: item.name,
-                price: item.price,
-                quantity: item.quantity,
-                image_url: item.image || item.image_url,
-                image: item.image || item.image_url,
-                color: item.color || null,
-                variant_id: item.variantId || null
-            }))
+            items: orderItems
         }
 
-        if (paymentMethod === 'razorpay') {
-            const loaded = await loadRazorpayScript()
-            if (!loaded) {
-                alert('Could not load Razorpay SDK. Please check your internet connection.')
-                setLoading(false)
-                return
-            }
+        try {
+            const result = await placeOrder(orderData)
+            
+            // Set success view state
+            setSuccessOrder({
+                id: result?.id || orderNumber,
+                order_number: orderNumber,
+                total,
+                payment_id: orderData.payment_id,
+                payment_method: orderData.payment_method,
+                waUrl,
+                items: orderItems,
+                shipping
+            })
 
-            try {
-                await openRazorpayCheckout({
-                    amount: total,
-                    name: "Smiley N Traders",
-                    description: `Checkout payment for Order #${orderNumber}`,
-                    user: {
-                        firstName: shipping.firstName,
-                        lastName: shipping.lastName,
-                        email: shipping.email,
-                        phone: shipping.phone,
-                        address: `${shipping.address}, ${shipping.city}, ${shipping.state} - ${shipping.pincode}`
-                    },
-                    onSuccess: async (response) => {
-                        try {
-                            orderData.payment_id = response.razorpay_payment_id
-                            const result = await placeOrder(orderData)
-                            if (result.success) {
-                                setSuccessOrder({
-                                    id: result.id,
-                                    order_number: orderNumber,
-                                    total,
-                                    payment_id: response.razorpay_payment_id
-                                })
-                                clearCart()
-                            }
-                        } catch (err) {
-                            console.error('Failed to save order in Neon DB:', err)
-                            alert(`Payment of ${formatPrice(total)} was SUCCESSFUL (ID: ${response.razorpay_payment_id}), but saving order to database failed. Please contact customer support with your payment ID immediately!`)
-                        } finally {
-                            setLoading(false)
-                        }
-                    },
-                    onDismiss: () => {
-                        setLoading(false)
-                    }
-                })
-            } catch (err) {
-                console.error('Razorpay process failed:', err)
-                alert('Payment window failed to load. Please try again.')
-                setLoading(false)
+            // Clear local cart
+            clearCart()
+
+            // Automatically open WhatsApp in a new tab
+            const openedWindow = window.open(waUrl, '_blank')
+            if (!openedWindow) {
+                // If browser blocked the popup, redirect directly
+                window.location.href = waUrl
             }
-        } else {
-            // Cash on Delivery (COD)
-            try {
-                orderData.payment_id = 'COD-' + Date.now()
-                const result = await placeOrder(orderData)
-                if (result.success) {
-                    setSuccessOrder({
-                        id: result.id,
-                        order_number: orderNumber,
-                        total,
-                        payment_id: 'CASH_ON_DELIVERY'
-                    })
-                    clearCart()
-                }
-            } catch (err) {
-                console.error('Failed to create COD order:', err)
-                alert('Failed to place order. Please try again.')
-            } finally {
-                setLoading(false)
-            }
+        } catch (err) {
+            console.error('Failed to save order in database:', err)
+            // Even if DB fails, fulfill user request by opening WhatsApp and showing details
+            setSuccessOrder({
+                id: orderNumber,
+                order_number: orderNumber,
+                total,
+                payment_id: orderData.payment_id,
+                payment_method: orderData.payment_method,
+                waUrl,
+                items: orderItems,
+                shipping
+            })
+            clearCart()
+            window.open(waUrl, '_blank')
+        } finally {
+            setLoading(false)
         }
     }
 
@@ -204,14 +241,34 @@ export default function PaymentPage() {
         return (
             <div className="payment-success page-enter" id="payment-success-section">
                 <div className="payment-success__card">
-                    <div className="success-animation">
-                        <div className="success-ring" />
-                        <div className="success-checkmark">
-                            <i className="bi bi-check-lg" />
-                        </div>
+                    <div className="whatsapp-success-badge">
+                        <i className="bi bi-whatsapp" />
                     </div>
-                    <h2>Order Confirmed!</h2>
-                    <p>Thank you for shopping with Smiley N Traders. Your order has been placed and is being processed.</p>
+
+                    <h2>Order Placed Successfully!</h2>
+                    <p>
+                        Thank you for shopping with <strong>Smiley N Traders</strong>. Your order has been registered and is ready for payment on WhatsApp.
+                    </p>
+
+                    {/* WhatsApp CTA Card */}
+                    <div className="whatsapp-action-box">
+                        <div className="whatsapp-action-header">
+                            <i className="bi bi-chat-dots-fill" />
+                            <span>Complete Payment on WhatsApp</span>
+                        </div>
+                        <p className="whatsapp-action-desc">
+                            Click below to open WhatsApp chat with our verified payment team at <strong>{WHATSAPP_DISPLAY}</strong>. Your order summary and product details are pre-filled.
+                        </p>
+                        <a 
+                            href={successOrder.waUrl} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="btn-whatsapp-cta"
+                            id="open-whatsapp-btn"
+                        >
+                            <i className="bi bi-whatsapp" /> Open WhatsApp Chat ({WHATSAPP_DISPLAY})
+                        </a>
+                    </div>
                     
                     <div className="success-details">
                         <div className="success-detail-row">
@@ -220,19 +277,50 @@ export default function PaymentPage() {
                         </div>
                         <div className="success-detail-row">
                             <span><i className="bi bi-wallet2" /> Payment Method</span>
-                            <span>{paymentMethod === 'razorpay' ? 'Razorpay Online' : 'Cash on Delivery'}</span>
+                            <span style={{ color: '#059669', fontWeight: 700 }}>
+                                {successOrder.payment_method === 'WhatsApp' ? 'WhatsApp Direct Payment' : 'Cash on Delivery'}
+                            </span>
                         </div>
                         <div className="success-detail-row">
-                            <span><i className="bi bi-shield-check" /> Transaction ID</span>
-                            <span style={{ fontSize: '0.8rem', wordBreak: 'break-all' }}>{successOrder.payment_id}</span>
+                            <span><i className="bi bi-telephone-forward" /> WhatsApp Number</span>
+                            <strong>{WHATSAPP_DISPLAY}</strong>
                         </div>
                         <div className="success-detail-row">
                             <span><i className="bi bi-receipt" /> Total Amount</span>
-                            <strong className="text-green">{formatPrice(successOrder.total)}</strong>
+                            <strong className="text-green" style={{ fontSize: '1.15rem' }}>{formatPrice(successOrder.total)}</strong>
                         </div>
                     </div>
 
-                    <div className="success-actions">
+                    {/* Ordered Items Preview */}
+                    {successOrder.items && successOrder.items.length > 0 && (
+                        <div className="success-items-preview">
+                            <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: '#4B5563', textAlign: 'left' }}>
+                                Items in Order ({successOrder.items.length}):
+                            </h4>
+                            <div className="success-items-list">
+                                {successOrder.items.map((item, idx) => (
+                                    <div key={idx} className="success-item-mini">
+                                        <img 
+                                            src={item.image_url || '/logo.png'} 
+                                            alt={item.name} 
+                                            style={{ width: 44, height: 44, objectFit: 'contain', borderRadius: 8, border: '1px solid #E5E7EB', background: '#FFF' }}
+                                        />
+                                        <div style={{ flex: 1, textAlign: 'left' }}>
+                                            <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{item.name}</div>
+                                            <div style={{ fontSize: '0.75rem', color: '#6B7280' }}>
+                                                SKU: <code style={{ color: '#1E293B', fontWeight: 600 }}>{item.sku}</code> • Qty: {item.quantity}
+                                            </div>
+                                        </div>
+                                        <div style={{ fontWeight: 700, fontSize: '0.85rem' }}>
+                                            {formatPrice(item.price * item.quantity)}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="success-actions" style={{ marginTop: '24px' }}>
                         <Link to={`/orders/${successOrder.id}`} className="btn btn-primary btn-full">
                             <i className="bi bi-eye" /> View Order Details
                         </Link>
@@ -265,18 +353,18 @@ export default function PaymentPage() {
     }
 
     return (
-        <div className="payment-page page-enter" id="payment-page">
+        <div className="payment-page page-enter" id="payment-page" style={{ backgroundColor: '#F8FAFC', minHeight: '100vh' }}>
             {/* Header */}
-            <header className="payment-header" id="payment-header">
+            <header className="payment-header" id="payment-header" style={{ backgroundColor: '#FFFFFF' }}>
                 <div className="container">
                     <h1>
-                        <i className="bi bi-shield-lock-fill" />
-                        Secure Checkout
+                        <i className="bi bi-shield-lock-fill" style={{ color: '#059669' }} />
+                        Secure Checkout & Order
                     </h1>
                     <div className="payment-header__trust">
-                        <span><i className="bi bi-check-circle-fill" /> 256-Bit SSL Encryption</span>
-                        <span><i className="bi bi-truck" /> Free Express Shipping</span>
-                        <span><i className="bi bi-arrow-counterclockwise" /> 7-Day Easy Returns</span>
+                        <span><i className="bi bi-whatsapp" style={{ color: '#25D366' }} /> WhatsApp Payment Support</span>
+                        <span><i className="bi bi-truck" style={{ color: '#2563EB' }} /> Free Express Shipping</span>
+                        <span><i className="bi bi-arrow-counterclockwise" style={{ color: '#D97706' }} /> 7-Day Easy Returns</span>
                     </div>
                 </div>
             </header>
@@ -292,7 +380,7 @@ export default function PaymentPage() {
                         <div className="payment-section" id="shipping-address-section">
                             <h2>
                                 <i className="bi bi-geo-alt-fill" />
-                                Shipping & Contact details
+                                Customer & Shipping Details
                             </h2>
                             
                             <div className="form-row">
@@ -341,7 +429,7 @@ export default function PaymentPage() {
                                 </div>
 
                                 <div className="form-field">
-                                    <label htmlFor="phone"><i className="bi bi-telephone" /> Phone Number *</label>
+                                    <label htmlFor="phone"><i className="bi bi-telephone" /> Phone / WhatsApp Number *</label>
                                     <input 
                                         type="tel" 
                                         id="phone" 
@@ -419,29 +507,37 @@ export default function PaymentPage() {
                         <div className="payment-section" id="payment-method-section">
                             <h2>
                                 <i className="bi bi-credit-card-2-front-fill" />
-                                Payment Method
+                                Payment & Order Options
                             </h2>
+
                             <div className="payment-methods">
-                                <label className={`payment-method-card ${paymentMethod === 'razorpay' ? 'active' : ''}`}>
+                                {/* WhatsApp Payment */}
+                                <label className={`payment-method-card whatsapp-card ${paymentMethod === 'whatsapp' ? 'active' : ''}`}>
                                     <input 
                                         type="radio" 
                                         name="paymentMethod" 
-                                        value="razorpay" 
-                                        checked={paymentMethod === 'razorpay'}
-                                        onChange={() => setPaymentMethod('razorpay')}
+                                        value="whatsapp" 
+                                        checked={paymentMethod === 'whatsapp'}
+                                        onChange={() => setPaymentMethod('whatsapp')}
                                     />
-                                    <div className="payment-method-icon">
-                                        <i className="bi bi-wallet" />
+                                    <div className="payment-method-icon whatsapp-icon">
+                                        <i className="bi bi-whatsapp" />
                                     </div>
                                     <div className="payment-method-info">
-                                        <span className="payment-method-label">Razorpay Secure Online</span>
-                                        <span className="payment-method-desc">Pay safely with UPI, Cards, Netbanking, or Wallet</span>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                            <span className="payment-method-label">Pay via WhatsApp (UPI / QR / Bank)</span>
+                                            <span className="whatsapp-badge">Recommended</span>
+                                        </div>
+                                        <span className="payment-method-desc">
+                                            Pay directly via Google Pay, PhonePe, Paytm, or NetBanking with our team on WhatsApp ({WHATSAPP_DISPLAY})
+                                        </span>
                                     </div>
                                     <div className="payment-method-check">
-                                        <i className={`bi ${paymentMethod === 'razorpay' ? 'bi-check-circle-fill' : 'bi-circle'}`} />
+                                        <i className={`bi ${paymentMethod === 'whatsapp' ? 'bi-check-circle-fill' : 'bi-circle'}`} />
                                     </div>
                                 </label>
 
+                                {/* Cash on Delivery */}
                                 <label className={`payment-method-card ${paymentMethod === 'cod' ? 'active' : ''}`}>
                                     <input 
                                         type="radio" 
@@ -455,43 +551,58 @@ export default function PaymentPage() {
                                     </div>
                                     <div className="payment-method-info">
                                         <span className="payment-method-label">Cash on Delivery (COD)</span>
-                                        <span className="payment-method-desc">Pay cash when your order is delivered at your doorstep</span>
+                                        <span className="payment-method-desc">
+                                            Pay cash when order arrives at your doorstep. Confirmed on WhatsApp ({WHATSAPP_DISPLAY})
+                                        </span>
                                     </div>
                                     <div className="payment-method-check">
                                         <i className={`bi ${paymentMethod === 'cod' ? 'bi-check-circle-fill' : 'bi-circle'}`} />
                                     </div>
                                 </label>
                             </div>
+
+                            {/* WhatsApp Process Explainer */}
+                            <div className="whatsapp-notice-card">
+                                <div className="whatsapp-notice-title">
+                                    <i className="bi bi-info-circle-fill" />
+                                    <span>How Payment on WhatsApp Works:</span>
+                                </div>
+                                <ol className="whatsapp-steps-list">
+                                    <li>Enter your shipping details above and click the green button below.</li>
+                                    <li>You will be redirected to WhatsApp chat with <strong>{WHATSAPP_DISPLAY}</strong> with your order, products, quantities, and SKUs pre-filled.</li>
+                                    <li>Send the message to our team. We will send you our official UPI QR code or bank details to complete payment immediately.</li>
+                                </ol>
+                            </div>
                         </div>
 
                         {/* Complete Payment Button */}
                         <button 
                             type="submit" 
-                            className={`pay-btn ${loading ? 'loading' : ''}`}
+                            className={`pay-btn ${paymentMethod === 'whatsapp' ? 'pay-btn-whatsapp' : ''} ${loading ? 'loading' : ''}`}
                             disabled={loading}
                             id="pay-now-btn"
                         >
                             {loading ? (
                                 <>
                                     <span className="spinner" />
-                                    Processing Order...
+                                    Creating Order & Connecting to WhatsApp...
                                 </>
-                            ) : paymentMethod === 'razorpay' ? (
+                            ) : paymentMethod === 'whatsapp' ? (
                                 <>
-                                    <i className="bi bi-shield-lock" />
-                                    Pay securely with Razorpay ({formatPrice(cartTotal)})
+                                    <i className="bi bi-whatsapp" style={{ fontSize: '1.25rem' }} />
+                                    Proceed to WhatsApp for Payment ({formatPrice(cartTotal)})
                                 </>
                             ) : (
                                 <>
-                                    <i className="bi bi-bag-check" />
-                                    Place Cash on Delivery Order ({formatPrice(cartTotal)})
+                                    <i className="bi bi-whatsapp" style={{ fontSize: '1.25rem' }} />
+                                    Confirm COD Order on WhatsApp ({formatPrice(cartTotal)})
                                 </>
                             )}
                         </button>
                         
                         <p className="payment-disclaimer">
-                            <i className="bi bi-lock-fill" />
-                            Your transaction is secured using industry-grade SSL encryption protocol.
+                            <i className="bi bi-shield-check" style={{ color: '#059669' }} />
+                            Direct merchant checkout powered by Smiley N Traders WhatsApp Support ({WHATSAPP_DISPLAY}).
                         </p>
                     </div>
 
@@ -504,21 +615,44 @@ export default function PaymentPage() {
                             </h3>
 
                             <div className="summary-items">
-                                {cartItems.map(item => (
-                                    <div key={item.id} className="summary-item">
-                                        <img src={item.image} alt={item.name} />
-                                        <div>
-                                            <p className="summary-item__name">{item.name}</p>
-                                            {item.variantId && <p className="summary-item__variant" style={{ fontSize: '0.8rem', color: 'var(--cta)', fontWeight: 600, margin: '2px 0 4px' }}>Offer: {item.variantId}</p>}
-                                            <p className="summary-item__qty">
-                                                <i className="bi bi-layers" /> Qty: {item.quantity}
-                                            </p>
+                                {cartItems.map(item => {
+                                    const itemSku = item.sku || (item.category ? `SMN-${item.category.substring(0, 3).toUpperCase()}-${String(item.id).padStart(4, '0')}` : `SMN-${String(item.id).padStart(4, '0')}`)
+                                    return (
+                                        <div key={item.id} className="summary-item">
+                                            <img 
+                                                src={item.image || item.image_url || '/logo.png'} 
+                                                alt={item.name}
+                                                style={{
+                                                    width: '60px',
+                                                    height: '60px',
+                                                    borderRadius: '10px',
+                                                    objectFit: 'contain',
+                                                    backgroundColor: '#FFFFFF',
+                                                    border: '1px solid #E5E7EB',
+                                                    padding: '4px',
+                                                    flexShrink: 0
+                                                }}
+                                                onError={(e) => {
+                                                    e.currentTarget.onerror = null;
+                                                    e.currentTarget.src = 'https://images.unsplash.com/photo-1558611848-73f7eb4001a1?w=200&q=80';
+                                                }}
+                                            />
+                                            <div style={{ flex: 1, minWidth: 0 }}>
+                                                <p className="summary-item__name" style={{ wordBreak: 'break-word', fontWeight: 600 }}>{item.name}</p>
+                                                <p style={{ margin: '2px 0', fontSize: '0.75rem', color: '#4B5563', fontFamily: 'monospace' }}>
+                                                    SKU: <strong>{itemSku}</strong>
+                                                </p>
+                                                {item.variantId && <p className="summary-item__variant" style={{ fontSize: '0.78rem', color: '#6366F1', fontWeight: 600, margin: '2px 0' }}>Offer: {item.variantId}</p>}
+                                                <p className="summary-item__qty">
+                                                    <i className="bi bi-layers" /> Qty: {item.quantity}
+                                                </p>
+                                            </div>
+                                            <span className="summary-item__price" style={{ color: '#111827', fontWeight: '700', fontSize: '0.9375rem' }}>
+                                                {formatPrice(item.price * item.quantity)}
+                                            </span>
                                         </div>
-                                        <span className="summary-item__price">
-                                            {formatPrice(item.price * item.quantity)}
-                                        </span>
-                                    </div>
-                                ))}
+                                    )
+                                })}
                             </div>
 
                             <hr className="divider" style={{ margin: '16px 0' }} />
@@ -526,7 +660,7 @@ export default function PaymentPage() {
                             <div className="summary-calc-rows">
                                 <div className="summary-calc-row">
                                     <span><i className="bi bi-tag" /> Subtotal</span>
-                                    <span>{formatPrice(cartTotal)}</span>
+                                    <span style={{ color: '#111827', fontWeight: '600' }}>{formatPrice(cartTotal)}</span>
                                 </div>
                                 <div className="summary-calc-row">
                                     <span><i className="bi bi-truck" /> Shipping</span>
@@ -542,27 +676,27 @@ export default function PaymentPage() {
 
                             <div className="summary-total-row">
                                 <strong>Total Amount</strong>
-                                <strong className="total-amount">{formatPrice(cartTotal)}</strong>
+                                <strong className="total-amount" style={{ color: '#111827', fontWeight: '800', fontSize: '1.25rem' }}>{formatPrice(cartTotal)}</strong>
                             </div>
 
                             <div className="free-shipping-badge">
                                 <i className="bi bi-gift-fill" />
-                                You qualify for FREE premium express shipping!
+                                You qualify for FREE express shipping!
                             </div>
                         </div>
 
                         {/* Trust Badges */}
                         <div className="trust-badges">
                             <div className="trust-badge">
-                                <i className="bi bi-shield-check" />
-                                Safe Payments
+                                <i className="bi bi-whatsapp" style={{ color: '#25D366' }} />
+                                Direct WhatsApp
                             </div>
                             <div className="trust-badge">
-                                <i className="bi bi-truck" />
+                                <i className="bi bi-truck" style={{ color: '#2563EB' }} />
                                 Fast Shipping
                             </div>
                             <div className="trust-badge">
-                                <i className="bi bi-arrow-left-right" />
+                                <i className="bi bi-arrow-left-right" style={{ color: '#D97706' }} />
                                 Easy Returns
                             </div>
                         </div>

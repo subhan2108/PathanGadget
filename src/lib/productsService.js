@@ -9,9 +9,11 @@ function mapProduct(row) {
   if (!row) return null;
   const colorsArray = typeof row.colors === 'string' ? JSON.parse(row.colors) : (row.colors || []);
   const detailsObj = typeof row.details === 'string' ? JSON.parse(row.details) : (row.details || {});
+  const skuCode = row.sku || detailsObj.sku || (row.id ? `SMN-${(row.category || 'GEN').substring(0, 3).toUpperCase()}-${String(row.id).padStart(4, '0')}` : '');
   
   return {
     id: row.id,
+    sku: skuCode,
     name: row.name,
     description: row.description,
     category: row.category,

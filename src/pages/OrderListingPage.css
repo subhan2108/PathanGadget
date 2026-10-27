@@ -44,7 +44,7 @@
 }
 
 .breadcrumb a {
-    color: var(--accent);
+    color: #f6b304;
     display: flex;
     align-items: center;
     gap: 4px;

@@ -12,6 +12,8 @@ import {
 } from '../lib/adminService'
 import { useAuth } from '../context/AuthContext'
 import { useCategories } from '../hooks/useProducts'
+import { syncMockDataToNeon } from '../lib/syncService'
+import { compressImageFile, formatFileSize, getDataUrlSize } from '../lib/imageUtils'
 import './AdminPage.css'
 
 export default function AdminPage() {
@@ -19,6 +21,7 @@ export default function AdminPage() {
     const { categories } = useCategories()
     const [tab, setTab] = useState('products')
     const [loading, setLoading] = useState(false)
+    const [syncing, setSyncing] = useState(false)
 
     // Data states
     const [products, setProducts] = useState([])
@@ -33,6 +36,58 @@ export default function AdminPage() {
     const [editingProductId, setEditingProductId] = useState(null)
     const [selectedOrder, setSelectedOrder] = useState(null)
     const [trackingForm, setTrackingForm] = useState({ label: '', description: '', status: 'processing', is_current: true })
+
+    // Image Upload States
+    const [uploadingSlot, setUploadingSlot] = useState(null)
+    const [bulkProgress, setBulkProgress] = useState(null)
+    const [showUrlInputs, setShowUrlInputs] = useState({})
+
+    const handleSingleImageUpload = async (slotKey, e) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+        try {
+            setUploadingSlot(slotKey)
+            const compressed = await compressImageFile(file, 1200, 1200, 0.82)
+            setProductForm(prev => ({ ...prev, [slotKey]: compressed }))
+        } catch (err) {
+            alert('Failed to process image: ' + err.message)
+        } finally {
+            setUploadingSlot(null)
+            e.target.value = ''
+        }
+    }
+
+    const handleBulkImageUpload = async (e) => {
+        const files = Array.from(e.target.files || []).slice(0, 6)
+        if (files.length === 0) return
+        try {
+            setUploadingSlot('bulk')
+            const slotKeys = ['image_url', 'image2', 'image3', 'image4', 'image5', 'image6']
+            const updated = { ...productForm }
+
+            for (let i = 0; i < files.length && i < slotKeys.length; i++) {
+                setBulkProgress(`Optimizing ${i + 1} of ${files.length} from gallery...`)
+                const compressed = await compressImageFile(files[i], 1200, 1200, 0.82)
+                updated[slotKeys[i]] = compressed
+            }
+
+            setProductForm(updated)
+        } catch (err) {
+            alert('Bulk upload error: ' + err.message)
+        } finally {
+            setUploadingSlot(null)
+            setBulkProgress(null)
+            e.target.value = ''
+        }
+    }
+
+    const handleRemoveSlotImage = (slotKey) => {
+        setProductForm(prev => ({ ...prev, [slotKey]: '' }))
+    }
+
+    const toggleUrlInput = (slotKey) => {
+        setShowUrlInputs(prev => ({ ...prev, [slotKey]: !prev[slotKey] }))
+    }
 
     useEffect(() => {
         if (!user) return
@@ -58,30 +113,82 @@ export default function AdminPage() {
         setLoading(false)
     }
 
+    const handleSyncMockData = async () => {
+        if (!window.confirm('Sync and populate all products, orders, and tracking data from mockData.js into Neon PostgreSQL?')) return
+        setSyncing(true)
+        try {
+            const res = await syncMockDataToNeon()
+            if (res.success) {
+                alert('Database synchronized successfully with all products, orders, and tracking milestones!')
+                loadProducts()
+                loadOrders()
+            } else {
+                alert('Sync failed: ' + res.error)
+            }
+        } catch (err) {
+            alert('Sync error: ' + err.message)
+        } finally {
+            setSyncing(false)
+        }
+    }
+
+    const handleAutoGenerateSku = () => {
+        const cat = (productForm.category || 'GEN').substring(0, 3).toUpperCase();
+        const rand = Math.floor(1000 + Math.random() * 9000);
+        setProductForm(prev => ({ ...prev, sku: `SMN-${cat}-${rand}` }));
+    };
+
     /* ── Product Functions ── */
 
     const openProductModal = (prod = null) => {
         setEditingProductId(prod ? prod.id : null)
         
         const detailsObj = prod?.details || {};
+        const existingSpecs = (detailsObj.specifications && Object.keys(detailsObj.specifications).length > 0)
+            ? detailsObj.specifications
+            : (detailsObj.specs && Object.keys(detailsObj.specs).length > 0
+                ? detailsObj.specs
+                : (prod?.specs || {}));
         
+        let existingExtraImages = [];
+        if (Array.isArray(detailsObj.extraImages)) {
+            existingExtraImages = detailsObj.extraImages;
+        } else if (typeof detailsObj.extraImages === 'string') {
+            const trimmed = detailsObj.extraImages.trim();
+            if (trimmed.startsWith('[')) {
+                try { existingExtraImages = JSON.parse(trimmed); } catch (e) { existingExtraImages = []; }
+            } else if (trimmed.startsWith('data:image/')) {
+                existingExtraImages = [trimmed];
+            } else {
+                existingExtraImages = trimmed.split(/[\n,]+/).map(u => u.trim()).filter(Boolean);
+            }
+        }
+
+        const existingSku = prod?.sku || detailsObj.sku || (prod?.id ? `SMN-${(prod.category || 'GEN').substring(0, 3).toUpperCase()}-${String(prod.id).padStart(4, '0')}` : '');
+
         setProductForm(prod ? {
             ...prod,
+            sku: existingSku,
             colors: prod.colors?.join(', ') || '',
-            extraImages: (detailsObj.extraImages || []).join('\n'),
-            highlights: (detailsObj.highlights || []).join('\n'),
-            specifications: Object.entries(detailsObj.specifications || {}).map(([k,v]) => `${k}: ${v}`).join('\n'),
+            image_url: prod.image_url || prod.image || '',
+            image2: existingExtraImages[0] || '',
+            image3: existingExtraImages[1] || '',
+            image4: existingExtraImages[2] || '',
+            image5: existingExtraImages[3] || '',
+            image6: existingExtraImages[4] || '',
+            highlights: (detailsObj.highlights || prod?.highlights || []).join('\n'),
+            specifications: Object.entries(existingSpecs).filter(([k]) => k.toUpperCase() !== 'SKU').map(([k,v]) => `${k}: ${v}`).join('\n'),
             whyChooseUs: (detailsObj.whyChooseUs || []).join('\n'),
-            marketingHeading: detailsObj.marketingHeading || '',
             buy2Discount: detailsObj.discounts?.buy2 || 0,
             buy3Discount: detailsObj.discounts?.buy3 || 0,
             hasOffer: detailsObj.hasOffer !== false // default to true
         } : {
-            name: '', price: 0, original_price: 0, category: 'smartphones', brand: '',
+            name: '', sku: '', price: 0, original_price: 0, category: 'smartphones', brand: '',
             description: '', image_url: '', badge: '', in_stock: true,
             rating: 0, review_count: 0, colors: '', 
-            extraImages: '', highlights: '', specifications: '', whyChooseUs: '', 
-            marketingHeading: '', buy2Discount: 0, buy3Discount: 0, hasOffer: true
+            image2: '', image3: '', image4: '', image5: '', image6: '',
+            highlights: '', specifications: '', whyChooseUs: '', 
+            buy2Discount: 0, buy3Discount: 0, hasOffer: true
         })
         setShowProductModal(true)
     }
@@ -90,8 +197,9 @@ export default function AdminPage() {
         e.preventDefault()
         try {
             const { 
-                extraImages, highlights, specifications, whyChooseUs, 
-                marketingHeading, buy2Discount, buy3Discount, hasOffer,
+                image2, image3, image4, image5, image6,
+                highlights, specifications, whyChooseUs, 
+                buy2Discount, buy3Discount, hasOffer,
                 ...restForm 
             } = productForm;
             
@@ -108,12 +216,21 @@ export default function AdminPage() {
                 });
             }
 
+            // Determine final SKU
+            const finalSku = (restForm.sku && restForm.sku.trim()) || `SMN-${(restForm.category || 'GEN').substring(0, 3).toUpperCase()}-${Date.now().toString().slice(-4)}`;
+
+            // Collect all extra gallery images (Slots 2-6)
+            const extraList = [image2, image3, image4, image5, image6]
+                .map(u => typeof u === 'string' ? u.trim() : '')
+                .filter(u => Boolean(u) && u !== restForm.image_url);
+
             const parsedDetails = {
-                extraImages: extraImages ? extraImages.split('\n').map(u => u.trim()).filter(Boolean) : [],
+                sku: finalSku,
+                extraImages: extraList,
                 highlights: highlights ? highlights.split('\n').map(u => u.trim()).filter(Boolean) : [],
-                specifications: specsObj,
+                specifications: { SKU: finalSku, ...specsObj },
+                specs: { SKU: finalSku, ...specsObj },
                 whyChooseUs: whyChooseUs ? whyChooseUs.split('\n').map(u => u.trim()).filter(Boolean) : [],
-                marketingHeading: marketingHeading || '',
                 hasOffer: hasOffer !== false, // explicitly save boolean
                 discounts: {
                     buy2: Number(buy2Discount) || 0,
@@ -123,6 +240,7 @@ export default function AdminPage() {
 
             const formattedForm = {
                 ...restForm,
+                sku: finalSku,
                 colors: restForm.colors ? restForm.colors.split(',').map(c => c.trim()).filter(Boolean) : [],
                 details: parsedDetails,
             };
@@ -190,11 +308,20 @@ export default function AdminPage() {
 
     return (
         <div className="admin-container page-enter">
-            <header className="admin-header">
+            <header className="admin-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
                 <div>
                     <h1><i className="bi bi-shield-lock" /> Smiley N Traders Admin Panel</h1>
                     <p>Manage products, orders, and real-time shipment updates.</p>
                 </div>
+                <button 
+                    className="btn btn-outline-primary"
+                    onClick={handleSyncMockData}
+                    disabled={syncing}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 18px', borderRadius: '10px', fontWeight: '700', fontSize: '0.9rem' }}
+                >
+                    <i className={`bi ${syncing ? 'bi-arrow-repeat bi-spin' : 'bi-database-fill-gear'}`} />
+                    {syncing ? 'Syncing to Neon DB...' : 'Sync Mock Data to Database'}
+                </button>
             </header>
 
             <div className="admin-tabs">
@@ -236,7 +363,14 @@ export default function AdminPage() {
                                                 <tr key={p.id}>
                                                     <td>{p.id}</td>
                                                     <td><img src={p.image_url} alt="" width="40" height="40" style={{ objectFit: 'contain' }} /></td>
-                                                    <td><strong>{p.name}</strong></td>
+                                                    <td>
+                                                        <strong>{p.name}</strong>
+                                                        {p.sku && (
+                                                            <div style={{ fontSize: '0.75rem', color: '#6B7280', fontFamily: 'monospace', marginTop: '2px' }}>
+                                                                SKU: {p.sku}
+                                                            </div>
+                                                        )}
+                                                    </td>
                                                     <td>₹{p.price}</td>
                                                     <td><span className="badge badge-secondary">{p.category}</span></td>
                                                     <td>{p.in_stock ? <span className="text-success">In Stock</span> : <span className="text-danger">Out</span>}</td>
@@ -325,9 +459,31 @@ export default function AdminPage() {
                                     <input type="number" className="form-control" name="original_price" value={productForm.original_price || ''} onChange={e => setProductForm({ ...productForm, original_price: Number(e.target.value) })} />
                                 </div>
                             </div>
-                            <div className="form-row mb-3" style={{ display: 'flex', gap: 15 }}>
+                            <div className="form-row mb-3" style={{ display: 'flex', gap: 15, alignItems: 'flex-start' }}>
+                                <div className="form-group" style={{ flex: 1.2 }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                                        <label style={{ margin: 0, fontWeight: '600', fontSize: '0.9rem' }}>SKU (Stock Keeping Unit)</label>
+                                        <button
+                                            type="button"
+                                            onClick={handleAutoGenerateSku}
+                                            style={{ background: 'none', border: 'none', color: 'var(--cta-dark)', fontSize: '0.72rem', fontWeight: '700', cursor: 'pointer', padding: 0 }}
+                                            title="Generate SKU based on category"
+                                        >
+                                            <i className="bi bi-magic" /> Auto-Gen
+                                        </button>
+                                    </div>
+                                    <input 
+                                        type="text" 
+                                        className="form-control" 
+                                        placeholder="e.g. SMN-WAT-0001" 
+                                        name="sku" 
+                                        value={productForm.sku || ''} 
+                                        onChange={e => setProductForm({ ...productForm, sku: e.target.value })}
+                                        style={{ fontFamily: 'monospace', fontWeight: '700', letterSpacing: '0.5px' }} 
+                                    />
+                                </div>
                                 <div className="form-group" style={{ flex: 1 }}>
-                                    <label>Category</label>
+                                    <label style={{ marginBottom: '6px' }}>Category</label>
                                     <input type="text" list="admin-categories" className="form-control" value={productForm.category || ''} onChange={e => setProductForm({ ...productForm, category: e.target.value })} placeholder="Select or type new..." />
                                     <datalist id="admin-categories">
                                         {categories.map(c => (
@@ -336,7 +492,7 @@ export default function AdminPage() {
                                     </datalist>
                                 </div>
                                 <div className="form-group" style={{ flex: 1 }}>
-                                    <label>Brand</label>
+                                    <label style={{ marginBottom: '6px' }}>Brand</label>
                                     <input type="text" className="form-control" name="brand" value={productForm.brand || ''} onChange={e => setProductForm({ ...productForm, brand: e.target.value })} />
                                 </div>
                             </div>
@@ -360,13 +516,255 @@ export default function AdminPage() {
                                     <input type="number" className="form-control" name="review_count" value={productForm.review_count || ''} onChange={e => setProductForm({ ...productForm, review_count: Number(e.target.value) })} />
                                 </div>
                             </div>
-                            <div className="form-group mb-3">
-                                <label>Image URL (Primary)</label>
-                                <input type="url" className="form-control" name="image_url" value={productForm.image_url || ''} onChange={e => setProductForm({ ...productForm, image_url: e.target.value })} required />
-                            </div>
-                            <div className="form-group mb-3">
-                                <label>Extra Gallery Images (1 URL per line)</label>
-                                <textarea className="form-control" rows="3" placeholder="https://..." value={productForm.extraImages || ''} onChange={e => setProductForm({ ...productForm, extraImages: e.target.value })} />
+                            {/* ── Product Gallery (Direct Gallery Upload — Stored in Neon DB) ── */}
+                            <div style={{ backgroundColor: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: '16px', padding: '20px', marginBottom: '24px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '16px' }}>
+                                    <div>
+                                        <label style={{ margin: 0, fontWeight: '800', color: '#111827', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <i className="bi bi-images" style={{ color: 'var(--cta)', fontSize: '1.2rem' }} />
+                                            Product Gallery (Direct Gallery Upload)
+                                        </label>
+                                        <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: '#6B7280' }}>
+                                            Upload photos directly from your device gallery. Auto-optimized & stored in Neon DB.
+                                        </p>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                                        <span style={{ fontSize: '0.8rem', fontWeight: '700', backgroundColor: '#EFF6FF', color: '#1D4ED8', padding: '4px 12px', borderRadius: '20px' }}>
+                                            {[productForm.image_url, productForm.image2, productForm.image3, productForm.image4, productForm.image5, productForm.image6].filter(Boolean).length} / 6 Images
+                                        </span>
+                                        {/* Bulk Upload Button */}
+                                        <input 
+                                            type="file" 
+                                            id="admin-bulk-file-input" 
+                                            accept="image/*" 
+                                            multiple 
+                                            style={{ display: 'none' }} 
+                                            onChange={handleBulkImageUpload} 
+                                        />
+                                        <button
+                                            type="button"
+                                            className="btn btn-primary"
+                                            onClick={() => document.getElementById('admin-bulk-file-input').click()}
+                                            disabled={uploadingSlot === 'bulk'}
+                                            style={{
+                                                padding: '6px 14px',
+                                                fontSize: '0.825rem',
+                                                fontWeight: '700',
+                                                borderRadius: '8px',
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '6px'
+                                            }}
+                                        >
+                                            <i className={`bi ${uploadingSlot === 'bulk' ? 'bi-arrow-repeat bi-spin' : 'bi-cloud-upload-fill'}`} />
+                                            {uploadingSlot === 'bulk' ? (bulkProgress || 'Uploading...') : 'Bulk Upload from Gallery'}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Slots Grid: Slot 1 is Primary Cover, Slots 2-6 are Extra Angles */}
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '14px' }}>
+                                    {[
+                                        { num: 1, key: 'image_url', label: '1. Primary Cover', required: true, isCover: true },
+                                        { num: 2, key: 'image2', label: '2. Angle / Detail 2' },
+                                        { num: 3, key: 'image3', label: '3. Angle / Detail 3' },
+                                        { num: 4, key: 'image4', label: '4. Angle / Detail 4' },
+                                        { num: 5, key: 'image5', label: '5. Angle / Detail 5' },
+                                        { num: 6, key: 'image6', label: '6. Angle / Detail 6' },
+                                    ].map(slot => {
+                                        const val = productForm[slot.key];
+                                        const hasVal = Boolean(val && String(val).trim());
+                                        const isDataUrl = hasVal && String(val).startsWith('data:image/');
+                                        const isUploading = uploadingSlot === slot.key;
+
+                                        return (
+                                            <div 
+                                                key={slot.key} 
+                                                style={{
+                                                    backgroundColor: '#FFFFFF',
+                                                    border: slot.isCover ? '2px solid var(--cta)' : '1px solid #E5E7EB',
+                                                    borderRadius: '12px',
+                                                    padding: '12px',
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    gap: '8px',
+                                                    position: 'relative'
+                                                }}
+                                            >
+                                                {/* Slot Header */}
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                    <span style={{ fontSize: '0.8rem', fontWeight: '700', color: slot.isCover ? 'var(--cta-dark)' : '#374151' }}>
+                                                        {slot.label} {slot.required && <span style={{ color: '#DC2626' }}>*</span>}
+                                                    </span>
+                                                    {slot.isCover && (
+                                                        <span style={{ fontSize: '0.65rem', fontWeight: '800', backgroundColor: 'var(--cta)', color: '#FFF', padding: '1px 6px', borderRadius: '6px', textTransform: 'uppercase' }}>
+                                                            Cover
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                {/* Hidden Native File Input */}
+                                                <input 
+                                                    type="file" 
+                                                    id={`file-input-${slot.key}`} 
+                                                    accept="image/*" 
+                                                    style={{ display: 'none' }} 
+                                                    onChange={e => handleSingleImageUpload(slot.key, e)} 
+                                                />
+
+                                                {/* If Image Exists */}
+                                                {hasVal ? (
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                        <div style={{
+                                                            width: '100%',
+                                                            height: '120px',
+                                                            borderRadius: '8px',
+                                                            overflow: 'hidden',
+                                                            border: '1px solid #E5E7EB',
+                                                            backgroundColor: '#F9FAFB',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            position: 'relative'
+                                                        }}>
+                                                            <img 
+                                                                src={val} 
+                                                                alt={slot.label} 
+                                                                style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
+                                                                onError={e => e.currentTarget.style.display = 'none'}
+                                                            />
+                                                            {isDataUrl && (
+                                                                <span style={{
+                                                                    position: 'absolute',
+                                                                    bottom: '4px',
+                                                                    right: '4px',
+                                                                    backgroundColor: 'rgba(0,0,0,0.65)',
+                                                                    color: '#FFF',
+                                                                    fontSize: '0.65rem',
+                                                                    padding: '1px 5px',
+                                                                    borderRadius: '4px'
+                                                                }}>
+                                                                    {formatFileSize(getDataUrlSize(val))}
+                                                                </span>
+                                                            )}
+                                                        </div>
+
+                                                        {/* Action Buttons */}
+                                                        <div style={{ display: 'flex', gap: '6px' }}>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => document.getElementById(`file-input-${slot.key}`).click()}
+                                                                className="btn btn-outline-primary"
+                                                                style={{ flex: 1, padding: '4px 8px', fontSize: '0.75rem', borderRadius: '6px', justifyContent: 'center' }}
+                                                                title="Choose another image from your gallery"
+                                                            >
+                                                                <i className="bi bi-camera" /> Change
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleRemoveSlotImage(slot.key)}
+                                                                style={{
+                                                                    padding: '4px 10px',
+                                                                    fontSize: '0.75rem',
+                                                                    borderRadius: '6px',
+                                                                    backgroundColor: '#FEE2E2',
+                                                                    color: '#DC2626',
+                                                                    border: '1px solid #FCA5A5',
+                                                                    cursor: 'pointer'
+                                                                }}
+                                                                title="Remove this image"
+                                                            >
+                                                                <i className="bi bi-trash" />
+                                                            </button>
+                                                        </div>
+
+                                                        {/* Small URL Toggle */}
+                                                        <div style={{ marginTop: '2px' }}>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => toggleUrlInput(slot.key)}
+                                                                style={{ background: 'none', border: 'none', padding: 0, fontSize: '0.7rem', color: '#6B7280', textDecoration: 'underline', cursor: 'pointer' }}
+                                                            >
+                                                                {showUrlInputs[slot.key] ? 'Hide URL details' : 'View/Edit URL'}
+                                                            </button>
+                                                            {showUrlInputs[slot.key] && (
+                                                                <input 
+                                                                    type="text" 
+                                                                    className="form-control" 
+                                                                    style={{ fontSize: '0.75rem', marginTop: '4px', padding: '4px 8px' }} 
+                                                                    value={val} 
+                                                                    onChange={e => setProductForm({ ...productForm, [slot.key]: e.target.value })} 
+                                                                />
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    /* Empty Slot: Upload from Gallery Drop Area */
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                                        <div 
+                                                            onClick={() => document.getElementById(`file-input-${slot.key}`).click()}
+                                                            style={{
+                                                                border: '2px dashed #D1D5DB',
+                                                                borderRadius: '8px',
+                                                                padding: '16px 8px',
+                                                                textAlign: 'center',
+                                                                cursor: 'pointer',
+                                                                backgroundColor: '#FAFAFA',
+                                                                minHeight: '120px',
+                                                                display: 'flex',
+                                                                flexDirection: 'column',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center',
+                                                                gap: '6px',
+                                                                transition: 'all 0.2s'
+                                                            }}
+                                                            onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--cta)'}
+                                                            onMouseLeave={e => e.currentTarget.style.borderColor = '#D1D5DB'}
+                                                        >
+                                                            {isUploading ? (
+                                                                <>
+                                                                    <div className="spinner-border spinner-border-sm text-primary" role="status" />
+                                                                    <span style={{ fontSize: '0.75rem', color: 'var(--cta)', fontWeight: '600' }}>Compressing...</span>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <i className="bi bi-image" style={{ fontSize: '1.6rem', color: 'var(--cta)' }} />
+                                                                    <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#374151' }}>
+                                                                        Upload from Gallery
+                                                                    </span>
+                                                                    <span style={{ fontSize: '0.68rem', color: '#9CA3AF' }}>
+                                                                        Click to pick photo
+                                                                    </span>
+                                                                </>
+                                                            )}
+                                                        </div>
+
+                                                        {/* Or paste URL toggle */}
+                                                        <div style={{ textAlign: 'center' }}>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => toggleUrlInput(slot.key)}
+                                                                style={{ background: 'none', border: 'none', padding: 0, fontSize: '0.72rem', color: 'var(--cta-dark)', cursor: 'pointer', textDecoration: 'underline' }}
+                                                            >
+                                                                {showUrlInputs[slot.key] ? 'Close URL box' : 'Or paste URL'}
+                                                            </button>
+                                                            {showUrlInputs[slot.key] && (
+                                                                <input 
+                                                                    type="url" 
+                                                                    className="form-control" 
+                                                                    placeholder="https://..." 
+                                                                    style={{ fontSize: '0.75rem', marginTop: '6px', padding: '4px 8px' }} 
+                                                                    value={productForm[slot.key] || ''} 
+                                                                    onChange={e => setProductForm({ ...productForm, [slot.key]: e.target.value })} 
+                                                                />
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
                             </div>
 
                             <div className="form-group mb-3">
@@ -388,10 +786,6 @@ export default function AdminPage() {
                                 </div>
                             </h5>
 
-                            <div className="form-group mb-3">
-                                <label>Marketing Heading</label>
-                                <input type="text" className="form-control" placeholder="e.g. Stay Cool & Say Goodbye TO HEAT THIS SUMMER!" value={productForm.marketingHeading || ''} onChange={e => setProductForm({ ...productForm, marketingHeading: e.target.value })} />
-                            </div>
 
                             <div className="form-row mb-3" style={{ display: 'flex', gap: 15 }}>
                                 <div className="form-group" style={{ flex: 1 }}>
@@ -451,7 +845,7 @@ export default function AdminPage() {
                                                     {selectedOrder.payment_status}
                                                 </span>
                                             </p>
-                                            <p style={{ margin: '0 0 5px 0' }}><strong>UTR/Transaction ID:</strong> <code>{selectedOrder.razorpay_id || 'N/A'}</code></p>
+                                            <p style={{ margin: '0 0 5px 0' }}><strong>UTR/Transaction ID:</strong> <code>{selectedOrder.payment_id || selectedOrder.razorpay_id || 'N/A'}</code></p>
                                             <p style={{ margin: 0 }}><strong>Date:</strong> {new Date(selectedOrder.created_at).toLocaleString()}</p>
                                         </div>
                                         <div style={{ textAlign: 'right' }}>

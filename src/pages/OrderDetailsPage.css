@@ -241,9 +241,11 @@
     width: 90px;
     height: 90px;
     border-radius: 10px;
-    object-fit: cover;
+    object-fit: contain;
+    background: #FFFFFF;
     border: 1px solid var(--border);
     flex-shrink: 0;
+    padding: 6px;
 }
 
 .order-detail-item__info {
@@ -273,7 +275,7 @@
 .order-detail-item__price {
     font-size: 1.05rem;
     font-weight: 800;
-    color: var(--cta) !important;
+    color: #111827 !important;
 }
 
 /* ── Spec Accordion ── */
@@ -431,7 +433,7 @@
 }
 
 .summary-total strong {
-    color: var(--cta);
+    color: #111827;
     font-size: 1.15rem;
 }
 

@@ -4,9 +4,29 @@ import sql from './db';
  * Admin Service (Neon Postgres Implementation)
  */
 
+let skuColumnChecked = false;
+async function ensureSkuColumn() {
+    if (skuColumnChecked) return;
+    try {
+        await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS sku TEXT`;
+        skuColumnChecked = true;
+    } catch (e) {
+        // Table column verified or alter not needed
+    }
+}
+
 export async function adminGetProducts() {
     try {
-        return await sql`SELECT * FROM products ORDER BY created_at DESC`;
+        await ensureSkuColumn();
+        const rows = await sql`SELECT * FROM products ORDER BY created_at DESC`;
+        return rows.map(r => {
+            const detailsObj = typeof r.details === 'string' ? JSON.parse(r.details) : (r.details || {});
+            return {
+                ...r,
+                sku: r.sku || detailsObj.sku || `SMN-${(r.category || 'GEN').substring(0, 3).toUpperCase()}-${String(r.id).padStart(4, '0')}`,
+                details: detailsObj
+            };
+        });
     } catch (err) {
         console.error('Error fetching admin products:', err);
         return [];
@@ -15,15 +35,22 @@ export async function adminGetProducts() {
 
 export async function adminCreateProduct(p) {
     try {
+        await ensureSkuColumn();
+        const skuVal = (p.sku && p.sku.trim()) || `SMN-${(p.category || 'GEN').substring(0, 3).toUpperCase()}-${Date.now().toString().slice(-4)}`;
+        const detailsWithSku = {
+            ...(p.details || {}),
+            sku: skuVal
+        };
+
         const [prod] = await sql`
             INSERT INTO products (
-                name, price, original_price, category, brand, 
+                name, sku, price, original_price, category, brand, 
                 description, image_url, badge, in_stock, 
                 rating, review_count, colors, details
             ) VALUES (
-                ${p.name}, ${p.price}, ${p.original_price || 0}, ${p.category}, ${p.brand || ''},
+                ${p.name}, ${skuVal}, ${p.price}, ${p.original_price || 0}, ${p.category}, ${p.brand || ''},
                 ${p.description || ''}, ${p.image_url}, ${p.badge || ''}, ${p.in_stock},
-                ${p.rating || 0}, ${p.review_count || 0}, ${JSON.stringify(p.colors)}, ${JSON.stringify(p.details)}
+                ${p.rating || 0}, ${p.review_count || 0}, ${JSON.stringify(p.colors)}, ${JSON.stringify(detailsWithSku)}
             ) RETURNING *
         `;
         return { success: true, data: prod };
@@ -35,13 +62,20 @@ export async function adminCreateProduct(p) {
 
 export async function adminUpdateProduct(id, p) {
     try {
+        await ensureSkuColumn();
+        const skuVal = (p.sku && p.sku.trim()) || `SMN-${(p.category || 'GEN').substring(0, 3).toUpperCase()}-${String(id).padStart(4, '0')}`;
+        const detailsWithSku = {
+            ...(p.details || {}),
+            sku: skuVal
+        };
+
         const [prod] = await sql`
             UPDATE products SET
-                name = ${p.name}, price = ${p.price}, original_price = ${p.original_price || 0},
+                name = ${p.name}, sku = ${skuVal}, price = ${p.price}, original_price = ${p.original_price || 0},
                 category = ${p.category}, brand = ${p.brand || ''}, description = ${p.description || ''},
                 image_url = ${p.image_url}, badge = ${p.badge || ''}, in_stock = ${p.in_stock},
                 rating = ${p.rating || 0}, review_count = ${p.review_count || 0},
-                colors = ${JSON.stringify(p.colors)}, details = ${JSON.stringify(p.details)}
+                colors = ${JSON.stringify(p.colors)}, details = ${JSON.stringify(detailsWithSku)}
             WHERE id = ${id}
             RETURNING *
         `;
@@ -78,18 +112,16 @@ export async function adminGetOrderDetails(id) {
         if (!order) return null;
 
         const items = await sql`SELECT * FROM order_items WHERE order_id = ${id}`;
-        
-        // Mock tracking if missing, or fetch if exists
-        // (Assuming tracking table is not fully implemented yet)
-        const mockTracking = [
-            { id: 1, label: 'Order Placed', status: 'confirmed', timestamp: order.created_at, is_current: order.status === 'confirmed' },
-            { id: 2, label: 'Processing', status: 'processing', timestamp: new Date(new Date(order.created_at).getTime() + 3600000), is_current: order.status === 'processing' }
-        ];
+        const tracking = await sql`
+            SELECT * FROM order_tracking 
+            WHERE order_id = ${id} 
+            ORDER BY timestamp ASC, id ASC
+        `;
 
         return { 
             ...order, 
             order_items: items.map(i => ({ ...i, image_url: i.image_url || i.image })),
-            order_tracking: mockTracking
+            order_tracking: tracking
         };
     } catch (err) {
         console.error('Error fetching admin order details:', err);
@@ -108,11 +140,20 @@ export async function adminUpdateOrderStatus(orderId, status) {
 }
 
 export async function adminAddTrackingStep(data) {
-    // For now, we update order status as a shortcut
-    if (data.is_current) {
-        await adminUpdateOrderStatus(data.order_id, data.status);
+    try {
+        if (data.is_current) {
+            await sql`UPDATE order_tracking SET is_current = false WHERE order_id = ${data.order_id}`;
+            await adminUpdateOrderStatus(data.order_id, data.status);
+        }
+        await sql`
+            INSERT INTO order_tracking (order_id, label, description, status, is_current, timestamp)
+            VALUES (${data.order_id}, ${data.label}, ${data.description || ''}, ${data.status || 'processing'}, ${Boolean(data.is_current)}, CURRENT_TIMESTAMP)
+        `;
+        return { success: true };
+    } catch (err) {
+        console.error('Error adding tracking step:', err);
+        throw err;
     }
-    return { success: true };
 }
 
 export async function fetchStats() {

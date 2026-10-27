@@ -56,21 +56,35 @@ export async function fetchOrderDetails(orderNumberOrId) {
         `;
         const normalizedItems = items.map(i => ({ ...i, image: i.image_url }));
         
-        // Mock tracking data since we don't have a tracking table yet
-        const mockTracking = [
-            { id: 1, label: 'Order Placed', description: 'Your order has been successfully placed.', timestamp: order.created_at },
-            { id: 2, label: 'Processing', description: 'Our team is preparing your package.', timestamp: new Date(new Date(order.created_at).getTime() + 3600000) }
-        ];
+        // Fetch real dynamic tracking milestones from order_tracking table
+        const tracking = await sql`
+            SELECT * FROM order_tracking 
+            WHERE order_id = ${order.id} 
+            ORDER BY timestamp ASC, id ASC
+        `;
 
-        return { ...order, items: normalizedItems, order_tracking: mockTracking };
+        return { ...order, items: normalizedItems, order_tracking: tracking };
     } catch (err) {
         console.error('Error fetching order details:', err);
         return null;
     }
 }
 
+let orderSkuColumnChecked = false;
+async function ensureOrderSkuColumn() {
+    if (orderSkuColumnChecked) return;
+    try {
+        await sql`ALTER TABLE order_items ADD COLUMN IF NOT EXISTS sku TEXT`;
+        orderSkuColumnChecked = true;
+    } catch (e) {
+        // Safe ignore if permission or already exists
+    }
+}
+
 export async function placeOrder(orderData) {
     try {
+        await ensureOrderSkuColumn();
+
         // 1. Insert Order
         const [newOrder] = await sql`
             INSERT INTO orders (
@@ -90,19 +104,37 @@ export async function placeOrder(orderData) {
 
         // 2. Insert Items
         for (const item of orderData.items) {
-            await sql`
-                INSERT INTO order_items (
-                    order_id, product_id, name, price, quantity, image_url, color
-                ) VALUES (
-                    ${newOrder.id},
-                    ${item.id},
-                    ${item.name},
-                    ${item.price},
-                    ${item.quantity},
-                    ${item.image_url || item.image},
-                    ${item.variant_id || item.color || null}
-                )
-            `;
+            try {
+                await sql`
+                    INSERT INTO order_items (
+                        order_id, product_id, name, price, quantity, image_url, color, sku
+                    ) VALUES (
+                        ${newOrder.id},
+                        ${item.id},
+                        ${item.name},
+                        ${item.price},
+                        ${item.quantity},
+                        ${item.image_url || item.image},
+                        ${item.variant_id || item.color || null},
+                        ${item.sku || null}
+                    )
+                `;
+            } catch (itemErr) {
+                // Fallback in case sku column is absent in restricted schema
+                await sql`
+                    INSERT INTO order_items (
+                        order_id, product_id, name, price, quantity, image_url, color
+                    ) VALUES (
+                        ${newOrder.id},
+                        ${item.id},
+                        ${item.name},
+                        ${item.price},
+                        ${item.quantity},
+                        ${item.image_url || item.image},
+                        ${item.variant_id || item.color || null}
+                    )
+                `;
+            }
         }
 
         return { success: true, id: newOrder.id };

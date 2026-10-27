@@ -202,10 +202,19 @@ export default function Navbar() {
                         <ul className="cart-items">
                             {cartItems.map(item => (
                                 <li key={item.id} className="cart-item">
-                                    <img src={item.image} alt={item.name} className="cart-item__img" />
+                                    <img 
+                                        src={item.image || item.image_url || '/logo.png'} 
+                                        alt={item.name} 
+                                        className="cart-item__img"
+                                        style={{ objectFit: 'contain', backgroundColor: '#FFFFFF', padding: '4px' }}
+                                        onError={(e) => {
+                                            e.currentTarget.onerror = null;
+                                            e.currentTarget.src = 'https://images.unsplash.com/photo-1558611848-73f7eb4001a1?w=200&q=80';
+                                        }}
+                                    />
                                     <div className="cart-item__info">
                                         <p className="cart-item__name">{item.name}</p>
-                                        <p className="cart-item__price">{formatPrice(item.price)}</p>
+                                        <p className="cart-item__price" style={{ color: '#111827', fontWeight: 700 }}>{formatPrice(item.price)}</p>
                                         <div className="cart-item__qty">
                                             <button id={`qty-dec-${item.id}`} onClick={() => updateQty(item.id, item.quantity - 1)} aria-label="Decrease">
                                                 <i className="bi bi-dash" />
@@ -229,7 +238,7 @@ export default function Navbar() {
                     <div className="cart-drawer__footer">
                         <div className="cart-total">
                             <span>Total</span>
-                            <strong>{formatPrice(cartTotal)}</strong>
+                            <strong style={{ color: '#111827', fontWeight: 800 }}>{formatPrice(cartTotal)}</strong>
                         </div>
                         <SignedOut>
                             <p className="cart-auth-notice">

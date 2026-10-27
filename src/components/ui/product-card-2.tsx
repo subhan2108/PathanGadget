@@ -84,10 +84,12 @@ const ProductCard = React.forwardRef<HTMLDivElement, ProductCardProps>(
       if (addToCart) {
         addToCart({
           id,
+          sku: (raw as any)?.sku || `SMN-${((raw as any)?.category || 'GEN').substring(0, 3).toUpperCase()}-${String(id).padStart(4, '0')}`,
           name,
           price,
           originalPrice,
           image,
+          image_url: image,
           inStock,
           ...raw,
         });

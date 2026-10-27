@@ -7,6 +7,32 @@ import { useAuth } from '../context/AuthContext'
 import { ProductCard } from '@/components/ui/product-card-2'
 import './ProductDetailPage.css'
 
+const DEFAULT_CATEGORY_GALLERIES = {
+    watches: [
+        'https://images.unsplash.com/photo-1508685096489-7aacd43bd3b1?w=600&h=600&fit=crop',
+        'https://images.unsplash.com/photo-1524805444758-089113d48a6d?w=600&h=600&fit=crop',
+        'https://images.unsplash.com/photo-1546868871-7041f2a55e12?w=600&h=600&fit=crop',
+        'https://images.unsplash.com/photo-1510017803434-a899398421b3?w=600&h=600&fit=crop',
+    ],
+    airpods: [
+        'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=600&h=600&fit=crop',
+        'https://images.unsplash.com/photo-1572536147248-ac59a8abfa4b?w=600&h=600&fit=crop',
+        'https://images.unsplash.com/photo-1588423771073-b8903fbb85b5?w=600&h=600&fit=crop',
+        'https://images.unsplash.com/photo-1572645315416-6c5bc4fcabba?w=600&h=600&fit=crop',
+    ],
+    headphones: [
+        'https://images.unsplash.com/photo-1484704849700-f032a568e944?w=600&h=600&fit=crop',
+        'https://images.unsplash.com/photo-1546435770-a3e426bf472b?w=600&h=600&fit=crop',
+        'https://images.unsplash.com/photo-1583394838336-acd977736f90?w=600&h=600&fit=crop',
+        'https://images.unsplash.com/photo-1524678606370-a47ad25cb82a?w=600&h=600&fit=crop',
+    ],
+    smartphones: [
+        'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=600&h=600&fit=crop',
+        'https://images.unsplash.com/photo-1598327105666-5b89351aff97?w=600&h=600&fit=crop',
+        'https://images.unsplash.com/photo-1580910051074-3eb694886505?w=600&h=600&fit=crop',
+    ]
+};
+
 export default function ProductDetailPage() {
     const { id } = useParams()
     const navigate = useNavigate()
@@ -22,6 +48,7 @@ export default function ProductDetailPage() {
     const [quantity, setQuantity] = useState(1)
     const [selectedVariant, setSelectedVariant] = useState('buy1')
     const [added, setAdded] = useState(false)
+    const [copiedSku, setCopiedSku] = useState(false)
 
     const [reviewRating, setReviewRating] = useState(5)
     const [reviewTitle, setReviewTitle] = useState('')
@@ -83,14 +110,36 @@ export default function ProductDetailPage() {
 
     const hasRatingOrReviews = Boolean(computedAvgRating || reviewCount > 0)
 
-    // Build Gallery from DB (Deduplicate to prevent repeated thumbnail photos)
-    const mainImg = product?.image_url ?? product?.image
-    const extraImages = (product?.product_images && product.product_images.length > 0)
-        ? [...product.product_images].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)).map(img => img.image_url).filter(Boolean)
-        : (Array.isArray(product?.details?.extraImages) ? product.details.extraImages.filter(Boolean) : [])
+    // Build Gallery from DB (supports 4-6 images from backend/admin panel)
+    const mainImg = (product?.image_url || product?.image || '').trim()
+    let rawExtraList = []
+    if (Array.isArray(product?.details?.extraImages)) {
+        rawExtraList = product.details.extraImages
+    } else if (typeof product?.details?.extraImages === 'string') {
+        const trimmed = product.details.extraImages.trim()
+        if (trimmed.startsWith('[')) {
+            try { rawExtraList = JSON.parse(trimmed) } catch (e) { rawExtraList = [] }
+        } else if (trimmed.startsWith('data:image/')) {
+            rawExtraList = [trimmed]
+        } else {
+            rawExtraList = trimmed.split(/[\n,]+/)
+        }
+    } else if (Array.isArray(product?.product_images)) {
+        rawExtraList = product.product_images.map(img => img.image_url || img)
+    }
 
-    const rawGallery = [mainImg, ...extraImages].filter(Boolean)
-    const gallery = Array.from(new Set(rawGallery))
+    let cleanExtraList = rawExtraList
+        .map(u => typeof u === 'string' ? u.trim() : '')
+        .filter(u => Boolean(u) && u !== mainImg)
+
+    // If backend extraImages is empty or only contained copies of mainImg, provide category angles
+    if (cleanExtraList.length === 0 && product?.category) {
+        const catKey = product.category.toLowerCase()
+        const fallbackAngles = DEFAULT_CATEGORY_GALLERIES[catKey] || []
+        cleanExtraList = fallbackAngles.filter(u => u !== mainImg)
+    }
+
+    const gallery = [mainImg, ...cleanExtraList].filter(Boolean)
 
     // Colors from DB
     const colors = Array.isArray(product?.colors) && product.colors.length > 0 ? product.colors : []
@@ -107,7 +156,11 @@ export default function ProductDetailPage() {
             ? details.specs
             : (product?.specs && Object.keys(product.specs).length > 0 ? product.specs : {}))
 
-    const mappedSpecs = Object.entries(rawSpecs)
+    const specsWithSku = product?.sku && !rawSpecs.SKU && !rawSpecs.sku
+        ? { SKU: product.sku, ...rawSpecs }
+        : rawSpecs
+
+    const mappedSpecs = Object.entries(specsWithSku)
         .filter(([_, v]) => v !== undefined && v !== null && String(v).trim() !== '')
         .map(([k, v]) => ({
             label: k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
@@ -161,9 +214,11 @@ export default function ProductDetailPage() {
         if (!isInStock) return
         await addToCart({
             ...product,
+            sku: product.sku || `SMN-${(product.category || 'GEN').substring(0, 3).toUpperCase()}-${String(product.id).padStart(4, '0')}`,
             name: product.name,
             price: finalUnitCost,
-            image: gallery[0] || null,
+            image: gallery[0] || product.image_url || null,
+            image_url: gallery[0] || product.image_url || null,
             originalPrice: baseOriginalPrice,
             selectedColor: selectedColor || (colors[0] || null),
             variantId: activeVariant?.discountApplied > 0 ? `Buy ${activeVariant.qty} (${activeVariant.discountApplied}% Off)` : (selectedColor ? `Color: ${selectedColor}` : undefined),
@@ -196,9 +251,9 @@ export default function ProductDetailPage() {
 
     return (
         <div className="product-detail-page" style={{ backgroundColor: '#FFFFFF', minHeight: '100vh' }}>
-            {/* Breadcrumb Bar */}
+            {/* Breadcrumb Bar (Aligned with Navbar Logo) */}
             <div className="pdp-breadcrumb-bar">
-                <div className="container" style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 20px' }}>
+                <div className="container">
                     <nav className="breadcrumb">
                         <Link to="/"><i className="bi bi-house" /> Home</Link>
                         <span>›</span>
@@ -217,14 +272,48 @@ export default function ProductDetailPage() {
                 </div>
             </div>
 
-            <div className="container" style={{ maxWidth: '1200px', margin: '0 auto', padding: '32px 20px 48px' }}>
+            <div className="container" style={{ padding: '28px 24px 64px' }}>
 
-                {/* Two Column Layout */}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '48px', alignItems: 'flex-start' }}>
+                {/* Two Column Layout (Aligned with Navbar Logo) */}
+                <div className="pdp-layout-grid">
 
-                    {/* Left Column: Images (Sticky) */}
-                    <div style={{ flex: '1 1 420px', display: 'flex', flexDirection: 'column', gap: '16px', position: 'sticky', top: '90px' }}>
+                    {/* Left Column: Image Gallery (Small thumbnails on LEFT, Big image on RIGHT) */}
+                    <div className="pdp-gallery-wrap">
+                        {/* Small images box (Thumbnails) on the LEFT */}
+                        {gallery.length > 1 && (
+                            <div className="pdp-thumbnail-strip">
+                                {gallery.map((img, idx) => (
+                                    <div
+                                        key={idx}
+                                        onClick={() => setActiveImg(idx)}
+                                        onMouseEnter={() => setActiveImg(idx)}
+                                        className={`pdp-thumb-item ${activeImg === idx ? 'active' : ''}`}
+                                        style={{
+                                            width: '74px',
+                                            height: '74px',
+                                            flexShrink: 0,
+                                            backgroundColor: '#FFFFFF',
+                                            borderRadius: '12px',
+                                            cursor: 'pointer',
+                                            border: `2px solid ${activeImg === idx ? 'var(--cta)' : '#E5E7EB'}`,
+                                            overflow: 'hidden',
+                                            padding: '6px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            transition: 'all 0.2s ease',
+                                            boxShadow: activeImg === idx ? '0 2px 8px rgba(229, 184, 36, 0.25)' : 'none'
+                                        }}
+                                    >
+                                        <img src={img} alt={`Thumb ${idx}`} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Big Image Box */}
                         <div style={{
+                            flex: '1 1 auto',
                             backgroundColor: '#FFFFFF',
                             borderRadius: '20px',
                             aspectRatio: '1',
@@ -234,7 +323,8 @@ export default function ProductDetailPage() {
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            padding: '16px'
+                            padding: '24px',
+                            minWidth: '0'
                         }}>
                             {product.badge && (
                                 <span style={{
@@ -255,7 +345,7 @@ export default function ProductDetailPage() {
                             )}
                             {gallery.length > 0 ? (
                                 <img
-                                    src={gallery[activeImg]}
+                                    src={gallery[activeImg] || gallery[0]}
                                     alt={product.name}
                                     style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                                 />
@@ -266,40 +356,13 @@ export default function ProductDetailPage() {
                                 </div>
                             )}
                         </div>
-
-                        {gallery.length > 1 && (
-                            <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '8px' }}>
-                                {gallery.map((img, idx) => (
-                                    <div
-                                        key={idx}
-                                        onClick={() => setActiveImg(idx)}
-                                        style={{
-                                            width: '76px',
-                                            height: '76px',
-                                            flexShrink: 0,
-                                            backgroundColor: '#FFFFFF',
-                                            borderRadius: '10px',
-                                            cursor: 'pointer',
-                                            border: `2px solid ${activeImg === idx ? 'var(--cta)' : '#E5E7EB'}`,
-                                            overflow: 'hidden',
-                                            padding: '6px',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center'
-                                        }}
-                                    >
-                                        <img src={img} alt={`Thumb ${idx}`} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-                                    </div>
-                                ))}
-                            </div>
-                        )}
                     </div>
 
                     {/* Right Column: Product Purchasing Info & Direct Backend Details */}
-                    <div style={{ flex: '1 1 450px', display: 'flex', flexDirection: 'column' }}>
+                    <div className="pdp-details-column" style={{ display: 'flex', flexDirection: 'column', minWidth: '0' }}>
 
-                        {/* Category & Brand Pills (Strictly from backend) */}
-                        {(product.category || product.brand) && (
+                        {/* Category, Brand & SKU Pills (Strictly from backend) */}
+                        {(product.category || product.brand || product.sku) && (
                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px', flexWrap: 'wrap' }}>
                                 {product.category && (
                                     <div style={{
@@ -334,6 +397,41 @@ export default function ProductDetailPage() {
                                     }}>
                                         <i className="bi bi-building" />
                                         <span>{product.brand}</span>
+                                    </div>
+                                )}
+                                {product.sku && (
+                                    <div
+                                        onClick={() => {
+                                            if (navigator.clipboard) {
+                                                navigator.clipboard.writeText(product.sku)
+                                                setCopiedSku(true)
+                                                setTimeout(() => setCopiedSku(false), 2000)
+                                            }
+                                        }}
+                                        title="Click to copy SKU"
+                                        style={{
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '6px',
+                                            background: '#F3F4F6',
+                                            color: '#374151',
+                                            border: '1px solid #E5E7EB',
+                                            padding: '4px 12px',
+                                            borderRadius: '20px',
+                                            fontSize: '0.8rem',
+                                            fontWeight: '700',
+                                            letterSpacing: '0.5px',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s ease',
+                                            userSelect: 'none'
+                                        }}
+                                    >
+                                        <i className="bi bi-upc-scan" style={{ color: 'var(--cta)', fontSize: '0.9rem' }} />
+                                        <span>SKU: {product.sku}</span>
+                                        <span style={{ fontSize: '0.72rem', color: copiedSku ? '#059669' : '#9CA3AF', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                            <i className={`bi ${copiedSku ? 'bi-check-lg' : 'bi-copy'}`} />
+                                            {copiedSku && <span style={{ fontWeight: '800' }}>Copied!</span>}
+                                        </span>
                                     </div>
                                 )}
                             </div>
