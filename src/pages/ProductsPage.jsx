@@ -14,6 +14,22 @@ const CATEGORY_ICONS = {
     smartphones: 'bi-phone',
 }
 
+const getCategoryIcon = (id = '', name = '') => {
+    if (CATEGORY_ICONS[id]) return CATEGORY_ICONS[id]
+    const key = `${id} ${name}`.toLowerCase()
+    if (key.includes('watch')) return 'bi-smartwatch'
+    if (key.includes('airpod') || key.includes('earbud')) return 'bi-earbuds'
+    if (key.includes('headphone') || key.includes('audio')) return 'bi-headphones'
+    if (key.includes('phone') || key.includes('mobile')) return 'bi-phone'
+    if (key.includes('remote') || key.includes('key')) return 'bi-key'
+    if (key.includes('shell')) return 'bi-shield-check'
+    if (key.includes('electronic')) return 'bi-cpu'
+    if (key.includes('cable') || key.includes('charger')) return 'bi-lightning-charge'
+    if (key.includes('camera')) return 'bi-camera'
+    if (key.includes('tool') || key.includes('device')) return 'bi-tools'
+    return 'bi-tag'
+}
+
 const COLOR_MAP = {
     Black: '#1a1a2e',
     White: '#f5f5f5',
@@ -201,6 +217,101 @@ export default function ProductsPage() {
         categoryCountMap[c.id] = c.count
     })
 
+    // ── Horizontal Category Tabs Scrolling ──
+    const tabsRef = useRef(null)
+    const [canScrollLeft, setCanScrollLeft] = useState(false)
+    const [canScrollRight, setCanScrollRight] = useState(false)
+    const isDraggingRef = useRef(false)
+    const dragStartXRef = useRef(0)
+    const dragScrollLeftRef = useRef(0)
+    const hasDraggedRef = useRef(false)
+
+    const checkTabsScroll = useCallback(() => {
+        const el = tabsRef.current
+        if (!el) return
+        const { scrollLeft, scrollWidth, clientWidth } = el
+        setCanScrollLeft(scrollLeft > 4)
+        setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 4)
+    }, [])
+
+    const scrollTabs = (direction) => {
+        const el = tabsRef.current
+        if (!el) return
+        const scrollAmount = direction === 'left' ? -280 : 280
+        el.scrollBy({ left: scrollAmount, behavior: 'smooth' })
+    }
+
+    const handleMouseDownTabs = (e) => {
+        if (e.button !== 0) return
+        isDraggingRef.current = true
+        hasDraggedRef.current = false
+        dragStartXRef.current = e.pageX
+        dragScrollLeftRef.current = tabsRef.current?.scrollLeft || 0
+    }
+
+    const handleMouseMoveTabs = (e) => {
+        if (!isDraggingRef.current || !tabsRef.current) return
+        const deltaX = e.pageX - dragStartXRef.current
+        if (Math.abs(deltaX) > 4) {
+            hasDraggedRef.current = true
+        }
+        tabsRef.current.scrollLeft = dragScrollLeftRef.current - deltaX
+        checkTabsScroll()
+    }
+
+    const handleMouseUpTabs = () => {
+        isDraggingRef.current = false
+        setTimeout(() => {
+            hasDraggedRef.current = false
+        }, 60)
+    }
+
+    // Wheel event to translate vertical wheel into horizontal scrolling on tabs
+    useEffect(() => {
+        const el = tabsRef.current
+        if (!el) return
+
+        const handleWheel = (e) => {
+            if (el.scrollWidth > el.clientWidth) {
+                const canLeft = el.scrollLeft > 0
+                const canRight = el.scrollLeft < el.scrollWidth - el.clientWidth - 1
+
+                if ((e.deltaY > 0 && canRight) || (e.deltaY < 0 && canLeft)) {
+                    e.preventDefault()
+                    el.scrollLeft += e.deltaY
+                    checkTabsScroll()
+                }
+            }
+        }
+
+        el.addEventListener('wheel', handleWheel, { passive: false })
+        return () => el.removeEventListener('wheel', handleWheel)
+    }, [checkTabsScroll])
+
+    // Update scroll indicators on resize, category changes, or scroll
+    useEffect(() => {
+        checkTabsScroll()
+        const el = tabsRef.current
+        if (el) {
+            el.addEventListener('scroll', checkTabsScroll, { passive: true })
+        }
+        window.addEventListener('resize', checkTabsScroll)
+        return () => {
+            if (el) el.removeEventListener('scroll', checkTabsScroll)
+            window.removeEventListener('resize', checkTabsScroll)
+        }
+    }, [categories, checkTabsScroll])
+
+    // Auto-scroll active tab into view when activeCategory changes
+    useEffect(() => {
+        if (!tabsRef.current) return
+        const tabs = Array.from(tabsRef.current.querySelectorAll('.plp-cat-tab'))
+        const activeBtn = tabs.find(btn => btn.dataset.categoryId === String(activeCategory))
+        if (activeBtn) {
+            activeBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
+        }
+    }, [activeCategory])
+
     /* ── Sidebar Panel ── */
     const FilterSidebar = () => (
         <aside className={`plp-sidebar ${sidebarOpen ? 'open' : ''}`} id="plp-sidebar">
@@ -350,23 +461,62 @@ export default function ProductsPage() {
                     </div>
 
                     {/* ── Category Tabs ── */}
-                    <div className="plp-category-tabs" id="plp-category-tabs" role="tablist">
-                        {[{ id: 'all', name: 'All', icon: 'bi-grid' }, ...categories.map(c => ({ ...c, icon: CATEGORY_ICONS[c.id] }))].map(cat => (
+                    <div className={`plp-category-tabs-wrapper ${canScrollLeft ? 'can-scroll-left' : ''} ${canScrollRight ? 'can-scroll-right' : ''}`}>
+                        {canScrollLeft && (
                             <button
-                                key={cat.id}
-                                id={`plp-cat-${cat.id}`}
-                                role="tab"
-                                aria-selected={activeCategory === cat.id}
-                                className={`plp-cat-tab ${activeCategory === cat.id ? 'active' : ''}`}
-                                onClick={() => setActiveCategory(cat.id)}
+                                type="button"
+                                className="plp-cat-arrow plp-cat-arrow--left"
+                                onClick={() => scrollTabs('left')}
+                                aria-label="Scroll categories left"
+                                title="Scroll left"
                             >
-                                <i className={`bi ${cat.icon}`} />
-                                <span>{cat.name || 'All'}</span>
-                                <span className={`plp-cat-count ${activeCategory === cat.id ? 'active' : ''}`}>
-                                    {categoryCountMap[cat.id]}
-                                </span>
+                                <i className="bi bi-chevron-left" />
                             </button>
-                        ))}
+                        )}
+
+                        <div
+                            ref={tabsRef}
+                            className="plp-category-tabs"
+                            id="plp-category-tabs"
+                            role="tablist"
+                            onMouseDown={handleMouseDownTabs}
+                            onMouseMove={handleMouseMoveTabs}
+                            onMouseUp={handleMouseUpTabs}
+                            onMouseLeave={handleMouseUpTabs}
+                        >
+                            {[{ id: 'all', name: 'All', icon: 'bi-grid' }, ...categories.map(c => ({ ...c, icon: getCategoryIcon(c.id, c.name) }))].map(cat => (
+                                <button
+                                    key={cat.id}
+                                    id={`plp-cat-${cat.id}`}
+                                    data-category-id={cat.id}
+                                    role="tab"
+                                    aria-selected={activeCategory === cat.id}
+                                    className={`plp-cat-tab ${activeCategory === cat.id ? 'active' : ''}`}
+                                    onClick={() => {
+                                        if (hasDraggedRef.current) return
+                                        setActiveCategory(cat.id)
+                                    }}
+                                >
+                                    <i className={`bi ${cat.icon}`} />
+                                    <span>{cat.name || 'All'}</span>
+                                    <span className={`plp-cat-count ${activeCategory === cat.id ? 'active' : ''}`}>
+                                        {categoryCountMap[cat.id] ?? 0}
+                                    </span>
+                                </button>
+                            ))}
+                        </div>
+
+                        {canScrollRight && (
+                            <button
+                                type="button"
+                                className="plp-cat-arrow plp-cat-arrow--right"
+                                onClick={() => scrollTabs('right')}
+                                aria-label="Scroll categories right"
+                                title="Scroll right"
+                            >
+                                <i className="bi bi-chevron-right" />
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>

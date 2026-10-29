@@ -140,6 +140,62 @@ export async function fetchCategories() {
         icon: '🎵',
         color: '#6C5CE7',
         image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=600&h=400&fit=crop',
+      },
+      Remote: {
+        name: 'Car Key Remotes',
+        description: 'Universal smart remotes, key fobs & transponders',
+        icon: '🔑',
+        color: '#FF6B6B',
+        image: 'https://qubakeys.com/uploads/course/3c4ce9e976a6a245a89abb2eac505e5b.png',
+      },
+      remote: {
+        name: 'Car Key Remotes',
+        description: 'Universal smart remotes, key fobs & transponders',
+        icon: '🔑',
+        color: '#FF6B6B',
+        image: 'https://qubakeys.com/uploads/course/3c4ce9e976a6a245a89abb2eac505e5b.png',
+      },
+      'Remote Shell': {
+        name: 'Remote Shells',
+        description: 'Replacement car key shells, flip cases & remote housings',
+        icon: '🗝️',
+        color: '#FFA502',
+        image: 'https://qubakeys.com/uploads/course/3bc259dec1804b89d415620b3272ea1f.jpg',
+      },
+      'remote shell': {
+        name: 'Remote Shells',
+        description: 'Replacement car key shells, flip cases & remote housings',
+        icon: '🗝️',
+        color: '#FFA502',
+        image: 'https://qubakeys.com/uploads/course/3bc259dec1804b89d415620b3272ea1f.jpg',
+      },
+      'remote-shell': {
+        name: 'Remote Shells',
+        description: 'Replacement car key shells, flip cases & remote housings',
+        icon: '🗝️',
+        color: '#FFA502',
+        image: 'https://qubakeys.com/uploads/course/3bc259dec1804b89d415620b3272ea1f.jpg',
+      },
+      'KEYDIY UNIVERSAL REMOTE': {
+        name: 'Keydiy Universal Remote',
+        description: 'Multi-frequency programmable car keys, B-Series & NB-Series remotes',
+        icon: '📟',
+        color: '#0984E3',
+        image: 'https://5.imimg.com/data5/SELLER/Default/2024/11/468326697/VN/QU/PL/186187450/b14-3-1-universal-keydiy-flip-remote-500x500.png',
+      },
+      'keydiy universal remote': {
+        name: 'Keydiy Universal Remote',
+        description: 'Multi-frequency programmable car keys, B-Series & NB-Series remotes',
+        icon: '📟',
+        color: '#0984E3',
+        image: 'https://5.imimg.com/data5/SELLER/Default/2024/11/468326697/VN/QU/PL/186187450/b14-3-1-universal-keydiy-flip-remote-500x500.png',
+      },
+      'keydiy-universal-remote': {
+        name: 'Keydiy Universal Remote',
+        description: 'Multi-frequency programmable car keys, B-Series & NB-Series remotes',
+        icon: '📟',
+        color: '#0984E3',
+        image: 'https://5.imimg.com/data5/SELLER/Default/2024/11/468326697/VN/QU/PL/186187450/b14-3-1-universal-keydiy-flip-remote-500x500.png',
       }
     };
     
