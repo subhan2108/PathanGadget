@@ -145,16 +145,13 @@ export default function HomePage() {
                     <div className="section-header">
                         <span className="section-label"><i className="bi bi-grid-3x3-gap-fill" /> Browse by Category</span>
                         <h2>Shop by Collection</h2>
-                        <p>Curated electronics for the modern lifestyle</p>
                     </div>
                     <div className="categories-grid" id="categories-grid">
-                        {categories.map((cat, index) => {
-                            const isTall = (categories.length === 5 && index === 2) || (categories.length % 3 === 2 && index === 2);
-                            return (
+                        {categories.map((cat) => (
                                 <div
                                     key={cat.id}
                                     id={`category-${cat.id}`}
-                                    className={`category-card ${isTall ? 'category-card--tall' : ''}`}
+                                    className="category-card"
                                     onClick={() => navigate(`/products?category=${cat.id}`)}
                                     role="button"
                                     tabIndex={0}
@@ -180,8 +177,7 @@ export default function HomePage() {
                                         </span>
                                     </div>
                                 </div>
-                            )
-                        })}
+                        ))}
                     </div>
                 </div>
             </section>
@@ -192,7 +188,6 @@ export default function HomePage() {
                     <div className="section-header">
                         <span className="section-label"><i className="bi bi-stars" /> Handpicked for You</span>
                         <h2>Featured Products</h2>
-                        <p>Top-rated electronics with fast shipping</p>
                     </div>
 
                     {/* Filter Tabs */}

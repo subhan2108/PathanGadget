@@ -272,7 +272,7 @@ export default function ProductDetailPage() {
                 </div>
             </div>
 
-            <div className="container" style={{ padding: '28px 24px 64px' }}>
+            <div className="container pdp-container" style={{ padding: '28px 24px 64px' }}>
 
                 {/* Two Column Layout (Aligned with Navbar Logo) */}
                 <div className="pdp-layout-grid">
@@ -312,7 +312,7 @@ export default function ProductDetailPage() {
                         )}
 
                         {/* Big Image Box */}
-                        <div style={{
+                        <div className="pdp-big-image-box" style={{
                             flex: '1 1 auto',
                             backgroundColor: '#FFFFFF',
                             borderRadius: '20px',
@@ -689,11 +689,11 @@ export default function ProductDetailPage() {
                                 <h3 style={{ fontSize: '1.15rem', fontWeight: '800', color: '#111827', margin: '0 0 14px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
                                     <i className="bi bi-sliders" style={{ color: 'var(--cta)' }} /> Specifications
                                 </h3>
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px' }}>
+                                <div className="pdp-specs-grid">
                                     {mappedSpecs.map((spec, i) => (
-                                        <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '2px', padding: '10px 14px', background: '#F9FAFB', borderRadius: '10px', border: '1px solid #F3F4F6' }}>
-                                            <span style={{ fontWeight: '600', color: '#6B7280', fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{spec.label}</span>
-                                            <span style={{ fontWeight: '700', color: '#111827', fontSize: '0.9rem' }}>{spec.value}</span>
+                                        <div key={i} className="pdp-spec-card">
+                                            <span className="pdp-spec-label">{spec.label}</span>
+                                            <span className="pdp-spec-value">{spec.value}</span>
                                         </div>
                                     ))}
                                 </div>

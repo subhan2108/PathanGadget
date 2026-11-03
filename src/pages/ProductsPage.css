@@ -1073,54 +1073,13 @@
 
 @media (max-width: 900px) {
 
-    /* Sidebar becomes a drawer */
+    /* Desktop sidebar is hidden on mobile; mobile uses dropdown popup under Filters button */
+    .plp-sidebar--desktop {
+        display: none !important;
+    }
+
     .plp-body__inner {
         grid-template-columns: 1fr;
-    }
-
-    .plp-sidebar {
-        position: fixed;
-        inset: 0;
-        z-index: 200;
-        pointer-events: none;
-    }
-
-    .plp-sidebar.open {
-        pointer-events: all;
-    }
-
-    .plp-sidebar__backdrop {
-        display: block;
-        position: absolute;
-        inset: 0;
-        background: rgba(0, 0, 0, 0.4);
-        opacity: 0;
-        transition: opacity 300ms ease;
-    }
-
-    .plp-sidebar.open .plp-sidebar__backdrop {
-        opacity: 1;
-    }
-
-    .plp-sidebar__panel {
-        position: fixed;
-        top: 0;
-        left: 0;
-        bottom: 0;
-        width: 300px;
-        border-radius: 0;
-        max-height: 100vh;
-        transform: translateX(-100%);
-        transition: transform 300ms cubic-bezier(0.4, 0, 0.2, 1);
-        z-index: 201;
-    }
-
-    .plp-sidebar.open .plp-sidebar__panel {
-        transform: translateX(0);
-    }
-
-    .sidebar-close-btn {
-        display: flex;
     }
 
     .desktop-filter-btn {
@@ -1130,8 +1089,53 @@
 
 @media (max-width: 640px) {
     .plp-grid {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 12px;
+        display: grid !important;
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 10px 8px !important;
+    }
+
+    /* ── Mobile 2-in-a-row Product Card Adjustments ── */
+    .glass-card {
+        min-height: auto !important;
+        padding: 10px 8px !important;
+        border-radius: 14px !important;
+    }
+
+    .glass-card .h-48 {
+        height: 135px !important;
+        margin-bottom: 8px !important;
+        padding: 6px !important;
+    }
+
+    .glass-card h3 {
+        font-size: 0.82rem !important;
+        line-height: 1.25 !important;
+        margin-bottom: 4px !important;
+        text-align: left !important;
+    }
+
+    .glass-card p {
+        display: -webkit-box !important;
+        -webkit-line-clamp: 1 !important;
+        -webkit-box-orient: vertical !important;
+        overflow: hidden !important;
+        font-size: 0.65rem !important;
+        line-height: 1.25 !important;
+        color: #6B7280 !important;
+        margin-bottom: 4px !important;
+        height: 14px !important;
+        text-align: left !important;
+    }
+
+    .glass-card .text-xl,
+    .glass-card .sm\:text-2xl {
+        font-size: 1.05rem !important;
+    }
+
+    .glass-card button {
+        padding: 7px 10px !important;
+        font-size: 0.75rem !important;
+        border-radius: 10px !important;
     }
 
     .plp-toolbar__inner {
@@ -1164,25 +1168,217 @@
     .plp-cat-arrow--right {
         right: 4px;
     }
+}
+/* ── Filter Dropdown on Mobile ──────────────────────────── */
+.plp-filter-toggle-wrap {
+    position: relative;
+    display: inline-block;
+}
 
-    .plp-grid--list {
-        grid-template-columns: 1fr;
-    }
-
-    .plp-grid--list .glass-card {
-        flex-direction: column;
-        min-height: 420px;
-    }
-
-    .plp-grid--list .glass-card>div:first-child {
-        width: 100%;
-        height: 192px;
-        margin-bottom: 12px;
+@media (min-width: 901px) {
+    .plp-filter-toggle-wrap {
+        display: none !important;
     }
 }
 
-@media (max-width: 420px) {
-    .plp-grid {
-        grid-template-columns: 1fr;
+/* Invisible backdrop to capture outside clicks without darkening/blurring page */
+.plp-dropdown-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 998;
+    background: transparent;
+    cursor: default;
+}
+
+/* Dropdown menu card anchored directly below the Filters button */
+.plp-filter-dropdown {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    width: 320px;
+    max-width: calc(100vw - 28px);
+    background: #FFFFFF;
+    border: 1px solid var(--border, #E5E7EB);
+    border-radius: 14px;
+    box-shadow: 0 14px 34px -4px rgba(0, 0, 0, 0.16), 0 4px 12px rgba(0, 0, 0, 0.08);
+    z-index: 999;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    animation: plpDropdownSlide 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes plpDropdownSlide {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
     }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.plp-filter-dropdown-content {
+    display: flex;
+    flex-direction: column;
+    background: #FFFFFF;
+    width: 100%;
+}
+
+.plp-filter-dropdown .plp-sidebar__header {
+    padding: 12px 16px;
+    background: #F9FAFB;
+    border-bottom: 1px solid #E5E7EB;
+    position: static;
+}
+
+.plp-filter-dropdown .plp-sidebar__header h3 {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.plp-dropdown-scrollable {
+    max-height: 380px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 0;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(184, 132, 36, 0.3) transparent;
+}
+
+.plp-dropdown-scrollable::-webkit-scrollbar {
+    width: 4px;
+}
+
+.plp-dropdown-scrollable::-webkit-scrollbar-thumb {
+    background: rgba(184, 132, 36, 0.3);
+    border-radius: 4px;
+}
+
+.plp-filter-dropdown .filter-section {
+    padding: 12px 16px;
+    border-bottom: 1px solid #F3F4F6;
+}
+
+.plp-filter-dropdown .filter-section:last-child {
+    border-bottom: none;
+}
+
+.plp-filter-dropdown .filter-section__title {
+    font-size: 0.8rem;
+    margin-bottom: 10px;
+}
+
+.plp-dropdown-footer {
+    padding: 12px 16px;
+    background: #FAFAFA;
+    border-top: 1px solid #E5E7EB;
+}
+
+.plp-dropdown-apply-btn {
+    width: 100%;
+    padding: 10px 16px;
+    font-size: 0.875rem;
+    font-weight: 700;
+    border-radius: 10px;
+    background: var(--cta, #B88424) !important;
+    color: #FFFFFF !important;
+    border: none !important;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(184, 132, 36, 0.25);
+    transition: background 150ms ease, transform 150ms ease;
+}
+
+.plp-dropdown-apply-btn:hover {
+    background: var(--cta-hover, #9c6e1c) !important;
+    transform: translateY(-1px);
+}
+
+.plp-dropdown-apply-btn:active {
+    transform: translateY(0);
+}
+
+/* ── White Overlay with Loading Spinner when Applying Filters ──────────────── */
+.plp-loading-screen-overlay {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    background: rgba(255, 255, 255, 0.75) !important;
+    backdrop-filter: blur(3px) !important;
+    -webkit-backdrop-filter: blur(3px) !important;
+    z-index: 99999 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    margin: 0 !important;
+    padding: 16px !important;
+    box-sizing: border-box !important;
+    animation: plpFadeIn 150ms ease-out;
+}
+
+/* Hide applying filters overlay strictly on desktop (> 900px) */
+@media (min-width: 901px) {
+    .plp-loading-screen-overlay {
+        display: none !important;
+    }
+}
+
+.plp-loading-spinner-box {
+    background: #FFFFFF;
+    padding: 20px 28px;
+    border-radius: 18px;
+    box-shadow: 0 16px 36px -4px rgba(0, 0, 0, 0.16), 0 6px 16px rgba(0, 0, 0, 0.08);
+    border: 1px solid #E5E7EB;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    min-width: 170px;
+    margin: auto !important;
+    animation: plpScaleUp 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes plpScaleUp {
+    from {
+        opacity: 0;
+        transform: scale(0.92);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.plp-spinner-ring {
+    width: 38px;
+    height: 38px;
+    border: 3.5px solid rgba(184, 132, 36, 0.2);
+    border-top-color: var(--cta, #B88424);
+    border-radius: 50%;
+    animation: plpSpin 0.75s linear infinite;
+}
+
+@keyframes plpSpin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.plp-loading-spinner-box span {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary, #111827);
+    letter-spacing: 0.2px;
+    white-space: nowrap;
 }

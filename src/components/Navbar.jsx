@@ -100,16 +100,6 @@ export default function Navbar() {
                                 />
                             </div>
                         </SignedIn>
-                        <SignedOut>
-                            <SignInButton mode="modal">
-                                <button
-                                    id="nav-signin-btn"
-                                    className="btn btn-outline navbar__signin"
-                                >
-                                    <i className="bi bi-person-circle" /> Sign In
-                                </button>
-                            </SignInButton>
-                        </SignedOut>
 
                         <button
                             id="nav-checkout"

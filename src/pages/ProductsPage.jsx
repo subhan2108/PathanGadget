@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useCart } from '../context/CartContext'
 import { useProducts, useFilterMeta, useCategories } from '../hooks/useProducts'
@@ -132,6 +133,161 @@ function PriceRangeSlider({ min, max, value, onChange }) {
 }
 
 /* ─── Main Page ─────────────────────────────────── */
+/* ── Reusable, stable Filter Sidebar Content (Defined outside to preserve scroll position on mobile) ── */
+function FilterSidebarContent({
+    isDropdown = false,
+    activeFilterCount,
+    resetFilters,
+    setSidebarOpen,
+    MIN_PRICE,
+    MAX_PRICE,
+    priceRange,
+    onPriceChange,
+    ALL_COLORS,
+    selectedColors,
+    onToggleColor,
+    ALL_BRANDS,
+    selectedBrands,
+    onToggleBrand,
+    minRating,
+    onMinRating,
+    inStockOnly,
+    onInStockOnly,
+    filteredCount,
+    COLOR_MAP,
+}) {
+    return (
+        <div className={`plp-filter-content ${isDropdown ? 'plp-filter-dropdown-content' : 'plp-sidebar__panel'}`}>
+            <div className="plp-sidebar__header">
+                <h3><i className="bi bi-funnel-fill" /> Filters</h3>
+                <div className="sidebar-header-actions">
+                    {activeFilterCount > 0 && (
+                        <button className="clear-btn" onClick={resetFilters}>
+                            <i className="bi bi-x-circle" /> Clear All ({activeFilterCount})
+                        </button>
+                    )}
+                    {isDropdown && (
+                        <button className="sidebar-close-btn" onClick={() => setSidebarOpen(false)} aria-label="Close filters">
+                            <i className="bi bi-x-lg" />
+                        </button>
+                    )}
+                </div>
+            </div>
+
+            <div className={isDropdown ? "plp-dropdown-scrollable" : "plp-sidebar-body"}>
+                {/* Price Range */}
+                <div className="filter-section">
+                    <h4 className="filter-section__title">
+                        <i className="bi bi-currency-rupee" /> Price Range
+                    </h4>
+                    <PriceRangeSlider
+                        min={MIN_PRICE}
+                        max={MAX_PRICE}
+                        value={priceRange}
+                        onChange={onPriceChange}
+                    />
+                </div>
+
+                {/* Colors */}
+                {ALL_COLORS && ALL_COLORS.length > 0 && (
+                    <div className="filter-section">
+                        <h4 className="filter-section__title">
+                            <i className="bi bi-palette" /> Color
+                        </h4>
+                        <div className="color-filter-grid">
+                            {ALL_COLORS.map(color => (
+                                <button
+                                    key={color}
+                                    type="button"
+                                    id={`cf-${color.replace(/\s+/g, '-').toLowerCase()}`}
+                                    className={`color-filter-item ${selectedColors.includes(color) ? 'active' : ''}`}
+                                    onClick={() => onToggleColor(color)}
+                                    title={color}
+                                >
+                                    <span className="cf-swatch" style={{ background: COLOR_MAP[color] || '#888' }} />
+                                    <span className="cf-label">{color}</span>
+                                    {selectedColors.includes(color) && <i className="bi bi-check cf-check" />}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* Brands (alphabetically sorted, stable order) */}
+                <div className="filter-section">
+                    <h4 className="filter-section__title">
+                        <i className="bi bi-building" /> Brand
+                    </h4>
+                    <div className="brand-filter-list">
+                        {ALL_BRANDS.map(brand => (
+                            <label key={brand} className={`brand-filter-item ${selectedBrands.includes(brand) ? 'active' : ''}`} id={`bf-${brand.toLowerCase()}`}>
+                                <input
+                                    type="checkbox"
+                                    checked={selectedBrands.includes(brand)}
+                                    onChange={() => onToggleBrand(brand)}
+                                />
+                                <span className="bf-box" />
+                                <span className="bf-label">{brand}</span>
+                            </label>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Min Rating */}
+                <div className="filter-section">
+                    <h4 className="filter-section__title">
+                        <i className="bi bi-star-fill" /> Minimum Rating
+                    </h4>
+                    <div className="rating-filter-list">
+                        {[4.5, 4, 3.5, 3, 0].map(r => (
+                            <button
+                                key={r}
+                                type="button"
+                                id={`rf-${r}`}
+                                className={`rating-filter-btn ${minRating === r ? 'active' : ''}`}
+                                onClick={() => onMinRating(r)}
+                            >
+                                {r === 0
+                                    ? <><i className="bi bi-grid" /> All Ratings</>
+                                    : <><i className="bi bi-star-fill" /> {r}+ Stars</>
+                                }
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Availability */}
+                <div className="filter-section">
+                    <h4 className="filter-section__title">
+                        <i className="bi bi-check-circle" /> Availability
+                    </h4>
+                    <label className="toggle-filter" id="in-stock-toggle">
+                        <input
+                            type="checkbox"
+                            checked={inStockOnly}
+                            onChange={e => onInStockOnly(e.target.checked)}
+                        />
+                        <span className="toggle-switch" />
+                        <span>In Stock Only</span>
+                    </label>
+                </div>
+            </div>
+
+            {isDropdown && (
+                <div className="plp-dropdown-footer">
+                    <button
+                        type="button"
+                        className="btn btn-primary btn-full plp-dropdown-apply-btn"
+                        onClick={() => setSidebarOpen(false)}
+                    >
+                        Apply Filters ({filteredCount} products)
+                    </button>
+                </div>
+            )}
+        </div>
+    )
+}
+
 export default function ProductsPage() {
     const navigate = useNavigate()
     const [searchParams, setSearchParams] = useSearchParams()
@@ -148,6 +304,7 @@ export default function ProductsPage() {
     const [minRating, setMinRating] = useState(0)
     const [inStockOnly, setInStockOnly] = useState(false)
     const searchInputRef = useRef(null)
+
 
     // ── Live data from Supabase ──
     const { meta, loading: metaLoading } = useFilterMeta()
@@ -166,7 +323,11 @@ export default function ProductsPage() {
     const MIN_PRICE = meta.minPrice || 0
     const MAX_PRICE = meta.maxPrice || 200000
     const ALL_COLORS = meta.colors || []
-    const ALL_BRANDS = meta.brands || []
+    // Stable alphabetical brand ordering so checkboxes never jump or change sequence
+    const ALL_BRANDS = React.useMemo(() => {
+        const raw = meta.brands || []
+        return raw.filter(b => b && b !== 'All').sort((a, b) => a.localeCompare(b))
+    }, [meta.brands])
 
     // Build filter object passed to the hook
     const filters = {
@@ -182,6 +343,17 @@ export default function ProductsPage() {
 
     const { products: filtered, loading: productsLoading, error: productsError } = useProducts(filters, sortBy)
 
+    // Only show "Applying filters..." overlay when the user has actually interacted with a filter on mobile
+    const [isUserFiltering, setIsUserFiltering] = useState(false)
+    const hasLoadedOnceRef = useRef(false)
+
+    useEffect(() => {
+        if (!productsLoading) {
+            hasLoadedOnceRef.current = true
+            setIsUserFiltering(false)
+        }
+    }, [productsLoading])
+
     // Debounce search input → triggers re-fetch via hook
     useEffect(() => {
         const t = setTimeout(() => setSearch(searchInput), 320)
@@ -196,16 +368,38 @@ export default function ProductsPage() {
         setSearchParams(params, { replace: true })
     }, [search, activeCategory])
 
-    /* helpers */
-    const toggleColor = (c) => setSelectedColors(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c])
-    const toggleBrand = (b) => setSelectedBrands(prev => prev.includes(b) ? prev.filter(x => x !== b) : [...prev, b])
-    const resetFilters = () => {
+    /* filter action helpers - flag isUserFiltering for mobile overlay */
+    const handleToggleColor = (c) => {
+        setIsUserFiltering(true)
+        setSelectedColors(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c])
+    }
+    const handleToggleBrand = (b) => {
+        setIsUserFiltering(true)
+        setSelectedBrands(prev => prev.includes(b) ? prev.filter(x => x !== b) : [...prev, b])
+    }
+    const handlePriceChange = (val) => {
+        setIsUserFiltering(true)
+        setPriceRange(val)
+    }
+    const handleMinRating = (r) => {
+        setIsUserFiltering(true)
+        setMinRating(r)
+    }
+    const handleInStockOnly = (val) => {
+        setIsUserFiltering(true)
+        setInStockOnly(val)
+    }
+    const handleResetFilters = () => {
+        setIsUserFiltering(true)
         setSearch(''); setSearchInput('')
         setActiveCategory('all')
         setSelectedColors([]); setSelectedBrands([])
         setPriceRange([MIN_PRICE, MAX_PRICE])
         setMinRating(0); setInStockOnly(false); setSortBy('featured')
     }
+    const resetFilters = handleResetFilters
+    const toggleColor = handleToggleColor
+    const toggleBrand = handleToggleBrand
 
     const activeFilterCount = selectedColors.length + selectedBrands.length +
         (priceRange[0] > MIN_PRICE || priceRange[1] < MAX_PRICE ? 1 : 0) +
@@ -311,126 +505,6 @@ export default function ProductsPage() {
             activeBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
         }
     }, [activeCategory])
-
-    /* ── Sidebar Panel ── */
-    const FilterSidebar = () => (
-        <aside className={`plp-sidebar ${sidebarOpen ? 'open' : ''}`} id="plp-sidebar">
-            {/* Mobile overlay */}
-            <div className="plp-sidebar__backdrop" onClick={() => setSidebarOpen(false)} />
-
-            <div className="plp-sidebar__panel">
-                <div className="plp-sidebar__header">
-                    <h3><i className="bi bi-funnel-fill" /> Filters</h3>
-                    <div className="sidebar-header-actions">
-                        {activeFilterCount > 0 && (
-                            <button className="clear-btn" onClick={resetFilters}>
-                                <i className="bi bi-x-circle" /> Clear All ({activeFilterCount})
-                            </button>
-                        )}
-                        <button className="sidebar-close-btn" onClick={() => setSidebarOpen(false)}>
-                            <i className="bi bi-x-lg" />
-                        </button>
-                    </div>
-                </div>
-
-                {/* Price Range */}
-                <div className="filter-section">
-                    <h4 className="filter-section__title">
-                        <i className="bi bi-currency-rupee" /> Price Range
-                    </h4>
-                    <PriceRangeSlider
-                        min={MIN_PRICE}
-                        max={MAX_PRICE}
-                        value={priceRange}
-                        onChange={setPriceRange}
-                    />
-                </div>
-
-                {/* Colors */}
-                <div className="filter-section">
-                    <h4 className="filter-section__title">
-                        <i className="bi bi-palette" /> Color
-                    </h4>
-                    <div className="color-filter-grid">
-                        {ALL_COLORS.map(color => (
-                            <button
-                                key={color}
-                                id={`cf-${color.replace(/\s+/g, '-').toLowerCase()}`}
-                                className={`color-filter-item ${selectedColors.includes(color) ? 'active' : ''}`}
-                                onClick={() => toggleColor(color)}
-                                title={color}
-                            >
-                                <span className="cf-swatch" style={{ background: COLOR_MAP[color] || '#888' }} />
-                                <span className="cf-label">{color}</span>
-                                {selectedColors.includes(color) && <i className="bi bi-check cf-check" />}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-
-                {/* Brands */}
-                <div className="filter-section">
-                    <h4 className="filter-section__title">
-                        <i className="bi bi-building" /> Brand
-                    </h4>
-                    <div className="brand-filter-list">
-                        {ALL_BRANDS.map(brand => (
-                            <label key={brand} className={`brand-filter-item ${selectedBrands.includes(brand) ? 'active' : ''}`} id={`bf-${brand.toLowerCase()}`}>
-                                <input
-                                    type="checkbox"
-                                    checked={selectedBrands.includes(brand)}
-                                    onChange={() => toggleBrand(brand)}
-                                />
-                                <span className="bf-box" />
-                                <span className="bf-label">{brand}</span>
-                                <span className="bf-count">
-                                    {filtered.filter(p => p.brand === brand).length}
-                                </span>
-                            </label>
-                        ))}
-                    </div>
-                </div>
-
-                {/* Min Rating */}
-                <div className="filter-section">
-                    <h4 className="filter-section__title">
-                        <i className="bi bi-star-fill" /> Minimum Rating
-                    </h4>
-                    <div className="rating-filter-list">
-                        {[4.5, 4, 3.5, 3, 0].map(r => (
-                            <button
-                                key={r}
-                                id={`rf-${r}`}
-                                className={`rating-filter-btn ${minRating === r ? 'active' : ''}`}
-                                onClick={() => setMinRating(r)}
-                            >
-                                {r === 0
-                                    ? <><i className="bi bi-grid" /> All Ratings</>
-                                    : <><i className="bi bi-star-fill" /> {r}+ Stars</>
-                                }
-                            </button>
-                        ))}
-                    </div>
-                </div>
-
-                {/* Availability */}
-                <div className="filter-section">
-                    <h4 className="filter-section__title">
-                        <i className="bi bi-check-circle" /> Availability
-                    </h4>
-                    <label className="toggle-filter" id="in-stock-toggle">
-                        <input
-                            type="checkbox"
-                            checked={inStockOnly}
-                            onChange={e => setInStockOnly(e.target.checked)}
-                        />
-                        <span className="toggle-switch" />
-                        <span>In Stock Only</span>
-                    </label>
-                </div>
-            </div>
-        </aside>
-    )
 
     return (
         <div className="products-page page-enter" id="products-page">
@@ -545,16 +619,50 @@ export default function ProductsPage() {
 
                     {/* Toolbar right */}
                     <div className="plp-toolbar__right">
-                        {/* Filter toggle */}
-                        <button
-                            id="plp-filter-toggle"
-                            className={`plp-filter-toggle-btn ${activeFilterCount > 0 ? 'has-filters' : ''}`}
-                            onClick={() => setSidebarOpen(o => !o)}
-                        >
-                            <i className="bi bi-funnel" />
-                            Filters
-                            {activeFilterCount > 0 && <span className="filter-badge">{activeFilterCount}</span>}
-                        </button>
+                        {/* Filter toggle with Mobile Dropdown */}
+                        <div className="plp-filter-toggle-wrap">
+                            <button
+                                id="plp-filter-toggle"
+                                className={`plp-filter-toggle-btn ${activeFilterCount > 0 ? 'has-filters' : ''} ${sidebarOpen ? 'active' : ''}`}
+                                onClick={() => setSidebarOpen(o => !o)}
+                                aria-expanded={sidebarOpen}
+                            >
+                                <i className="bi bi-funnel" />
+                                Filters
+                                {activeFilterCount > 0 && <span className="filter-badge">{activeFilterCount}</span>}
+                            </button>
+
+                            {/* Dropdown directly below Filters button */}
+                            {sidebarOpen && (
+                                <>
+                                    <div className="plp-dropdown-backdrop" onClick={() => setSidebarOpen(false)} />
+                                    <div className="plp-filter-dropdown" id="plp-filter-dropdown">
+                                        <FilterSidebarContent
+                                            isDropdown={true}
+                                            activeFilterCount={activeFilterCount}
+                                            resetFilters={handleResetFilters}
+                                            setSidebarOpen={setSidebarOpen}
+                                            MIN_PRICE={MIN_PRICE}
+                                            MAX_PRICE={MAX_PRICE}
+                                            priceRange={priceRange}
+                                            onPriceChange={handlePriceChange}
+                                            ALL_COLORS={ALL_COLORS}
+                                            selectedColors={selectedColors}
+                                            onToggleColor={handleToggleColor}
+                                            ALL_BRANDS={ALL_BRANDS}
+                                            selectedBrands={selectedBrands}
+                                            onToggleBrand={handleToggleBrand}
+                                            minRating={minRating}
+                                            onMinRating={handleMinRating}
+                                            inStockOnly={inStockOnly}
+                                            onInStockOnly={handleInStockOnly}
+                                            filteredCount={filtered.length}
+                                            COLOR_MAP={COLOR_MAP}
+                                        />
+                                    </div>
+                                </>
+                            )}
+                        </div>
 
                         {/* Sort */}
                         <div className="plp-sort-wrap">
@@ -601,32 +709,32 @@ export default function ProductsPage() {
                             <span key={c} className="filter-chip">
                                 <span className="chip-swatch" style={{ background: COLOR_MAP[c] || '#888' }} />
                                 {c}
-                                <button onClick={() => toggleColor(c)}><i className="bi bi-x" /></button>
+                                <button onClick={() => handleToggleColor(c)}><i className="bi bi-x" /></button>
                             </span>
                         ))}
                         {selectedBrands.map(b => (
                             <span key={b} className="filter-chip">
                                 <i className="bi bi-building" /> {b}
-                                <button onClick={() => toggleBrand(b)}><i className="bi bi-x" /></button>
+                                <button onClick={() => handleToggleBrand(b)}><i className="bi bi-x" /></button>
                             </span>
                         ))}
                         {(priceRange[0] > MIN_PRICE || priceRange[1] < MAX_PRICE) && (
                             <span className="filter-chip">
                                 <i className="bi bi-currency-rupee" />
                                 {formatPrice(priceRange[0])} – {formatPrice(priceRange[1])}
-                                <button onClick={() => setPriceRange([MIN_PRICE, MAX_PRICE])}><i className="bi bi-x" /></button>
+                                <button onClick={() => handlePriceChange([MIN_PRICE, MAX_PRICE])}><i className="bi bi-x" /></button>
                             </span>
                         )}
                         {minRating > 0 && (
                             <span className="filter-chip">
                                 <i className="bi bi-star-fill" /> {minRating}+ Stars
-                                <button onClick={() => setMinRating(0)}><i className="bi bi-x" /></button>
+                                <button onClick={() => handleMinRating(0)}><i className="bi bi-x" /></button>
                             </span>
                         )}
                         {inStockOnly && (
                             <span className="filter-chip">
                                 <i className="bi bi-check-circle-fill" /> In Stock
-                                <button onClick={() => setInStockOnly(false)}><i className="bi bi-x" /></button>
+                                <button onClick={() => handleInStockOnly(false)}><i className="bi bi-x" /></button>
                             </span>
                         )}
                         <button className="chip-clear-all" onClick={resetFilters}>
@@ -640,8 +748,31 @@ export default function ProductsPage() {
             <div className="plp-body" id="plp-body">
                 <div className="container plp-body__inner">
 
-                    {/* Sidebar */}
-                    <FilterSidebar />
+                    {/* Desktop Sidebar */}
+                    <aside className="plp-sidebar plp-sidebar--desktop" id="plp-sidebar">
+                        <FilterSidebarContent
+                            isDropdown={false}
+                            activeFilterCount={activeFilterCount}
+                            resetFilters={handleResetFilters}
+                            setSidebarOpen={setSidebarOpen}
+                            MIN_PRICE={MIN_PRICE}
+                            MAX_PRICE={MAX_PRICE}
+                            priceRange={priceRange}
+                            onPriceChange={handlePriceChange}
+                            ALL_COLORS={ALL_COLORS}
+                            selectedColors={selectedColors}
+                            onToggleColor={handleToggleColor}
+                            ALL_BRANDS={ALL_BRANDS}
+                            selectedBrands={selectedBrands}
+                            onToggleBrand={handleToggleBrand}
+                            minRating={minRating}
+                            onMinRating={handleMinRating}
+                            inStockOnly={inStockOnly}
+                            onInStockOnly={handleInStockOnly}
+                            filteredCount={filtered.length}
+                            COLOR_MAP={COLOR_MAP}
+                        />
+                    </aside>
 
                     {/* Main Content */}
                     <main className="plp-main" id="plp-main">
@@ -668,8 +799,19 @@ export default function ProductsPage() {
                             </button>
                         </div>
 
+                        {/* White overlay with spinner ONLY on mobile when user actively applies a filter (rendered in Portal to center on viewport regardless of transforms/scroll) */}
+                        {isUserFiltering && productsLoading && typeof document !== 'undefined' && createPortal(
+                            <div className="plp-loading-screen-overlay" aria-live="polite" role="status">
+                                <div className="plp-loading-spinner-box">
+                                    <div className="plp-spinner-ring" />
+                                    <span>Applying filters…</span>
+                                </div>
+                            </div>,
+                            document.body
+                        )}
+
                         {/* Product Grid / List */}
-                        {productsLoading ? (
+                        {(!hasLoadedOnceRef.current && productsLoading) ? (
                             <div className="plp-loading" id="plp-loading">
                                 {[...Array(6)].map((_, i) => (
                                     <div key={i} className="plp-skeleton" />
