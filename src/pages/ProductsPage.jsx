@@ -13,21 +13,79 @@ const CATEGORY_ICONS = {
     airpods: 'bi-earbuds',
     headphones: 'bi-headphones',
     smartphones: 'bi-phone',
+    'Xhorse Smart Key': 'bi-key-fill',
+    'xhorse smart key': 'bi-key-fill',
+    'Xhorse Wireless Remote': 'bi-broadcast',
+    'xhorse wireless remote': 'bi-broadcast',
+    'Xhorse Wire Remote': 'bi-key',
+    'xhorse wire remote': 'bi-key',
+    'Xhorse Super Remote': 'bi-cpu-fill',
+    'xhorse super remote': 'bi-cpu-fill',
+    'xhorse-super-remote': 'bi-cpu-fill',
+    'Car Remote': 'bi-car-front-fill',
+    'car remote': 'bi-car-front-fill',
+    'car-remote': 'bi-car-front-fill',
+    'Transponder Shell': 'bi-key-fill',
+    'transponder shell': 'bi-key-fill',
+    'transponder-shell': 'bi-key-fill',
+    'ID Chip': 'bi-cpu-fill',
+    'id chip': 'bi-cpu-fill',
+    'id-chip': 'bi-cpu-fill',
+    'KEYDIY UNIVERSAL REMOTE': 'bi-cpu',
+    'Remote Shell': 'bi-shield-check',
+    'Key Cover': 'bi-shield-shaded',
+    'key cover': 'bi-shield-shaded',
+    'key-cover': 'bi-shield-shaded',
+    'Domestic Keys': 'bi-house-lock',
+    'domestic keys': 'bi-house-lock',
+    'domestic-keys': 'bi-house-lock',
+    'Remote Batteries': 'bi-battery-charging',
+    'remote batteries': 'bi-battery-charging',
+    'remote-batteries': 'bi-battery-charging',
+    'Flip Blades': 'bi-slash-square',
+    'flip blades': 'bi-slash-square',
+    'flip-blades': 'bi-slash-square',
+    'Keypads': 'bi-grid-3x3',
+    'keypads': 'bi-grid-3x3',
+    'key-pads': 'bi-grid-3x3',
+    '2-Wheeler Keys': 'bi-bicycle',
+    'Automotive Key Blanks': 'bi-key',
+    'Car Accessories': 'bi-car-front',
+    'Car Lighting': 'bi-lightbulb-fill',
+    'Xhorse Products': 'bi-broadcast',
+    'Keychains': 'bi-link-45deg',
+    'Car Fragrance': 'bi-droplet-fill',
+    'Locksmith Tools': 'bi-tools',
+    'Car Electronics': 'bi-camera-video',
+    'Smart Keys': 'bi-key-fill',
+    'KeyDIY Products': 'bi-cpu',
+    'Transponder Chips': 'bi-memory',
+    'Car Care & Accessories': 'bi-stars',
+    Remote: 'bi-key',
 }
 
 const getCategoryIcon = (id = '', name = '') => {
     if (CATEGORY_ICONS[id]) return CATEGORY_ICONS[id]
     const key = `${id} ${name}`.toLowerCase()
+    if (key.includes('pad')) return 'bi-grid-3x3'
+    if (key.includes('blade')) return 'bi-slash-square'
+    if (key.includes('batter')) return 'bi-battery-charging'
+    if (key.includes('domestic') || key.includes('house')) return 'bi-house-lock'
+    if (key.includes('cover')) return 'bi-shield-shaded'
+    if (key.includes('bike') || key.includes('wheeler')) return 'bi-bicycle'
+    if (key.includes('light') || key.includes('led') || key.includes('lamp')) return 'bi-lightbulb-fill'
+    if (key.includes('fragrance') || key.includes('perfume')) return 'bi-droplet-fill'
+    if (key.includes('chain')) return 'bi-link-45deg'
+    if (key.includes('tool')) return 'bi-tools'
+    if (key.includes('camera') || key.includes('electronic')) return 'bi-camera-video'
     if (key.includes('watch')) return 'bi-smartwatch'
     if (key.includes('airpod') || key.includes('earbud')) return 'bi-earbuds'
     if (key.includes('headphone') || key.includes('audio')) return 'bi-headphones'
     if (key.includes('phone') || key.includes('mobile')) return 'bi-phone'
     if (key.includes('remote') || key.includes('key')) return 'bi-key'
     if (key.includes('shell')) return 'bi-shield-check'
-    if (key.includes('electronic')) return 'bi-cpu'
+    if (key.includes('chip') || key.includes('transponder')) return 'bi-memory'
     if (key.includes('cable') || key.includes('charger')) return 'bi-lightning-charge'
-    if (key.includes('camera')) return 'bi-camera'
-    if (key.includes('tool') || key.includes('device')) return 'bi-tools'
     return 'bi-tag'
 }
 
@@ -58,17 +116,25 @@ function PriceRangeSlider({ min, max, value, onChange }) {
     const [dragging, setDragging] = useState(null)
     const trackRef = useRef(null)
 
-    const getPercent = (val) => ((val - min) / (max - min)) * 100
+    const range = Math.max(1, max - min)
+    const step = Math.max(1, Math.round(range * 0.005))
+    const minGap = Math.max(5, step * 2)
+
+    const getPercent = (val) => Math.max(0, Math.min(100, ((val - min) / range) * 100))
 
     const handleTrackClick = useCallback((e) => {
         const rect = trackRef.current.getBoundingClientRect()
         const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
-        const val = Math.round(min + pct * (max - min))
+        const rawVal = min + pct * range
+        const val = Math.round(rawVal / step) * step
         const diffLow = Math.abs(val - value[0])
         const diffHigh = Math.abs(val - value[1])
-        if (diffLow < diffHigh) onChange([Math.min(val, value[1] - 1000), value[1]])
-        else onChange([value[0], Math.max(val, value[0] + 1000)])
-    }, [min, max, value, onChange])
+        if (diffLow < diffHigh) {
+            onChange([Math.max(min, Math.min(val, value[1] - minGap)), value[1]])
+        } else {
+            onChange([value[0], Math.min(max, Math.max(val, value[0] + minGap))])
+        }
+    }, [min, max, range, step, minGap, value, onChange])
 
     const startDrag = (e, thumb) => {
         e.preventDefault()
@@ -82,9 +148,13 @@ function PriceRangeSlider({ min, max, value, onChange }) {
             if (!rect) return
             const clientX = e.touches ? e.touches[0].clientX : e.clientX
             const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
-            const val = Math.round(min + pct * (max - min))
-            if (dragging === 'low') onChange([Math.min(val, value[1] - 1000), value[1]])
-            else onChange([value[0], Math.max(val, value[0] + 1000)])
+            const rawVal = min + pct * range
+            const val = Math.round(rawVal / step) * step
+            if (dragging === 'low') {
+                onChange([Math.max(min, Math.min(val, value[1] - minGap)), value[1]])
+            } else {
+                onChange([value[0], Math.min(max, Math.max(val, value[0] + minGap))])
+            }
         }
         const stopDrag = () => setDragging(null)
         window.addEventListener('mousemove', onMove)
@@ -97,7 +167,7 @@ function PriceRangeSlider({ min, max, value, onChange }) {
             window.removeEventListener('touchmove', onMove)
             window.removeEventListener('touchend', stopDrag)
         }
-    }, [dragging, min, max, value, onChange])
+    }, [dragging, min, max, range, step, minGap, value, onChange])
 
     const lowPct = getPercent(value[0])
     const highPct = getPercent(value[1])
@@ -156,6 +226,13 @@ function FilterSidebarContent({
     filteredCount,
     COLOR_MAP,
 }) {
+    const [brandSearch, setBrandSearch] = useState('')
+    const visibleBrands = React.useMemo(() => {
+        if (!brandSearch.trim()) return ALL_BRANDS
+        const term = brandSearch.toLowerCase()
+        return ALL_BRANDS.filter(b => b.toLowerCase().includes(term))
+    }, [ALL_BRANDS, brandSearch])
+
     return (
         <div className={`plp-filter-content ${isDropdown ? 'plp-filter-dropdown-content' : 'plp-sidebar__panel'}`}>
             <div className="plp-sidebar__header">
@@ -213,23 +290,69 @@ function FilterSidebarContent({
                     </div>
                 )}
 
-                {/* Brands (alphabetically sorted, stable order) */}
+                {/* Brands (alphabetically sorted, searchable) */}
                 <div className="filter-section">
-                    <h4 className="filter-section__title">
-                        <i className="bi bi-building" /> Brand
-                    </h4>
-                    <div className="brand-filter-list">
-                        {ALL_BRANDS.map(brand => (
-                            <label key={brand} className={`brand-filter-item ${selectedBrands.includes(brand) ? 'active' : ''}`} id={`bf-${brand.toLowerCase()}`}>
-                                <input
-                                    type="checkbox"
-                                    checked={selectedBrands.includes(brand)}
-                                    onChange={() => onToggleBrand(brand)}
-                                />
-                                <span className="bf-box" />
-                                <span className="bf-label">{brand}</span>
-                            </label>
-                        ))}
+                    <div className="filter-section__header-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                        <h4 className="filter-section__title" style={{ margin: 0 }}>
+                            <i className="bi bi-building" /> Brand
+                        </h4>
+                        {selectedBrands.length > 0 && (
+                            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--cta)', background: 'rgba(184, 132, 36, 0.1)', padding: '2px 8px', borderRadius: 12 }}>
+                                {selectedBrands.length} selected
+                            </span>
+                        )}
+                    </div>
+
+                    {ALL_BRANDS.length > 8 && (
+                        <div className="brand-search-box" style={{ position: 'relative', marginBottom: 8 }}>
+                            <i className="bi bi-search" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', color: '#888' }} />
+                            <input
+                                type="text"
+                                className="brand-search-input"
+                                placeholder="Search brands..."
+                                value={brandSearch}
+                                onChange={e => setBrandSearch(e.target.value)}
+                                style={{
+                                    width: '100%',
+                                    padding: '6px 28px 6px 28px',
+                                    borderRadius: 6,
+                                    border: '1px solid var(--border)',
+                                    fontSize: '0.8125rem',
+                                    background: 'var(--neutral-bg, #f9fafb)',
+                                    outline: 'none'
+                                }}
+                            />
+                            {brandSearch && (
+                                <button
+                                    type="button"
+                                    onClick={() => setBrandSearch('')}
+                                    style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#888', fontSize: '0.875rem', padding: 0 }}
+                                    aria-label="Clear brand search"
+                                >
+                                    <i className="bi bi-x" />
+                                </button>
+                            )}
+                        </div>
+                    )}
+
+                    <div className="brand-filter-list" style={{ maxHeight: '240px', overflowY: 'auto', paddingRight: '4px' }}>
+                        {visibleBrands.length === 0 ? (
+                            <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', padding: '8px 0', textAlign: 'center' }}>
+                                No brands match "{brandSearch}"
+                            </div>
+                        ) : (
+                            visibleBrands.map(brand => (
+                                <label key={brand} className={`brand-filter-item ${selectedBrands.includes(brand) ? 'active' : ''}`} id={`bf-${brand.toLowerCase()}`}>
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedBrands.includes(brand)}
+                                        onChange={() => onToggleBrand(brand)}
+                                    />
+                                    <span className="bf-box" />
+                                    <span className="bf-label">{brand}</span>
+                                </label>
+                            ))
+                        )}
                     </div>
                 </div>
 

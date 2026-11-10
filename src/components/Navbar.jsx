@@ -199,7 +199,7 @@ export default function Navbar() {
                                         style={{ objectFit: 'contain', backgroundColor: '#FFFFFF', padding: '4px' }}
                                         onError={(e) => {
                                             e.currentTarget.onerror = null;
-                                            e.currentTarget.src = 'https://images.unsplash.com/photo-1558611848-73f7eb4001a1?w=200&q=80';
+                                            e.currentTarget.src = '/placeholder-key.svg';
                                         }}
                                     />
                                     <div className="cart-item__info">

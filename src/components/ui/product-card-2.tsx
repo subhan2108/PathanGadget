@@ -53,7 +53,27 @@ const ProductCard = React.forwardRef<HTMLDivElement, ProductCardProps>(
     const brand = raw.brand || null;
     const category = raw.category || null;
     const description = raw.description || tagline || (category ? `${category} Collection` : "Genuine Key & Remote");
-    const image = imageUrl || raw.image_url || raw.image || "";
+    const rawImage = imageUrl || raw.image_url || raw.image || "";
+    const cleanInitialImage = rawImage.startsWith("https://rkkeys.co.in/")
+      ? rawImage.replace("https://rkkeys.co.in/", "https://i0.wp.com/rkkeys.co.in/")
+      : (rawImage.startsWith("http://rkkeys.co.in/") ? rawImage.replace("http://rkkeys.co.in/", "https://i0.wp.com/rkkeys.co.in/") : rawImage);
+
+    const [currentImage, setCurrentImage] = React.useState(cleanInitialImage || "/placeholder-key.svg");
+
+    React.useEffect(() => {
+      setCurrentImage(cleanInitialImage || "/placeholder-key.svg");
+    }, [cleanInitialImage]);
+
+    const handleImgError = () => {
+      if (currentImage && !currentImage.includes("wsrv.nl") && !currentImage.includes("placeholder-key.svg")) {
+        const rawUrl = currentImage.replace("https://i0.wp.com/", "https://");
+        setCurrentImage(`https://wsrv.nl/?url=${encodeURIComponent(rawUrl)}`);
+      } else {
+        setCurrentImage("/placeholder-key.svg");
+      }
+    };
+
+    const image = currentImage;
     const price = propPrice ?? raw.price ?? 0;
     const originalPrice = propOriginalPrice ?? raw.original_price ?? raw.originalPrice ?? price;
     const rating = (raw.rating !== undefined && raw.rating !== null && Number(raw.rating) > 0) ? Number(raw.rating) : 0;
@@ -126,6 +146,7 @@ const ProductCard = React.forwardRef<HTMLDivElement, ProductCardProps>(
           <img
             src={image}
             alt={name}
+            onError={handleImgError}
             className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-105"
             loading="lazy"
           />

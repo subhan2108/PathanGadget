@@ -112,7 +112,7 @@ export function useProductDetail(id) {
             .then(data => {
                 setProduct(data)
                 if (data?.category) {
-                    return fetchSimilarProducts(data.category, id)
+                    return fetchSimilarProducts(data.category, id, data.brand)
                 }
                 return []
             })
@@ -130,16 +130,16 @@ export function useProductDetail(id) {
     return { product, similarProducts, loading, error }
 }
 
-export function useSimilarProducts(category, excludeId) {
+export function useSimilarProducts(category, excludeId, brand) {
     const [products, setProducts] = useState([])
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
         if (!category) return
-        fetchSimilarProducts(category, excludeId)
+        fetchSimilarProducts(category, excludeId, brand)
             .then(data => setProducts(data))
             .finally(() => setLoading(false))
-    }, [category, excludeId])
+    }, [category, excludeId, brand])
 
     return { products, loading }
 }

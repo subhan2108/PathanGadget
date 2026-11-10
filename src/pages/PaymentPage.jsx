@@ -301,8 +301,9 @@ Hello! I have placed this order on your website. Please confirm my order and sha
                                 {successOrder.items.map((item, idx) => (
                                     <div key={idx} className="success-item-mini">
                                         <img 
-                                            src={item.image_url || '/logo.png'} 
+                                            src={item.image_url || '/placeholder-key.svg'} 
                                             alt={item.name} 
+                                            onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/placeholder-key.svg'; }}
                                             style={{ width: 44, height: 44, objectFit: 'contain', borderRadius: 8, border: '1px solid #E5E7EB', background: '#FFF' }}
                                         />
                                         <div style={{ flex: 1, textAlign: 'left' }}>
@@ -620,8 +621,9 @@ Hello! I have placed this order on your website. Please confirm my order and sha
                                     return (
                                         <div key={item.id} className="summary-item">
                                             <img 
-                                                src={item.image || item.image_url || '/logo.png'} 
+                                                src={item.image || item.image_url || '/placeholder-key.svg'} 
                                                 alt={item.name}
+                                                onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/placeholder-key.svg'; }}
                                                 style={{
                                                     width: '60px',
                                                     height: '60px',
@@ -631,10 +633,6 @@ Hello! I have placed this order on your website. Please confirm my order and sha
                                                     border: '1px solid #E5E7EB',
                                                     padding: '4px',
                                                     flexShrink: 0
-                                                }}
-                                                onError={(e) => {
-                                                    e.currentTarget.onerror = null;
-                                                    e.currentTarget.src = 'https://images.unsplash.com/photo-1558611848-73f7eb4001a1?w=200&q=80';
                                                 }}
                                             />
                                             <div style={{ flex: 1, minWidth: 0 }}>

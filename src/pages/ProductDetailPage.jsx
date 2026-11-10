@@ -110,8 +110,26 @@ export default function ProductDetailPage() {
 
     const hasRatingOrReviews = Boolean(computedAvgRating || reviewCount > 0)
 
+    const sanitizeImg = (u) => {
+        if (!u || typeof u !== 'string') return '';
+        const trimmed = u.trim();
+        if (trimmed.startsWith('https://rkkeys.co.in/')) return trimmed.replace('https://rkkeys.co.in/', 'https://i0.wp.com/rkkeys.co.in/');
+        if (trimmed.startsWith('http://rkkeys.co.in/')) return trimmed.replace('http://rkkeys.co.in/', 'https://i0.wp.com/rkkeys.co.in/');
+        return trimmed;
+    };
+
+    const handleImgError = (e) => {
+        const target = e.currentTarget;
+        if (target.src && !target.src.includes('wsrv.nl') && !target.src.includes('placeholder-key.svg')) {
+            const rawUrl = target.src.replace('https://i0.wp.com/', 'https://');
+            target.src = `https://wsrv.nl/?url=${encodeURIComponent(rawUrl)}`;
+        } else {
+            target.src = '/placeholder-key.svg';
+        }
+    };
+
     // Build Gallery from DB (supports 4-6 images from backend/admin panel)
-    const mainImg = (product?.image_url || product?.image || '').trim()
+    const mainImg = sanitizeImg(product?.image_url || product?.image || '')
     let rawExtraList = []
     if (Array.isArray(product?.details?.extraImages)) {
         rawExtraList = product.details.extraImages
@@ -129,7 +147,7 @@ export default function ProductDetailPage() {
     }
 
     let cleanExtraList = rawExtraList
-        .map(u => typeof u === 'string' ? u.trim() : '')
+        .map(u => typeof u === 'string' ? sanitizeImg(u) : '')
         .filter(u => Boolean(u) && u !== mainImg)
 
     // If backend extraImages is empty or only contained copies of mainImg, provide category angles
@@ -161,7 +179,7 @@ export default function ProductDetailPage() {
         : rawSpecs
 
     const mappedSpecs = Object.entries(specsWithSku)
-        .filter(([_, v]) => v !== undefined && v !== null && String(v).trim() !== '')
+        .filter(([k, v]) => k.toLowerCase() !== 'source' && v !== undefined && v !== null && String(v).trim() !== '')
         .map(([k, v]) => ({
             label: k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
             value: String(v)
@@ -305,7 +323,7 @@ export default function ProductDetailPage() {
                                             boxShadow: activeImg === idx ? '0 2px 8px rgba(229, 184, 36, 0.25)' : 'none'
                                         }}
                                     >
-                                        <img src={img} alt={`Thumb ${idx}`} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                                        <img src={img} alt={`Thumb ${idx}`} onError={handleImgError} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                                     </div>
                                 ))}
                             </div>
@@ -347,6 +365,7 @@ export default function ProductDetailPage() {
                                 <img
                                     src={gallery[activeImg] || gallery[0]}
                                     alt={product.name}
+                                    onError={handleImgError}
                                     style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                                 />
                             ) : (
@@ -866,25 +885,46 @@ export default function ProductDetailPage() {
                 </div>
             </div>
 
-            {/* Suggested Products (Strictly if real similar products from backend exist) */}
+            {/* Recommended Products Section (recommends 4 products as per current product category) */}
             {similarProducts && similarProducts.length > 0 && (
-                <div className="container" style={{ maxWidth: '1200px', margin: '0 auto', padding: '40px 20px 80px' }}>
-                    <div style={{ marginTop: '40px', paddingTop: '40px', borderTop: '1px solid #E5E7EB' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-                            <h2 style={{ fontSize: '1.5rem', fontWeight: '800', color: '#111827', margin: 0 }}>
-                                You May Also Like
-                            </h2>
-                            <Link to="/products" style={{ color: 'var(--cta)', fontWeight: '700', fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                View All <i className="bi bi-arrow-right" />
+                <section className="recommended-products-section" style={{ maxWidth: '1240px', margin: '0 auto', padding: '20px 20px 80px' }}>
+                    <div style={{ marginTop: '20px', paddingTop: '36px', borderTop: '1px solid #E5E7EB' }}>
+                        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
+                            <div>
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--cta)', marginBottom: '4px' }}>
+                                    <i className="bi bi-stars" /> Handpicked For You
+                                </span>
+                                <h2 style={{ fontSize: '1.75rem', fontWeight: '800', color: '#111827', margin: 0 }}>
+                                    Recommended Products
+                                </h2>
+                                {product?.category && (
+                                    <p style={{ margin: '4px 0 0 0', fontSize: '0.9rem', color: '#6B7280' }}>
+                                        More high-demand items from <strong style={{ color: '#374151' }}>{product.category}</strong>
+                                    </p>
+                                )}
+                            </div>
+                            <Link 
+                                to={product?.category ? `/products?category=${encodeURIComponent(product.category)}` : '/products'} 
+                                style={{ 
+                                    color: 'var(--cta)', 
+                                    fontWeight: '700', 
+                                    fontSize: '0.9rem', 
+                                    display: 'inline-flex', 
+                                    alignItems: 'center', 
+                                    gap: '6px',
+                                    textDecoration: 'none'
+                                }}
+                            >
+                                View All in {product?.category || 'Catalog'} <i className="bi bi-arrow-right" />
                             </Link>
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '24px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '20px' }}>
                             {similarProducts.slice(0, 4).map((prod) => (
-                                <ProductCard key={prod.id} id={`similar-card-${prod.id}`} product={prod} />
+                                <ProductCard key={prod.id} id={`recommended-card-${prod.id}`} product={prod} />
                             ))}
                         </div>
                     </div>
-                </div>
+                </section>
             )}
         </div>
     )

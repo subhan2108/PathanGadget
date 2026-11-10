@@ -10,14 +10,50 @@ import {
     adminUpdateOrderStatus,
     adminAddTrackingStep
 } from '../lib/adminService'
-import { useAuth } from '../context/AuthContext'
+const ADMIN_PASSWORD = (import.meta.env.VITE_ADMIN_PASSWORD || 'admin123').trim()
 import { useCategories } from '../hooks/useProducts'
 import { syncMockDataToNeon } from '../lib/syncService'
 import { compressImageFile, formatFileSize, getDataUrlSize } from '../lib/imageUtils'
 import './AdminPage.css'
 
 export default function AdminPage() {
-    const { user, profile } = useAuth()
+    // Password-only protection state (stored in env via VITE_ADMIN_PASSWORD)
+    const [isAuthenticated, setIsAuthenticated] = useState(() => {
+        try {
+            return sessionStorage.getItem('smn_admin_auth') === 'true'
+        } catch {
+            return false
+        }
+    })
+    const [passwordInput, setPasswordInput] = useState('')
+    const [passwordError, setPasswordError] = useState('')
+    const [showPassword, setShowPassword] = useState(false)
+
+    const handlePasswordSubmit = (e) => {
+        if (e) e.preventDefault()
+        if (!passwordInput) {
+            setPasswordError('Please enter the admin password.')
+            return
+        }
+        if (passwordInput.trim() === ADMIN_PASSWORD) {
+            try {
+                sessionStorage.setItem('smn_admin_auth', 'true')
+            } catch {}
+            setIsAuthenticated(true)
+            setPasswordError('')
+        } else {
+            setPasswordError('Incorrect admin password. Please try again.')
+        }
+    }
+
+    const handleLockAdmin = () => {
+        try {
+            sessionStorage.removeItem('smn_admin_auth')
+        } catch {}
+        setIsAuthenticated(false)
+        setPasswordInput('')
+        setPasswordError('')
+    }
     const { categories } = useCategories()
     const [tab, setTab] = useState('products')
     const [loading, setLoading] = useState(false)
@@ -90,10 +126,10 @@ export default function AdminPage() {
     }
 
     useEffect(() => {
-        if (!user) return
+        if (!isAuthenticated) return
         if (tab === 'products') loadProducts()
         if (tab === 'orders') loadOrders()
-    }, [tab, user])
+    }, [tab, isAuthenticated])
 
     const loadProducts = async () => {
         setLoading(true)
@@ -304,7 +340,144 @@ export default function AdminPage() {
         }
     }
 
-    if (!user) return <div className="admin-container"><p>Access Denied. Please Sign In.</p></div>
+    if (!isAuthenticated) {
+        return (
+            <div className="admin-container page-enter" style={{ minHeight: '80vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 16px' }}>
+                <div style={{
+                    width: '100%',
+                    maxWidth: '440px',
+                    background: '#FFFFFF',
+                    borderRadius: '20px',
+                    border: '1px solid #E5E7EB',
+                    boxShadow: '0 20px 40px -15px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.02)',
+                    padding: '36px 32px',
+                    textAlign: 'center'
+                }}>
+                    <div style={{
+                        width: '68px',
+                        height: '68px',
+                        borderRadius: '18px',
+                        background: 'linear-gradient(135deg, #FFF7ED 0%, #FFEDD5 100%)',
+                        border: '1px solid #FDBA74',
+                        color: 'var(--cta, #D97706)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '1.9rem',
+                        margin: '0 auto 20px auto',
+                        boxShadow: '0 8px 16px -4px rgba(217, 119, 6, 0.15)'
+                    }}>
+                        <i className="bi bi-shield-lock-fill" />
+                    </div>
+
+                    <h2 style={{ fontSize: '1.45rem', fontWeight: '800', color: '#111827', margin: '0 0 6px 0' }}>
+                        Admin Portal Access
+                    </h2>
+                    <p style={{ fontSize: '0.88rem', color: '#6B7280', margin: '0 0 24px 0', lineHeight: '1.4' }}>
+                        Enter your administrative master password to access product management and orders.
+                    </p>
+
+                    <form onSubmit={handlePasswordSubmit}>
+                        <div style={{ position: 'relative', marginBottom: '14px', textAlign: 'left' }}>
+                            <label style={{ fontSize: '0.78rem', fontWeight: '700', color: '#4B5563', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px', display: 'block' }}>
+                                Master Password
+                            </label>
+                            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                                <i className="bi bi-key" style={{ position: 'absolute', left: '14px', color: '#9CA3AF', fontSize: '1.1rem', pointerEvents: 'none' }} />
+                                <input
+                                    type={showPassword ? 'text' : 'password'}
+                                    value={passwordInput}
+                                    onChange={(e) => {
+                                        setPasswordInput(e.target.value)
+                                        if (passwordError) setPasswordError('')
+                                    }}
+                                    placeholder="Enter admin password..."
+                                    autoFocus
+                                    style={{
+                                        width: '100%',
+                                        height: '46px',
+                                        padding: '0 44px 0 42px',
+                                        borderRadius: '12px',
+                                        border: passwordError ? '1.5px solid #EF4444' : '1px solid #D1D5DB',
+                                        fontSize: '0.95rem',
+                                        outline: 'none',
+                                        background: '#F9FAFB',
+                                        transition: 'all 0.2s ease'
+                                    }}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    tabIndex={-1}
+                                    style={{
+                                        position: 'absolute',
+                                        right: '12px',
+                                        background: 'none',
+                                        border: 'none',
+                                        color: '#9CA3AF',
+                                        cursor: 'pointer',
+                                        fontSize: '1rem',
+                                        padding: '4px'
+                                    }}
+                                >
+                                    <i className={`bi ${showPassword ? 'bi-eye-slash' : 'bi-eye'}`} />
+                                </button>
+                            </div>
+                        </div>
+
+                        {passwordError && (
+                            <div style={{
+                                padding: '10px 14px',
+                                borderRadius: '10px',
+                                background: '#FEF2F2',
+                                border: '1px solid #FCA5A5',
+                                color: '#B91C1C',
+                                fontSize: '0.84rem',
+                                fontWeight: '600',
+                                marginBottom: '16px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                textAlign: 'left'
+                            }}>
+                                <i className="bi bi-exclamation-circle-fill" />
+                                {passwordError}
+                            </div>
+                        )}
+
+                        <button
+                            type="submit"
+                            style={{
+                                width: '100%',
+                                height: '48px',
+                                background: 'var(--cta, #B88424)',
+                                color: '#FFFFFF',
+                                border: 'none',
+                                borderRadius: '12px',
+                                fontSize: '0.95rem',
+                                fontWeight: '700',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '8px',
+                                cursor: 'pointer',
+                                boxShadow: '0 4px 12px rgba(184, 132, 36, 0.25)',
+                                transition: 'all 0.2s ease'
+                            }}
+                        >
+                            <i className="bi bi-unlock-fill" /> Unlock Admin Panel
+                        </button>
+                    </form>
+
+                    <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid #F3F4F6' }}>
+                        <Link to="/" style={{ color: '#6B7280', fontSize: '0.85rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                            <i className="bi bi-arrow-left" /> Back to Store
+                        </Link>
+                    </div>
+                </div>
+            </div>
+        )
+    }
 
     return (
         <div className="admin-container page-enter">
@@ -313,15 +486,26 @@ export default function AdminPage() {
                     <h1><i className="bi bi-shield-lock" /> Smiley N Traders Admin Panel</h1>
                     <p>Manage products, orders, and real-time shipment updates.</p>
                 </div>
-                <button 
-                    className="btn btn-outline-primary"
-                    onClick={handleSyncMockData}
-                    disabled={syncing}
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 18px', borderRadius: '10px', fontWeight: '700', fontSize: '0.9rem' }}
-                >
-                    <i className={`bi ${syncing ? 'bi-arrow-repeat bi-spin' : 'bi-database-fill-gear'}`} />
-                    {syncing ? 'Syncing to Neon DB...' : 'Sync Mock Data to Database'}
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                    <button 
+                        className="btn btn-outline-danger"
+                        onClick={handleLockAdmin}
+                        title="Lock and sign out of admin panel"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 16px', borderRadius: '10px', fontWeight: '700', fontSize: '0.9rem' }}
+                    >
+                        <i className="bi bi-lock-fill" />
+                        Lock Admin
+                    </button>
+                    <button 
+                        className="btn btn-outline-primary"
+                        onClick={handleSyncMockData}
+                        disabled={syncing}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 18px', borderRadius: '10px', fontWeight: '700', fontSize: '0.9rem' }}
+                    >
+                        <i className={`bi ${syncing ? 'bi-arrow-repeat bi-spin' : 'bi-database-fill-gear'}`} />
+                        {syncing ? 'Syncing to Neon DB...' : 'Sync Mock Data to Database'}
+                    </button>
+                </div>
             </header>
 
             <div className="admin-tabs">
@@ -362,7 +546,7 @@ export default function AdminPage() {
                                             {products.map(p => (
                                                 <tr key={p.id}>
                                                     <td>{p.id}</td>
-                                                    <td><img src={p.image_url} alt="" width="40" height="40" style={{ objectFit: 'contain' }} /></td>
+                                                    <td><img src={p.image_url || '/placeholder-key.svg'} alt="" width="40" height="40" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/placeholder-key.svg'; }} style={{ objectFit: 'contain' }} /></td>
                                                     <td>
                                                         <strong>{p.name}</strong>
                                                         {p.sku && (
@@ -873,7 +1057,7 @@ export default function AdminPage() {
                                 <div style={{ maxHeight: 180, overflowY: 'auto', marginBottom: 25, border: '1px solid #eee', borderRadius: 8, padding: 10 }}>
                                     {(selectedOrder.order_items || []).map(item => (
                                         <div key={item.id} style={{ display: 'flex', gap: 15, padding: '10px 0', borderBottom: '1px solid #f1f5f9' }}>
-                                            <img src={item.image_url} alt={item.name} width={50} height={50} style={{ objectFit: 'contain', borderRadius: 4, border: '1px solid #eee' }} />
+                                            <img src={item.image_url || '/placeholder-key.svg'} alt={item.name} width={50} height={50} onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/placeholder-key.svg'; }} style={{ objectFit: 'contain', borderRadius: 4, border: '1px solid #eee' }} />
                                             <div>
                                                 <p style={{ margin: 0, fontWeight: 600 }}>
                                                     {item.name} 

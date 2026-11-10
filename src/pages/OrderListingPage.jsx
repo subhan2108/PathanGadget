@@ -135,7 +135,12 @@ export default function OrderListingPage() {
                                 <div className="order-card__items">
                                     {(order.items || []).map((item, index) => (
                                         <div key={item.id || index} className="order-item-row">
-                                            <img src={item.image_url || item.image} alt={item.name} className="order-item-row__img" />
+                                            <img 
+                                                src={item.image_url || item.image || '/placeholder-key.svg'} 
+                                                alt={item.name} 
+                                                className="order-item-row__img" 
+                                                onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/placeholder-key.svg'; }}
+                                            />
                                             <div className="order-item-row__info">
                                                 <p className="order-item-row__name">{item.name}</p>
                                                 <p className="order-item-row__qty">

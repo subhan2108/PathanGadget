@@ -137,7 +137,12 @@ export default function OrderDetailsPage() {
                             <div className="order-items-list">
                                 {(order.items || []).map(item => (
                                     <div key={item.id} className="order-detail-item">
-                                        <img src={item.image_url} alt={item.name} className="order-detail-item__img" />
+                                        <img 
+                                            src={item.image_url || '/placeholder-key.svg'} 
+                                            alt={item.name} 
+                                            className="order-detail-item__img" 
+                                            onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/placeholder-key.svg'; }}
+                                        />
                                         <div className="order-detail-item__info">
                                             <h3>{item.name}</h3>
                                             <p><i className="bi bi-layers" /> Qty: {item.quantity}</p>
