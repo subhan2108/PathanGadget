@@ -284,6 +284,12 @@ export default function ProductDetailPage() {
                                 </Link>
                             </>
                         )}
+                        {product?.subcategory && (
+                            <>
+                                <span>›</span>
+                                <span style={{ color: 'var(--text-secondary)' }}>{product.subcategory}</span>
+                            </>
+                        )}
                         <span>›</span>
                         <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{product.name}</span>
                     </nav>
@@ -399,6 +405,23 @@ export default function ProductDetailPage() {
                                     }}>
                                         <i className="bi bi-tag-fill" />
                                         <span>{product.category}</span>
+                                    </div>
+                                )}
+                                {product.subcategory && (
+                                    <div style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        background: 'rgba(16, 185, 129, 0.08)',
+                                        color: '#047857',
+                                        border: '1px solid rgba(16, 185, 129, 0.25)',
+                                        padding: '4px 12px',
+                                        borderRadius: '20px',
+                                        fontSize: '0.8rem',
+                                        fontWeight: '700'
+                                    }}>
+                                        <i className="bi bi-diagram-3-fill" />
+                                        <span>{product.subcategory}</span>
                                     </div>
                                 )}
                                 {product.brand && (

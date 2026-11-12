@@ -219,6 +219,9 @@ function FilterSidebarContent({
     ALL_BRANDS,
     selectedBrands,
     onToggleBrand,
+    ALL_SUBCATEGORIES = [],
+    selectedSubcategories = [],
+    onToggleSubcategory,
     minRating,
     onMinRating,
     inStockOnly,
@@ -227,11 +230,19 @@ function FilterSidebarContent({
     COLOR_MAP,
 }) {
     const [brandSearch, setBrandSearch] = useState('')
+    const [subcatSearch, setSubcatSearch] = useState('')
+
     const visibleBrands = React.useMemo(() => {
         if (!brandSearch.trim()) return ALL_BRANDS
         const term = brandSearch.toLowerCase()
         return ALL_BRANDS.filter(b => b.toLowerCase().includes(term))
     }, [ALL_BRANDS, brandSearch])
+
+    const visibleSubcategories = React.useMemo(() => {
+        if (!subcatSearch.trim()) return ALL_SUBCATEGORIES
+        const term = subcatSearch.toLowerCase()
+        return ALL_SUBCATEGORIES.filter(s => s.toLowerCase().includes(term))
+    }, [ALL_SUBCATEGORIES, subcatSearch])
 
     return (
         <div className={`plp-filter-content ${isDropdown ? 'plp-filter-dropdown-content' : 'plp-sidebar__panel'}`}>
@@ -356,6 +367,74 @@ function FilterSidebarContent({
                     </div>
                 </div>
 
+                {/* Subcategories (filtered by active category or all, searchable) */}
+                {ALL_SUBCATEGORIES.length > 0 && (
+                    <div className="filter-section">
+                        <div className="filter-section__header-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                            <h4 className="filter-section__title" style={{ margin: 0 }}>
+                                <i className="bi bi-diagram-3" /> Subcategory
+                            </h4>
+                            {selectedSubcategories.length > 0 && (
+                                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--cta)', background: 'rgba(184, 132, 36, 0.1)', padding: '2px 8px', borderRadius: 12 }}>
+                                    {selectedSubcategories.length} selected
+                                </span>
+                            )}
+                        </div>
+
+                        {ALL_SUBCATEGORIES.length > 5 && (
+                            <div className="brand-search-box" style={{ position: 'relative', marginBottom: 8 }}>
+                                <i className="bi bi-search" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', color: '#888' }} />
+                                <input
+                                    type="text"
+                                    className="brand-search-input"
+                                    placeholder="Search subcategories..."
+                                    value={subcatSearch}
+                                    onChange={e => setSubcatSearch(e.target.value)}
+                                    style={{
+                                        width: '100%',
+                                        padding: '6px 28px 6px 28px',
+                                        borderRadius: 6,
+                                        border: '1px solid var(--border)',
+                                        fontSize: '0.8125rem',
+                                        background: 'var(--neutral-bg, #f9fafb)',
+                                        outline: 'none'
+                                    }}
+                                />
+                                {subcatSearch && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setSubcatSearch('')}
+                                        style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#888', fontSize: '0.875rem', padding: 0 }}
+                                        aria-label="Clear subcategory search"
+                                    >
+                                        <i className="bi bi-x" />
+                                    </button>
+                                )}
+                            </div>
+                        )}
+
+                        <div className="brand-filter-list" style={{ maxHeight: '220px', overflowY: 'auto', paddingRight: '4px' }}>
+                            {visibleSubcategories.length === 0 ? (
+                                <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', padding: '8px 0', textAlign: 'center' }}>
+                                    No subcategories match "{subcatSearch}"
+                                </div>
+                            ) : (
+                                visibleSubcategories.map(sub => (
+                                    <label key={sub} className={`brand-filter-item ${selectedSubcategories.includes(sub) ? 'active' : ''}`} id={`scf-${sub.replace(/\s+/g, '-').toLowerCase()}`}>
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedSubcategories.includes(sub)}
+                                            onChange={() => onToggleSubcategory(sub)}
+                                        />
+                                        <span className="bf-box" />
+                                        <span className="bf-label">{sub}</span>
+                                    </label>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                )}
+
                 {/* Min Rating */}
                 <div className="filter-section">
                     <h4 className="filter-section__title">
@@ -421,6 +500,7 @@ export default function ProductsPage() {
     const [activeCategory, setActiveCategory] = useState(searchParams.get('category') || 'all')
     const [selectedColors, setSelectedColors] = useState([])
     const [selectedBrands, setSelectedBrands] = useState([])
+    const [selectedSubcategories, setSelectedSubcategories] = useState([])
     const [sortBy, setSortBy] = useState('featured')
     const [viewMode, setViewMode] = useState('grid')
     const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -452,10 +532,21 @@ export default function ProductsPage() {
         return raw.filter(b => b && b !== 'All').sort((a, b) => a.localeCompare(b))
     }, [meta.brands])
 
+    // Dynamic subcategories: filtered by activeCategory when a category is selected, or all subcategories
+    const ALL_SUBCATEGORIES = React.useMemo(() => {
+        if (activeCategory && activeCategory !== 'all') {
+            const catKey = activeCategory.toLowerCase();
+            const list = meta.subcategoriesByCategory?.[catKey] || [];
+            if (list.length > 0) return [...list].sort((a, b) => a.localeCompare(b));
+        }
+        return (meta.subcategories || []).filter(Boolean).sort((a, b) => a.localeCompare(b));
+    }, [meta.subcategories, meta.subcategoriesByCategory, activeCategory]);
+
     // Build filter object passed to the hook
     const filters = {
         search,
         category: activeCategory !== 'all' ? activeCategory : undefined,
+        subcategories: selectedSubcategories.length ? selectedSubcategories : undefined,
         colors: selectedColors.length ? selectedColors : undefined,
         brands: selectedBrands.length ? selectedBrands : undefined,
         // Only apply price filter IF meta has finally loaded, otherwise show all
@@ -500,6 +591,10 @@ export default function ProductsPage() {
         setIsUserFiltering(true)
         setSelectedBrands(prev => prev.includes(b) ? prev.filter(x => x !== b) : [...prev, b])
     }
+    const handleToggleSubcategory = (sub) => {
+        setIsUserFiltering(true)
+        setSelectedSubcategories(prev => prev.includes(sub) ? prev.filter(x => x !== sub) : [...prev, sub])
+    }
     const handlePriceChange = (val) => {
         setIsUserFiltering(true)
         setPriceRange(val)
@@ -516,15 +611,16 @@ export default function ProductsPage() {
         setIsUserFiltering(true)
         setSearch(''); setSearchInput('')
         setActiveCategory('all')
-        setSelectedColors([]); setSelectedBrands([])
+        setSelectedColors([]); setSelectedBrands([]); setSelectedSubcategories([])
         setPriceRange([MIN_PRICE, MAX_PRICE])
         setMinRating(0); setInStockOnly(false); setSortBy('featured')
     }
     const resetFilters = handleResetFilters
     const toggleColor = handleToggleColor
     const toggleBrand = handleToggleBrand
+    const toggleSubcategory = handleToggleSubcategory
 
-    const activeFilterCount = selectedColors.length + selectedBrands.length +
+    const activeFilterCount = selectedColors.length + selectedBrands.length + selectedSubcategories.length +
         (priceRange[0] > MIN_PRICE || priceRange[1] < MAX_PRICE ? 1 : 0) +
         (minRating > 0 ? 1 : 0) + (inStockOnly ? 1 : 0)
 
@@ -775,6 +871,9 @@ export default function ProductsPage() {
                                             ALL_BRANDS={ALL_BRANDS}
                                             selectedBrands={selectedBrands}
                                             onToggleBrand={handleToggleBrand}
+                                            ALL_SUBCATEGORIES={ALL_SUBCATEGORIES}
+                                            selectedSubcategories={selectedSubcategories}
+                                            onToggleSubcategory={handleToggleSubcategory}
                                             minRating={minRating}
                                             onMinRating={handleMinRating}
                                             inStockOnly={inStockOnly}
@@ -841,6 +940,12 @@ export default function ProductsPage() {
                                 <button onClick={() => handleToggleBrand(b)}><i className="bi bi-x" /></button>
                             </span>
                         ))}
+                        {selectedSubcategories.map(sub => (
+                            <span key={sub} className="filter-chip">
+                                <i className="bi bi-diagram-3" /> {sub}
+                                <button onClick={() => handleToggleSubcategory(sub)}><i className="bi bi-x" /></button>
+                            </span>
+                        ))}
                         {(priceRange[0] > MIN_PRICE || priceRange[1] < MAX_PRICE) && (
                             <span className="filter-chip">
                                 <i className="bi bi-currency-rupee" />
@@ -888,6 +993,9 @@ export default function ProductsPage() {
                             ALL_BRANDS={ALL_BRANDS}
                             selectedBrands={selectedBrands}
                             onToggleBrand={handleToggleBrand}
+                            ALL_SUBCATEGORIES={ALL_SUBCATEGORIES}
+                            selectedSubcategories={selectedSubcategories}
+                            onToggleSubcategory={handleToggleSubcategory}
                             minRating={minRating}
                             onMinRating={handleMinRating}
                             inStockOnly={inStockOnly}

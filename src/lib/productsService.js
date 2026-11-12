@@ -39,6 +39,7 @@ function mapProduct(row) {
     name: row.name,
     description: row.description,
     category: row.category,
+    subcategory: row.subcategory || detailsObj.subcategory || '',
     brand: row.brand,
     price: parseFloat(row.price || 0),
     originalPrice: row.original_price ? parseFloat(row.original_price) : undefined,
@@ -72,6 +73,16 @@ export async function fetchProducts(filters = {}, sortBy = 'featured') {
         OR LOWER(REPLACE(category, ' ', '-')) = $${params.length}
         OR LOWER(REPLACE(category, '-', ' ')) = $${params.length}
       )`;
+    }
+
+    // Subcategories Filter (supports array of subcategories or single subcategory)
+    const selectedSubcats = Array.isArray(filters.subcategories) && filters.subcategories.length > 0
+      ? filters.subcategories.filter(s => s && s !== 'All')
+      : (filters.subcategory && filters.subcategory !== 'All' ? [filters.subcategory] : []);
+
+    if (selectedSubcats.length > 0) {
+      params.push(selectedSubcats);
+      query += ` AND subcategory = ANY($${params.length})`;
     }
 
     // Brands Filter (supports array of brands or single brand)
@@ -128,6 +139,7 @@ export async function fetchProducts(filters = {}, sortBy = 'featured') {
         OR LOWER(description) LIKE $${params.length} 
         OR LOWER(brand) LIKE $${params.length} 
         OR LOWER(category) LIKE $${params.length} 
+        OR LOWER(COALESCE(subcategory, '')) LIKE $${params.length} 
         OR LOWER(sku) LIKE $${params.length}
       )`;
     }
@@ -157,15 +169,31 @@ export async function fetchProducts(filters = {}, sortBy = 'featured') {
 
 export async function fetchFilterMeta() {
   try {
-    const brandsRow = await sql`SELECT DISTINCT brand FROM products WHERE brand IS NOT NULL`;
+    const brandsRow = await sql`SELECT DISTINCT brand FROM products WHERE brand IS NOT NULL AND brand != '' ORDER BY brand ASC`;
+    const subcatsRow = await sql`SELECT DISTINCT category, subcategory FROM products WHERE subcategory IS NOT NULL AND subcategory != '' ORDER BY subcategory ASC`;
     const priceRow = await sql`SELECT MIN(price) as min_p, MAX(price) as max_p FROM products`;
 
     const brands = ['All', ...brandsRow.map(b => b.brand)];
+    const subcategories = Array.from(new Set(subcatsRow.map(s => s.subcategory)));
+    const subcategoriesByCategory = {};
+    for (const row of subcatsRow) {
+      if (!row.category) continue;
+      const catKey = row.category.toLowerCase();
+      if (!subcategoriesByCategory[catKey]) {
+        subcategoriesByCategory[catKey] = [];
+      }
+      if (!subcategoriesByCategory[catKey].includes(row.subcategory)) {
+        subcategoriesByCategory[catKey].push(row.subcategory);
+      }
+    }
+
     const minPrice = parseFloat(priceRow[0]?.min_p || 0);
     const maxPrice = parseFloat(priceRow[0]?.max_p || 100000);
 
     return {
       brands,
+      subcategories,
+      subcategoriesByCategory,
       colors: [],
       minPrice,
       maxPrice,
@@ -174,10 +202,38 @@ export async function fetchFilterMeta() {
     console.error('Error fetching filter meta:', err);
     return {
       brands: ['All'],
+      subcategories: [],
+      subcategoriesByCategory: {},
       colors: [],
       minPrice: 0,
       maxPrice: 60000,
     };
+  }
+}
+
+export async function fetchSubcategories(category) {
+  try {
+    if (category && category !== 'All' && category !== 'all') {
+      const rows = await sql`
+        SELECT DISTINCT subcategory FROM products 
+        WHERE (
+          LOWER(category) = LOWER(${category}) 
+          OR LOWER(REPLACE(category, '-', ' ')) = LOWER(REPLACE(${category}, '-', ' '))
+        )
+        AND subcategory IS NOT NULL AND subcategory != ''
+        ORDER BY subcategory ASC
+      `;
+      return rows.map(r => r.subcategory);
+    }
+    const rows = await sql`
+      SELECT DISTINCT subcategory FROM products 
+      WHERE subcategory IS NOT NULL AND subcategory != ''
+      ORDER BY subcategory ASC
+    `;
+    return rows.map(r => r.subcategory);
+  } catch (err) {
+    console.error('Error fetching subcategories:', err);
+    return [];
   }
 }
 

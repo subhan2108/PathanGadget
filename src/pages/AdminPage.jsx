@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import {
     adminGetProducts,
     adminCreateProduct,
     adminUpdateProduct,
     adminDeleteProduct,
+    adminRenameCategory,
+    adminRenameSubcategory,
+    adminBulkUpdateSubcategory,
     adminGetOrders,
     adminGetOrderDetails,
     adminUpdateOrderStatus,
@@ -14,6 +18,7 @@ const ADMIN_PASSWORD = (import.meta.env.VITE_ADMIN_PASSWORD || 'admin123').trim(
 import { useCategories } from '../hooks/useProducts'
 import { syncMockDataToNeon } from '../lib/syncService'
 import { compressImageFile, formatFileSize, getDataUrlSize } from '../lib/imageUtils'
+import { formatImageUrl } from '../lib/productsService'
 import './AdminPage.css'
 
 export default function AdminPage() {
@@ -62,6 +67,7 @@ export default function AdminPage() {
     // Data states
     const [products, setProducts] = useState([])
     const [orders, setOrders] = useState([])
+    const [adminSearch, setAdminSearch] = useState('')
 
     // Modals
     const [showProductModal, setShowProductModal] = useState(false)
@@ -78,6 +84,267 @@ export default function AdminPage() {
     const [bulkProgress, setBulkProgress] = useState(null)
     const [showUrlInputs, setShowUrlInputs] = useState({})
 
+    const availableSubcategories = React.useMemo(() => {
+        const catKey = (productForm?.category || '').toLowerCase().trim();
+        const subs = new Set();
+        products.forEach(p => {
+            if (p.subcategory && (!catKey || (p.category && p.category.toLowerCase().trim() === catKey))) {
+                subs.add(p.subcategory);
+            }
+        });
+        if (subs.size === 0) {
+            products.forEach(p => { if (p.subcategory) subs.add(p.subcategory); });
+        }
+        return Array.from(subs).sort();
+    }, [products, productForm?.category]);
+
+    const filteredAdminProducts = React.useMemo(() => {
+        if (!adminSearch.trim()) return products;
+        const term = adminSearch.toLowerCase().trim();
+        return products.filter(p =>
+            (p.name && p.name.toLowerCase().includes(term)) ||
+            (p.category && p.category.toLowerCase().includes(term)) ||
+            (p.subcategory && p.subcategory.toLowerCase().includes(term)) ||
+            (p.sku && p.sku.toLowerCase().includes(term)) ||
+            (p.brand && p.brand.toLowerCase().includes(term))
+        );
+    }, [products, adminSearch]);
+
+    // Collections Section State
+    const [selectedCollectionCategory, setSelectedCollectionCategory] = useState(null)
+    const [selectedCollectionSubcategory, setSelectedCollectionSubcategory] = useState(null)
+    const [collectionSearch, setCollectionSearch] = useState('')
+    const [collectionProductSearch, setCollectionProductSearch] = useState('')
+    const [openCategoryDropdown, setOpenCategoryDropdown] = useState({})
+    const [quickCategorySelect, setQuickCategorySelect] = useState('')
+    const [quickSubcategorySelect, setQuickSubcategorySelect] = useState('')
+
+    const toggleCategoryDropdown = (catName) => {
+        setOpenCategoryDropdown(prev => ({
+            ...prev,
+            [catName]: !prev[catName]
+        }))
+    }
+
+    // Collections Tree: Organizes products into Categories -> Subcategories with product counts
+    const collectionsTree = React.useMemo(() => {
+        const catMap = {};
+        products.forEach(p => {
+            const cat = (p.category || 'Uncategorized').trim();
+            const subcat = (p.subcategory || 'General').trim();
+            if (!catMap[cat]) {
+                catMap[cat] = {
+                    category: cat,
+                    count: 0,
+                    subcategories: {},
+                    sampleImage: p.image_url || null
+                };
+            }
+            catMap[cat].count += 1;
+            if (!catMap[cat].sampleImage && p.image_url) {
+                catMap[cat].sampleImage = p.image_url;
+            }
+            if (!catMap[cat].subcategories[subcat]) {
+                catMap[cat].subcategories[subcat] = 0;
+            }
+            catMap[cat].subcategories[subcat] += 1;
+        });
+
+        return Object.values(catMap).sort((a, b) => b.count - a.count).map(c => ({
+            ...c,
+            subcategoriesList: Object.entries(c.subcategories)
+                .map(([name, count]) => ({ name, count }))
+                .sort((a, b) => b.count - a.count)
+        }));
+    }, [products]);
+
+    // Summary statistics for Collections header
+    const collectionsStats = React.useMemo(() => {
+        const totalCats = collectionsTree.length;
+        let totalSubcats = 0;
+        collectionsTree.forEach(c => {
+            totalSubcats += c.subcategoriesList.length;
+        });
+        return { totalCats, totalSubcats, totalProducts: products.length };
+    }, [collectionsTree, products.length]);
+
+    // Filtered categories for the overview search
+    const filteredCollectionsTree = React.useMemo(() => {
+        if (!collectionSearch.trim()) return collectionsTree;
+        const q = collectionSearch.toLowerCase().trim();
+        return collectionsTree.filter(c => {
+            if (c.category.toLowerCase().includes(q)) return true;
+            return c.subcategoriesList.some(s => s.name.toLowerCase().includes(q));
+        });
+    }, [collectionsTree, collectionSearch]);
+
+    // Products filtered by selected Category & Subcategory
+    const collectionFilteredProducts = React.useMemo(() => {
+        if (!selectedCollectionCategory && !selectedCollectionSubcategory) return [];
+        return products.filter(p => {
+            const pCat = (p.category || '').toLowerCase().trim();
+            const pSub = (p.subcategory || '').toLowerCase().trim();
+            const selCat = (selectedCollectionCategory || '').toLowerCase().trim();
+            const selSub = (selectedCollectionSubcategory || '').toLowerCase().trim();
+
+            if (selCat && pCat !== selCat) return false;
+            if (selSub && selSub !== 'all' && pSub !== selSub) return false;
+
+            if (!collectionProductSearch.trim()) return true;
+            const q = collectionProductSearch.toLowerCase().trim();
+            return (p.name && p.name.toLowerCase().includes(q)) ||
+                   (p.sku && p.sku.toLowerCase().includes(q)) ||
+                   (p.brand && p.brand.toLowerCase().includes(q));
+        });
+    }, [products, selectedCollectionCategory, selectedCollectionSubcategory, collectionProductSearch]);
+
+    // Subcategories available for currently selected Category in product view
+    const currentCategorySubcategories = React.useMemo(() => {
+        if (!selectedCollectionCategory) return [];
+        const found = collectionsTree.find(c => c.category.toLowerCase() === selectedCollectionCategory.toLowerCase());
+        return found ? found.subcategoriesList : [];
+    }, [collectionsTree, selectedCollectionCategory]);
+
+    // All unique subcategories across entire product catalog for autocomplete
+    const allUniqueSubcategories = React.useMemo(() => {
+        const subs = new Set();
+        products.forEach(p => {
+            if (p.subcategory && p.subcategory.trim()) subs.add(p.subcategory.trim());
+        });
+        return Array.from(subs).sort();
+    }, [products]);
+
+    // Rename Category / Subcategory Modal State
+    const [renameModal, setRenameModal] = useState({
+        open: false,
+        type: 'category', // 'category' or 'subcategory'
+        category: '',     // parent category if type === 'subcategory'
+        oldName: '',      // current name
+        newName: '',      // target name
+        count: 0          // affected products count
+    });
+
+    const handleRenameSubmit = async (e) => {
+        if (e) e.preventDefault();
+        const { type, category, oldName, newName } = renameModal;
+        const trimmedNew = (newName || '').trim();
+        if (!trimmedNew) {
+            alert('Please enter a valid name.');
+            return;
+        }
+        if (trimmedNew === oldName.trim()) {
+            setRenameModal({ open: false, type: 'category', category: '', oldName: '', newName: '', count: 0 });
+            return;
+        }
+
+        try {
+            setLoading(true);
+            if (type === 'category') {
+                const res = await adminRenameCategory(oldName, trimmedNew);
+                alert(`Successfully renamed category "${oldName}" to "${trimmedNew}" across ${res.count} products!`);
+                if (selectedCollectionCategory === oldName) {
+                    setSelectedCollectionCategory(trimmedNew);
+                }
+            } else {
+                const res = await adminRenameSubcategory(category, oldName, trimmedNew);
+                alert(`Successfully renamed subcategory "${oldName}" to "${trimmedNew}" across ${res.count} products!`);
+                if (selectedCollectionSubcategory === oldName) {
+                    setSelectedCollectionSubcategory(trimmedNew);
+                }
+            }
+            setRenameModal({ open: false, type: 'category', category: '', oldName: '', newName: '', count: 0 });
+            await loadProducts();
+        } catch (err) {
+            alert('Failed to rename: ' + err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Bulk selection state for assigning subcategories to multiple products
+    const [selectedProductIds, setSelectedProductIds] = useState(new Set());
+    const [bulkFilterCategory, setBulkFilterCategory] = useState('');
+    const [bulkFilterSubcategory, setBulkFilterSubcategory] = useState('');
+    const [bulkFilterSearch, setBulkFilterSearch] = useState('');
+
+    const bulkFilteredProducts = React.useMemo(() => {
+        return products.filter(p => {
+            if (bulkFilterCategory && (p.category || '').toLowerCase().trim() !== bulkFilterCategory.toLowerCase().trim()) {
+                return false;
+            }
+            if (bulkFilterSubcategory && (p.subcategory || '').toLowerCase().trim() !== bulkFilterSubcategory.toLowerCase().trim()) {
+                return false;
+            }
+            if (bulkFilterSearch.trim()) {
+                const q = bulkFilterSearch.toLowerCase().trim();
+                const matchName = p.name && p.name.toLowerCase().includes(q);
+                const matchSku = p.sku && p.sku.toLowerCase().includes(q);
+                const matchBrand = p.brand && p.brand.toLowerCase().includes(q);
+                if (!matchName && !matchSku && !matchBrand) return false;
+            }
+            return true;
+        });
+    }, [products, bulkFilterCategory, bulkFilterSubcategory, bulkFilterSearch]);
+    const [bulkSubcategoryInput, setBulkSubcategoryInput] = useState('');
+    const [bulkLoading, setBulkLoading] = useState(false);
+
+    const toggleSelectProduct = (id) => {
+        setSelectedProductIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
+
+    const handleSelectAllProducts = (productsList) => {
+        const visibleIds = productsList.map(p => p.id);
+        const allAlreadySelected = visibleIds.length > 0 && visibleIds.every(id => selectedProductIds.has(id));
+        setSelectedProductIds(prev => {
+            const next = new Set(prev);
+            if (allAlreadySelected) {
+                visibleIds.forEach(id => next.delete(id));
+            } else {
+                visibleIds.forEach(id => next.add(id));
+            }
+            return next;
+        });
+    };
+
+    const handleApplyBulkSubcategory = async () => {
+        if (selectedProductIds.size === 0) return;
+        const targetSub = bulkSubcategoryInput.trim();
+        if (!targetSub) {
+            alert('Please select or enter a subcategory name to assign.');
+            return;
+        }
+        if (!window.confirm(`Are you sure you want to assign subcategory "${targetSub}" to all ${selectedProductIds.size} selected products?`)) return;
+
+        try {
+            setBulkLoading(true);
+            const res = await adminBulkUpdateSubcategory(Array.from(selectedProductIds), targetSub);
+            alert(`Successfully updated subcategory to "${targetSub}" for ${res.count} products!`);
+            setSelectedProductIds(new Set());
+            setBulkSubcategoryInput('');
+            await loadProducts();
+        } catch (err) {
+            alert('Failed to update products: ' + err.message);
+        } finally {
+            setBulkLoading(false);
+        }
+    };
+
+    // Lock background scroll when modal is open so it stays locked to current viewport
+    useEffect(() => {
+        if (showProductModal || showOrderModal || renameModal.open) {
+            const originalOverflow = document.body.style.overflow;
+            document.body.style.overflow = 'hidden';
+            return () => {
+                document.body.style.overflow = originalOverflow;
+            };
+        }
+    }, [showProductModal, showOrderModal, renameModal.open]);
+
     const handleSingleImageUpload = async (slotKey, e) => {
         const file = e.target.files?.[0]
         if (!file) return
@@ -92,6 +359,19 @@ export default function AdminPage() {
             e.target.value = ''
         }
     }
+
+    // Robust image error recovery handler (auto fallback to wsrv.nl CDN proxy, then placeholder)
+    const handleAdminImgError = (e) => {
+        const target = e.currentTarget;
+        const currentSrc = target.src || '';
+        if (currentSrc && !currentSrc.includes('wsrv.nl') && !currentSrc.includes('placeholder-key.svg')) {
+            const rawUrl = currentSrc.replace(/^https?:\/\/i[0-9]\.wp\.com\//, 'https://');
+            target.src = `https://wsrv.nl/?url=${encodeURIComponent(rawUrl)}&w=120&h=120&fit=contain`;
+        } else {
+            target.onerror = null;
+            target.src = '/placeholder-key.svg';
+        }
+    };
 
     const handleBulkImageUpload = async (e) => {
         const files = Array.from(e.target.files || []).slice(0, 6)
@@ -127,7 +407,7 @@ export default function AdminPage() {
 
     useEffect(() => {
         if (!isAuthenticated) return
-        if (tab === 'products') loadProducts()
+        if (tab === 'products' || tab === 'collections' || tab === 'bulk') loadProducts()
         if (tab === 'orders') loadOrders()
     }, [tab, isAuthenticated])
 
@@ -176,7 +456,7 @@ export default function AdminPage() {
 
     /* ── Product Functions ── */
 
-    const openProductModal = (prod = null) => {
+    const openProductModal = (prod = null, defaultCategory = '', defaultSubcategory = '') => {
         setEditingProductId(prod ? prod.id : null)
         
         const detailsObj = prod?.details || {};
@@ -205,6 +485,7 @@ export default function AdminPage() {
         setProductForm(prod ? {
             ...prod,
             sku: existingSku,
+            subcategory: prod.subcategory || detailsObj.subcategory || defaultSubcategory || '',
             colors: prod.colors?.join(', ') || '',
             image_url: prod.image_url || prod.image || '',
             image2: existingExtraImages[0] || '',
@@ -219,7 +500,10 @@ export default function AdminPage() {
             buy3Discount: detailsObj.discounts?.buy3 || 0,
             hasOffer: detailsObj.hasOffer !== false // default to true
         } : {
-            name: '', sku: '', price: 0, original_price: 0, category: 'smartphones', brand: '',
+            name: '', sku: '', price: 0, original_price: 0, 
+            category: defaultCategory || 'Key Cover', 
+            subcategory: defaultSubcategory || '', 
+            brand: '',
             description: '', image_url: '', badge: '', in_stock: true,
             rating: 0, review_count: 0, colors: '', 
             image2: '', image3: '', image4: '', image5: '', image6: '',
@@ -480,7 +764,7 @@ export default function AdminPage() {
     }
 
     return (
-        <div className="admin-container page-enter">
+        <div className="admin-container">
             <header className="admin-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
                 <div>
                     <h1><i className="bi bi-shield-lock" /> Smiley N Traders Admin Panel</h1>
@@ -512,6 +796,12 @@ export default function AdminPage() {
                 <button className={`admin-tab ${tab === 'products' ? 'active' : ''}`} onClick={() => setTab('products')}>
                     <i className="bi bi-box" /> Products
                 </button>
+                <button className={`admin-tab ${tab === 'collections' ? 'active' : ''}`} onClick={() => setTab('collections')}>
+                    <i className="bi bi-grid-3x3-gap-fill" /> Collections
+                </button>
+                <button className={`admin-tab ${tab === 'bulk' ? 'active' : ''}`} onClick={() => setTab('bulk')}>
+                    <i className="bi bi-check2-square" /> Bulk Subcategory Editor
+                </button>
                 <button className={`admin-tab ${tab === 'orders' ? 'active' : ''}`} onClick={() => setTab('orders')}>
                     <i className="bi bi-receipt" /> Orders
                 </button>
@@ -523,30 +813,152 @@ export default function AdminPage() {
                         {/* ── PRODUCTS TAB ── */}
                         {tab === 'products' && (
                             <div className="admin-panel">
-                                <div className="admin-panel__header">
-                                    <h2>Product Database</h2>
-                                    <button className="btn btn-primary btn-sm" onClick={() => openProductModal(null)}>
-                                        <i className="bi bi-plus" /> Add Product
-                                    </button>
+                                <div className="admin-panel__header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                                    <div>
+                                        <h2 style={{ margin: 0 }}>Product Database</h2>
+                                        <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#6B7280' }}>
+                                            Showing {filteredAdminProducts.length} of {products.length} products
+                                        </p>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                                        <div style={{ position: 'relative' }}>
+                                            <input
+                                                type="text"
+                                                className="form-control form-control-sm"
+                                                placeholder="Search name, subcategory, SKU..."
+                                                value={adminSearch}
+                                                onChange={e => setAdminSearch(e.target.value)}
+                                                style={{ width: '260px', paddingLeft: '28px', fontSize: '0.85rem' }}
+                                            />
+                                            <i className="bi bi-search" style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: '#9CA3AF', fontSize: '0.8rem' }} />
+                                            {adminSearch && (
+                                                <button onClick={() => setAdminSearch('')} style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'none', color: '#9CA3AF', cursor: 'pointer', padding: 0 }}>
+                                                    <i className="bi bi-x" />
+                                                </button>
+                                            )}
+
+
+                                        </div>
+                                        <button className="btn btn-primary btn-sm" onClick={() => openProductModal(null)}>
+                                            <i className="bi bi-plus" /> Add Product
+                                        </button>
+                                    </div>
                                 </div>
+
+                                {/* Bulk Subcategory Assignment Bar for Products Tab */}
+                                <div className="bulk-actions-bar" style={{
+                                    background: selectedProductIds.size > 0 ? '#1E293B' : '#FFFFFF',
+                                    border: selectedProductIds.size > 0 ? '1.5px solid var(--primary-color)' : '1px solid var(--border-color)',
+                                    color: selectedProductIds.size > 0 ? '#FFFFFF' : 'var(--text-color)',
+                                    boxShadow: selectedProductIds.size > 0 ? '0 8px 24px rgba(0, 0, 0, 0.22)' : '0 6px 20px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.04)',
+                                    transition: 'all 0.2s ease',
+                                    marginBottom: '16px'
+                                }}>
+                                    <div className="bulk-actions-info">
+                                        <span className={selectedProductIds.size > 0 ? "bulk-selected-pill" : "badge badge-light"} style={selectedProductIds.size === 0 ? { border: '1px solid #D1D5DB', padding: '5px 10px', fontSize: '0.8rem', fontWeight: 600 } : {}}>
+                                            <i className="bi bi-check2-square" style={{ marginRight: '6px' }} />
+                                            {selectedProductIds.size > 0 ? `${selectedProductIds.size} Selected` : 'Bulk Selection (0 Selected)'}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            className={`btn btn-sm ${selectedProductIds.size > 0 ? 'btn-outline-light' : 'btn-outline-primary'}`}
+                                            style={{ fontSize: '0.8rem', padding: '3px 10px' }}
+                                            onClick={() => handleSelectAllProducts(filteredAdminProducts)}
+                                        >
+                                            <i className="bi bi-check-all" /> {filteredAdminProducts.length > 0 && filteredAdminProducts.every(p => selectedProductIds.has(p.id)) ? 'Deselect All' : `Select All Visible (${filteredAdminProducts.length})`}
+                                        </button>
+                                        {selectedProductIds.size === 0 && (
+                                            <span style={{ fontSize: '0.82rem', color: '#6B7280' }}>
+                                                Check product boxes below to reassign subcategories in bulk.
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    {selectedProductIds.size > 0 && (
+                                        <div className="bulk-actions-controls">
+                                            <span style={{ fontSize: '0.85rem', color: '#CBD5E1' }}>Change Subcategory to:</span>
+                                            <input
+                                                type="text"
+                                                list="bulk-subcategories-list-main"
+                                                className="bulk-subcat-input"
+                                                placeholder="Choose or enter new subcategory..."
+                                                value={bulkSubcategoryInput}
+                                                onChange={e => setBulkSubcategoryInput(e.target.value)}
+                                            />
+                                            <datalist id="bulk-subcategories-list-main">
+                                                {allUniqueSubcategories.map(sub => (
+                                                    <option key={sub} value={sub} />
+                                                ))}
+                                            </datalist>
+
+                                            <button
+                                                type="button"
+                                                className="btn btn-primary btn-sm"
+                                                disabled={bulkLoading || !bulkSubcategoryInput.trim()}
+                                                onClick={handleApplyBulkSubcategory}
+                                                style={{ fontWeight: 700 }}
+                                            >
+                                                <i className="bi bi-check2-circle" /> {bulkLoading ? 'Updating...' : `Apply to ${selectedProductIds.size} Products`}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className="btn btn-outline-light btn-sm"
+                                                onClick={() => setSelectedProductIds(new Set())}
+                                            >
+                                                Clear
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+
                                 <div className="table-responsive">
                                     <table className="admin-table">
                                         <thead>
                                             <tr>
+                                                <th style={{ width: '40px' }}>
+                                                    <input 
+                                                        type="checkbox" 
+                                                        className="admin-checkbox"
+                                                        checked={filteredAdminProducts.length > 0 && filteredAdminProducts.every(p => selectedProductIds.has(p.id))}
+                                                        onChange={() => handleSelectAllProducts(filteredAdminProducts)}
+                                                        title="Select all products"
+                                                    />
+                                                </th>
                                                 <th>ID</th>
                                                 <th>Image</th>
                                                 <th>Name</th>
                                                 <th>Price</th>
                                                 <th>Category</th>
+                                                <th>Subcategory</th>
                                                 <th>Stock</th>
                                                 <th>Actions</th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {products.map(p => (
-                                                <tr key={p.id}>
+                                            {filteredAdminProducts.map(p => (
+                                                <tr key={p.id} style={{ background: selectedProductIds.has(p.id) ? 'rgba(184, 132, 36, 0.08)' : undefined }}>
+                                                    <td>
+                                                        <input 
+                                                            type="checkbox" 
+                                                            className="admin-checkbox"
+                                                            checked={selectedProductIds.has(p.id)}
+                                                            onChange={() => toggleSelectProduct(p.id)}
+                                                        />
+                                                    </td>
                                                     <td>{p.id}</td>
-                                                    <td><img src={p.image_url || '/placeholder-key.svg'} alt="" width="40" height="40" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/placeholder-key.svg'; }} style={{ objectFit: 'contain' }} /></td>
+                                                    <td>
+                                                        <img 
+                                                            src={formatImageUrl(p.image_url)} 
+                                                            alt="" 
+                                                            width="40" 
+                                                            height="40" 
+                                                            loading="lazy"
+                                                            decoding="async"
+                                                            referrerPolicy="no-referrer"
+                                                            onError={handleAdminImgError} 
+                                                            style={{ objectFit: 'contain', borderRadius: '4px', border: '1px solid #E5E7EB', backgroundColor: '#F9FAFB' }} 
+                                                        />
+                                                    </td>
                                                     <td>
                                                         <strong>{p.name}</strong>
                                                         {p.sku && (
@@ -554,9 +966,12 @@ export default function AdminPage() {
                                                                 SKU: {p.sku}
                                                             </div>
                                                         )}
+
+
                                                     </td>
                                                     <td>₹{p.price}</td>
                                                     <td><span className="badge badge-secondary">{p.category}</span></td>
+                                                    <td>{p.subcategory ? <span className="badge badge-light" style={{ border: '1px solid #D1D5DB', fontSize: '0.75rem', fontWeight: 600 }}>{p.subcategory}</span> : <span style={{ color: '#9CA3AF' }}>-</span>}</td>
                                                     <td>{p.in_stock ? <span className="text-success">In Stock</span> : <span className="text-danger">Out</span>}</td>
                                                     <td>
                                                         <button className="btn btn-sm btn-outline-primary" onClick={() => openProductModal(p)} style={{ marginRight: 8 }}>
@@ -568,6 +983,794 @@ export default function AdminPage() {
                                                     </td>
                                                 </tr>
                                             ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ── COLLECTIONS TAB ── */}
+                        {tab === 'collections' && (
+                            <div className="admin-panel">
+                                {!selectedCollectionSubcategory ? (
+                                    /* VIEW 1: CATEGORIES & SUBCATEGORIES OVERVIEW */
+                                    <div className="collections-overview">
+                                        <div className="admin-panel__header" style={{ marginBottom: '8px' }}>
+                                            <div>
+                                                <h2 style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                    <i className="bi bi-folder2-open" style={{ color: 'var(--primary-color)' }} />
+                                                    Collections & Subcategories
+                                                </h2>
+                                                <p style={{ margin: '4px 0 0 0', fontSize: '0.88rem', color: '#6B7280' }}>
+                                                    Browse products organized by Category. Open any category's dropdown to see subcategories, rename categories/subcategories across all products, or click to view its products.
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        {/* Stats Bar */}
+                                        <div className="collections-stats-bar">
+                                            <div className="collections-stat-item">
+                                                <div className="collections-stat-icon">
+                                                    <i className="bi bi-tags-fill" />
+                                                </div>
+                                                <div className="collections-stat-info">
+                                                    <div className="num">{collectionsStats.totalCats}</div>
+                                                    <div className="lbl">Categories</div>
+                                                </div>
+                                            </div>
+                                            <div className="collections-stat-item">
+                                                <div className="collections-stat-icon">
+                                                    <i className="bi bi-diagram-3-fill" />
+                                                </div>
+                                                <div className="collections-stat-info">
+                                                    <div className="num">{collectionsStats.totalSubcats}</div>
+                                                    <div className="lbl">Subcategories</div>
+                                                </div>
+                                            </div>
+                                            <div className="collections-stat-item">
+                                                <div className="collections-stat-icon">
+                                                    <i className="bi bi-box-seam-fill" />
+                                                </div>
+                                                <div className="collections-stat-info">
+                                                    <div className="num">{collectionsStats.totalProducts}</div>
+                                                    <div className="lbl">Catalog Products</div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Quick Dropdown Jump Bar */}
+                                        <div className="collections-jump-bar">
+                                            <div className="collections-jump-label">
+                                                <i className="bi bi-lightning-charge-fill" style={{ color: 'var(--primary-color)' }} />
+                                                Quick Jump:
+                                            </div>
+                                            <select 
+                                                className="form-control" 
+                                                style={{ width: '220px', padding: '8px 12px', fontSize: '0.88rem' }}
+                                                value={quickCategorySelect}
+                                                onChange={(e) => {
+                                                    setQuickCategorySelect(e.target.value);
+                                                    setQuickSubcategorySelect('');
+                                                }}
+                                            >
+                                                <option value="">Select Category...</option>
+                                                {collectionsTree.map(c => (
+                                                    <option key={c.category} value={c.category}>
+                                                        {c.category} ({c.count})
+                                                    </option>
+                                                ))}
+                                            </select>
+
+                                            <select 
+                                                className="form-control" 
+                                                style={{ width: '240px', padding: '8px 12px', fontSize: '0.88rem' }}
+                                                value={quickSubcategorySelect}
+                                                disabled={!quickCategorySelect}
+                                                onChange={(e) => {
+                                                    const sub = e.target.value;
+                                                    setQuickSubcategorySelect(sub);
+                                                    if (sub) {
+                                                        setSelectedCollectionCategory(quickCategorySelect);
+                                                        setSelectedCollectionSubcategory(sub);
+                                                    }
+                                                }}
+                                            >
+                                                <option value="">Select Subcategory...</option>
+                                                {quickCategorySelect && (
+                                                    <option value="all">View All in {quickCategorySelect}</option>
+                                                )}
+                                                {quickCategorySelect && (
+                                                    collectionsTree
+                                                        .find(c => c.category === quickCategorySelect)
+                                                        ?.subcategoriesList.map(s => (
+                                                            <option key={s.name} value={s.name}>
+                                                                {s.name} ({s.count})
+                                                            </option>
+                                                        ))
+                                                )}
+                                            </select>
+
+                                            <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
+                                                <input
+                                                    type="text"
+                                                    className="form-control"
+                                                    placeholder="Filter categories or subcategories..."
+                                                    value={collectionSearch}
+                                                    onChange={e => setCollectionSearch(e.target.value)}
+                                                    style={{ padding: '8px 12px 8px 32px', fontSize: '0.88rem' }}
+                                                />
+                                                <i className="bi bi-search" style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: '#9CA3AF', fontSize: '0.8rem' }} />
+                                                {collectionSearch && (
+                                                    <button onClick={() => setCollectionSearch('')} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'none', color: '#9CA3AF', cursor: 'pointer', padding: 0 }}>
+                                                        <i className="bi bi-x-circle-fill" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Category Cards Grid with Dropdowns and Rename */}
+                                        <div className="collections-grid">
+                                            {filteredCollectionsTree.map(cat => {
+                                                const isOpen = !!openCategoryDropdown[cat.category];
+                                                return (
+                                                    <div key={cat.category} className="collection-card">
+                                                        <div className="collection-card__head">
+                                                            <h3 className="collection-card__title">
+                                                                <i className="bi bi-folder-fill" style={{ color: 'var(--primary-color)' }} />
+                                                                {cat.category}
+                                                            </h3>
+                                                            <div className="collection-card__meta" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                                <button
+                                                                    type="button"
+                                                                    className="btn btn-outline-secondary btn-sm"
+                                                                    style={{ padding: '2px 8px', fontSize: '0.75rem', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                                                    title={`Rename Category "${cat.category}" across all products`}
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        setRenameModal({
+                                                                            open: true,
+                                                                            type: 'category',
+                                                                            category: cat.category,
+                                                                            oldName: cat.category,
+                                                                            newName: cat.category,
+                                                                            count: cat.count
+                                                                        });
+                                                                    }}
+                                                                >
+                                                                    <i className="bi bi-pencil" /> Rename
+                                                                </button>
+                                                                <span className="collection-badge-count">{cat.count} items</span>
+                                                            </div>
+                                                        </div>
+                                                        <div className="collection-card__body">
+                                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem', color: '#6B7280', marginBottom: '4px' }}>
+                                                                <span>Subcategories ({cat.subcategoriesList.length})</span>
+                                                                <button 
+                                                                    type="button"
+                                                                    className="btn btn-link" 
+                                                                    style={{ padding: 0, fontSize: '0.82rem', color: 'var(--primary-color)', textDecoration: 'none', fontWeight: 600 }}
+                                                                    onClick={() => {
+                                                                        setSelectedCollectionCategory(cat.category);
+                                                                        setSelectedCollectionSubcategory('all');
+                                                                    }}
+                                                                >
+                                                                    View All ({cat.count})
+                                                                </button>
+                                                            </div>
+
+                                                            {/* Dropdown toggle button */}
+                                                            <button
+                                                                type="button"
+                                                                className={`collection-dropdown-trigger ${isOpen ? 'open' : ''}`}
+                                                                onClick={() => toggleCategoryDropdown(cat.category)}
+                                                            >
+                                                                <span>
+                                                                    <i className="bi bi-diagram-3" style={{ marginRight: '6px' }} />
+                                                                    {isOpen ? 'Hide Subcategories' : `Browse Subcategories (${cat.subcategoriesList.length})`}
+                                                                </span>
+                                                                <i className={`bi ${isOpen ? 'bi-chevron-up' : 'bi-chevron-down'}`} />
+                                                            </button>
+
+                                                            {/* Subcategories dropdown list with Rename icons */}
+                                                            {isOpen && (
+                                                                <div className="collection-subcats-list">
+                                                                    {cat.subcategoriesList.map(sub => (
+                                                                        <div key={sub.name} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                                            <button
+                                                                                type="button"
+                                                                                className="collection-subcat-item"
+                                                                                style={{ flex: 1 }}
+                                                                                onClick={() => {
+                                                                                    setSelectedCollectionCategory(cat.category);
+                                                                                    setSelectedCollectionSubcategory(sub.name);
+                                                                                }}
+                                                                            >
+                                                                                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                                                    <i className="bi bi-arrow-return-right" style={{ color: '#9CA3AF', fontSize: '0.8rem' }} />
+                                                                                    <strong>{sub.name}</strong>
+                                                                                </span>
+                                                                                <span className="count-badge">
+                                                                                    {sub.count} products
+                                                                                    <i className="bi bi-chevron-right" style={{ marginLeft: 4, fontSize: '0.75rem' }} />
+                                                                                </span>
+                                                                            </button>
+                                                                            <button
+                                                                                type="button"
+                                                                                className="btn btn-sm"
+                                                                                style={{ border: '1px solid #E2E8F0', background: '#FFFFFF', borderRadius: '8px', padding: '6px 9px', color: '#64748B', cursor: 'pointer' }}
+                                                                                title={`Rename subcategory "${sub.name}" across all products`}
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    setRenameModal({
+                                                                                        open: true,
+                                                                                        type: 'subcategory',
+                                                                                        category: cat.category,
+                                                                                        oldName: sub.name,
+                                                                                        newName: sub.name,
+                                                                                        count: sub.count
+                                                                                    });
+                                                                                }}
+                                                                            >
+                                                                                <i className="bi bi-pencil" />
+                                                                            </button>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                ) : (
+                                    /* VIEW 2: PRODUCTS FOR SELECTED SUBCATEGORY */
+                                    <div className="collection-products-view">
+                                        {/* Breadcrumb Navigation & Back Button */}
+                                        <div className="collection-breadcrumbs-bar">
+                                            <div className="collection-breadcrumbs">
+                                                <button 
+                                                    type="button" 
+                                                    className="crumb-link" 
+                                                    onClick={() => {
+                                                        setSelectedCollectionSubcategory(null);
+                                                        setCollectionProductSearch('');
+                                                    }}
+                                                >
+                                                    <i className="bi bi-arrow-left" style={{ marginRight: 4 }} />
+                                                    All Collections
+                                                </button>
+                                                <span className="separator">/</span>
+                                                <span style={{ fontWeight: 600, color: '#4B5563' }}>{selectedCollectionCategory}</span>
+                                                <span className="separator">/</span>
+                                                <span className="active-crumb">
+                                                    {selectedCollectionSubcategory === 'all' ? 'All Products' : selectedCollectionSubcategory}
+                                                </span>
+                                            </div>
+
+                                            <button 
+                                                type="button"
+                                                className="btn btn-outline-secondary btn-sm"
+                                                onClick={() => {
+                                                    setSelectedCollectionSubcategory(null);
+                                                    setCollectionProductSearch('');
+                                                }}
+                                                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                                            >
+                                                <i className="bi bi-grid" /> View All Categories
+                                            </button>
+                                        </div>
+
+                                        {/* Subcategory Toolbar: Switchers, Search, and Add Product */}
+                                        <div className="collection-products-toolbar">
+                                            <div className="collection-switchers">
+                                                {/* Switch Category */}
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                    <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#6B7280' }}>Category:</span>
+                                                    <select 
+                                                        className="form-control form-control-sm"
+                                                        style={{ width: '180px', fontWeight: 600 }}
+                                                        value={selectedCollectionCategory || ''}
+                                                        onChange={(e) => {
+                                                            const newCat = e.target.value;
+                                                            setSelectedCollectionCategory(newCat);
+                                                            setSelectedCollectionSubcategory('all');
+                                                        }}
+                                                    >
+                                                        {collectionsTree.map(c => (
+                                                            <option key={c.category} value={c.category}>{c.category}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+
+                                                {/* Switch Subcategory */}
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                    <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#6B7280' }}>Subcategory:</span>
+                                                    <select 
+                                                        className="form-control form-control-sm"
+                                                        style={{ width: '210px', fontWeight: 600 }}
+                                                        value={selectedCollectionSubcategory || ''}
+                                                        onChange={(e) => setSelectedCollectionSubcategory(e.target.value)}
+                                                    >
+                                                        <option value="all">All Subcategories</option>
+                                                        {currentCategorySubcategories.map(s => (
+                                                            <option key={s.name} value={s.name}>
+                                                                {s.name} ({s.count})
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            </div>
+
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                                                {/* Search inside subcategory */}
+                                                <div style={{ position: 'relative', width: '240px' }}>
+                                                    <input
+                                                        type="text"
+                                                        className="form-control form-control-sm"
+                                                        placeholder="Search in this subcategory..."
+                                                        value={collectionProductSearch}
+                                                        onChange={e => setCollectionProductSearch(e.target.value)}
+                                                        style={{ paddingLeft: '28px' }}
+                                                    />
+                                                    <i className="bi bi-search" style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: '#9CA3AF', fontSize: '0.78rem' }} />
+                                                    {collectionProductSearch && (
+                                                        <button onClick={() => setCollectionProductSearch('')} style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'none', color: '#9CA3AF', cursor: 'pointer', padding: 0 }}>
+                                                            <i className="bi bi-x-circle-fill" />
+                                                        </button>
+                                                    )}
+                                                </div>
+
+                                                {/* Add Product prefilled */}
+                                                <button 
+                                                    className="btn btn-primary btn-sm"
+                                                    onClick={() => openProductModal(null, selectedCollectionCategory, selectedCollectionSubcategory === 'all' ? '' : selectedCollectionSubcategory)}
+                                                    style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                                                >
+                                                    <i className="bi bi-plus" /> Add Product
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* Subcategory Summary Banner & Rename Button */}
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 16px', background: '#FAFAFA', borderRadius: '10px', border: '1px solid #F1F5F9', flexWrap: 'wrap', gap: '10px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                                                <strong style={{ fontSize: '1.1rem', color: '#111827' }}>
+                                                    {selectedCollectionSubcategory === 'all' ? `All ${selectedCollectionCategory} Products` : selectedCollectionSubcategory}
+                                                </strong>
+                                                <span style={{ fontSize: '0.85rem', color: '#6B7280' }}>
+                                                    Category: <span className="badge badge-secondary">{selectedCollectionCategory}</span>
+                                                </span>
+                                                {selectedCollectionSubcategory !== 'all' && (
+                                                    <button 
+                                                        type="button"
+                                                        className="btn btn-sm btn-outline-secondary"
+                                                        style={{ fontSize: '0.78rem', padding: '2px 8px', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}
+                                                        onClick={() => {
+                                                            const count = collectionFilteredProducts.length;
+                                                            setRenameModal({
+                                                                open: true,
+                                                                type: 'subcategory',
+                                                                category: selectedCollectionCategory,
+                                                                oldName: selectedCollectionSubcategory,
+                                                                newName: selectedCollectionSubcategory,
+                                                                count
+                                                            });
+                                                        }}
+                                                    >
+                                                        <i className="bi bi-pencil" /> Rename Subcategory
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <span style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--primary-color)' }}>
+                                                {collectionFilteredProducts.length} {collectionFilteredProducts.length === 1 ? 'Product' : 'Products'} found
+                                            </span>
+                                        </div>
+
+                                        {/* Bulk Subcategory Assignment Bar for Collections View */}
+                                        <div className="bulk-actions-bar" style={{
+                                            background: selectedProductIds.size > 0 ? '#1E293B' : '#FFFFFF',
+                                            border: selectedProductIds.size > 0 ? '1.5px solid var(--primary-color)' : '1px solid var(--border-color)',
+                                            color: selectedProductIds.size > 0 ? '#FFFFFF' : 'var(--text-color)',
+                                            boxShadow: selectedProductIds.size > 0 ? '0 8px 24px rgba(0, 0, 0, 0.22)' : '0 6px 20px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.04)',
+                                            transition: 'all 0.2s ease',
+                                            marginBottom: '16px'
+                                        }}>
+                                            <div className="bulk-actions-info">
+                                                <span className={selectedProductIds.size > 0 ? "bulk-selected-pill" : "badge badge-light"} style={selectedProductIds.size === 0 ? { border: '1px solid #D1D5DB', padding: '5px 10px', fontSize: '0.8rem', fontWeight: 600 } : {}}>
+                                                    <i className="bi bi-check2-square" style={{ marginRight: '6px' }} />
+                                                    {selectedProductIds.size > 0 ? `${selectedProductIds.size} Selected` : 'Bulk Selection (0 Selected)'}
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    className={`btn btn-sm ${selectedProductIds.size > 0 ? 'btn-outline-light' : 'btn-outline-primary'}`}
+                                                    style={{ fontSize: '0.8rem', padding: '3px 10px' }}
+                                                    onClick={() => handleSelectAllProducts(collectionFilteredProducts)}
+                                                >
+                                                    <i className="bi bi-check-all" /> {collectionFilteredProducts.length > 0 && collectionFilteredProducts.every(p => selectedProductIds.has(p.id)) ? 'Deselect All' : `Select All (${collectionFilteredProducts.length})`}
+                                                </button>
+                                                {selectedProductIds.size === 0 && (
+                                                    <span style={{ fontSize: '0.82rem', color: '#6B7280' }}>
+                                                        Check product boxes below to reassign subcategories.
+                                                    </span>
+                                                )}
+                                            </div>
+
+                                            {selectedProductIds.size > 0 && (
+                                                <div className="bulk-actions-controls">
+                                                    <span style={{ fontSize: '0.85rem', color: '#CBD5E1' }}>Change Subcategory to:</span>
+                                                    <input
+                                                        type="text"
+                                                        list="bulk-subcategories-list-coll"
+                                                        className="bulk-subcat-input"
+                                                        placeholder="Choose or enter new subcategory..."
+                                                        value={bulkSubcategoryInput}
+                                                        onChange={e => setBulkSubcategoryInput(e.target.value)}
+                                                    />
+                                                    <datalist id="bulk-subcategories-list-coll">
+                                                        {allUniqueSubcategories.map(sub => (
+                                                            <option key={sub} value={sub} />
+                                                        ))}
+                                                    </datalist>
+
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-primary btn-sm"
+                                                        disabled={bulkLoading || !bulkSubcategoryInput.trim()}
+                                                        onClick={handleApplyBulkSubcategory}
+                                                        style={{ fontWeight: 700 }}
+                                                    >
+                                                        <i className="bi bi-check2-circle" /> {bulkLoading ? 'Updating...' : `Apply to ${selectedProductIds.size} Products`}
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-outline-light btn-sm"
+                                                        onClick={() => setSelectedProductIds(new Set())}
+                                                    >
+                                                        Clear
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Table of products in this subcategory */}
+                                        <div className="table-responsive">
+                                            <table className="admin-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th style={{ width: '40px' }}>
+                                                            <input 
+                                                                type="checkbox" 
+                                                                className="admin-checkbox"
+                                                                checked={collectionFilteredProducts.length > 0 && collectionFilteredProducts.every(p => selectedProductIds.has(p.id))}
+                                                                onChange={() => handleSelectAllProducts(collectionFilteredProducts)}
+                                                                title="Select all"
+                                                            />
+                                                        </th>
+                                                        <th>ID</th>
+                                                        <th>Image</th>
+                                                        <th>Name</th>
+                                                        <th>Price</th>
+                                                        <th>Brand</th>
+                                                        <th>Subcategory</th>
+                                                        <th>Stock</th>
+                                                        <th>Actions</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {collectionFilteredProducts.length === 0 ? (
+                                                        <tr>
+                                                            <td colSpan="9" style={{ textAlign: 'center', padding: '40px 20px', color: '#6B7280' }}>
+                                                                <i className="bi bi-inbox" style={{ fontSize: '2rem', display: 'block', marginBottom: '8px', color: '#D1D5DB' }} />
+                                                                No products found in this subcategory.
+                                                            </td>
+                                                        </tr>
+                                                    ) : (
+                                                        collectionFilteredProducts.map(p => (
+                                                            <tr key={p.id} style={{ background: selectedProductIds.has(p.id) ? 'rgba(184, 132, 36, 0.08)' : undefined }}>
+                                                                <td>
+                                                                    <input 
+                                                                        type="checkbox" 
+                                                                        className="admin-checkbox"
+                                                                        checked={selectedProductIds.has(p.id)}
+                                                                        onChange={() => toggleSelectProduct(p.id)}
+                                                                    />
+                                                                </td>
+                                                                <td>{p.id}</td>
+                                                                <td>
+                                                                    <img 
+                                                                        src={formatImageUrl(p.image_url)} 
+                                                                        alt="" 
+                                                                        width="40" 
+                                                                        height="40" 
+                                                                        loading="lazy"
+                                                                        decoding="async"
+                                                                        referrerPolicy="no-referrer"
+                                                                        onError={handleAdminImgError} 
+                                                                        style={{ objectFit: 'contain', borderRadius: '4px', border: '1px solid #E5E7EB', backgroundColor: '#F9FAFB' }} 
+                                                                    />
+                                                                </td>
+                                                                <td>
+                                                                    <strong>{p.name}</strong>
+                                                                    {p.sku && (
+                                                                        <div style={{ fontSize: '0.75rem', color: '#6B7280', fontFamily: 'monospace', marginTop: '2px' }}>
+                                                                            SKU: {p.sku}
+                                                                        </div>
+                                                                    )}
+                                                                </td>
+                                                                <td>₹{p.price}</td>
+                                                                <td>{p.brand || '-'}</td>
+                                                                <td>
+                                                                    <span className="badge badge-light" style={{ border: '1px solid #D1D5DB', fontSize: '0.75rem', fontWeight: 600 }}>
+                                                                        {p.subcategory || selectedCollectionSubcategory}
+                                                                    </span>
+                                                                </td>
+                                                                <td>{p.in_stock ? <span className="text-success">In Stock</span> : <span className="text-danger">Out</span>}</td>
+                                                                <td>
+                                                                    <button className="btn btn-sm btn-outline-primary" onClick={() => openProductModal(p)} style={{ marginRight: 8 }}>
+                                                                        <i className="bi bi-pencil" /> Edit
+                                                                    </button>
+                                                                    <button className="btn btn-sm btn-outline-danger" onClick={() => handleDeleteProduct(p.id)}>
+                                                                        <i className="bi bi-trash" /> Delete
+                                                                    </button>
+                                                                </td>
+                                                            </tr>
+                                                        ))
+                                                    )}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* ── BULK SUBCATEGORY EDITOR TAB ── */}
+                        {tab === 'bulk' && (
+                            <div className="admin-panel">
+                                <div className="admin-panel__header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                                    <div>
+                                        <h2 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
+                                            <i className="bi bi-check2-square" style={{ color: 'var(--primary-color)' }} />
+                                            Bulk Subcategory Editor
+                                        </h2>
+                                        <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#6B7280' }}>
+                                            Select multiple products across any category and reassign their subcategory in a single click.
+                                        </p>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                        <span className="badge badge-secondary" style={{ fontSize: '0.85rem', padding: '6px 12px' }}>
+                                            Total Catalog: {products.length} Products
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* Filter Controls */}
+                                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center', background: '#F8FAFC', padding: '16px 20px', borderRadius: '12px', border: '1px solid var(--border-color)', marginBottom: '16px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>Category:</span>
+                                        <select 
+                                            className="form-control form-control-sm"
+                                            style={{ width: '190px', fontWeight: 600 }}
+                                            value={bulkFilterCategory}
+                                            onChange={e => {
+                                                setBulkFilterCategory(e.target.value);
+                                                setBulkFilterSubcategory('');
+                                            }}
+                                        >
+                                            <option value="">All Categories ({products.length})</option>
+                                            {collectionsTree.map(c => (
+                                                <option key={c.category} value={c.category}>{c.category} ({c.count})</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>Subcategory:</span>
+                                        <select 
+                                            className="form-control form-control-sm"
+                                            style={{ width: '220px', fontWeight: 600 }}
+                                            value={bulkFilterSubcategory}
+                                            onChange={e => setBulkFilterSubcategory(e.target.value)}
+                                        >
+                                            <option value="">All Subcategories</option>
+                                            {allUniqueSubcategories.map(sub => (
+                                                <option key={sub} value={sub}>{sub}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
+                                        <input
+                                            type="text"
+                                            className="form-control form-control-sm"
+                                            placeholder="Search by name, SKU, or brand..."
+                                            value={bulkFilterSearch}
+                                            onChange={e => setBulkFilterSearch(e.target.value)}
+                                            style={{ paddingLeft: '28px' }}
+                                        />
+                                        <i className="bi bi-search" style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: '#9CA3AF', fontSize: '0.78rem' }} />
+                                        {bulkFilterSearch && (
+                                            <button onClick={() => setBulkFilterSearch('')} style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'none', color: '#9CA3AF', cursor: 'pointer', padding: 0 }}>
+                                                <i className="bi bi-x-circle-fill" />
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    {(bulkFilterCategory || bulkFilterSubcategory || bulkFilterSearch) && (
+                                        <button
+                                            type="button"
+                                            className="btn btn-outline-secondary btn-sm"
+                                            onClick={() => {
+                                                setBulkFilterCategory('');
+                                                setBulkFilterSubcategory('');
+                                                setBulkFilterSearch('');
+                                            }}
+                                        >
+                                            Reset Filters
+                                        </button>
+                                    )}
+                                </div>
+
+                                {/* Bulk Action Bar */}
+                                <div className="bulk-actions-bar" style={{
+                                    background: selectedProductIds.size > 0 ? '#1E293B' : '#FFFFFF',
+                                    border: selectedProductIds.size > 0 ? '1.5px solid var(--primary-color)' : '1px solid var(--border-color)',
+                                    color: selectedProductIds.size > 0 ? '#FFFFFF' : 'var(--text-color)',
+                                    boxShadow: selectedProductIds.size > 0 ? '0 8px 24px rgba(0, 0, 0, 0.22)' : '0 6px 20px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.04)',
+                                    transition: 'all 0.2s ease',
+                                    marginBottom: '20px'
+                                }}>
+                                    <div className="bulk-actions-info">
+                                        <span className={selectedProductIds.size > 0 ? "bulk-selected-pill" : "badge badge-light"} style={selectedProductIds.size === 0 ? { border: '1px solid #D1D5DB', padding: '5px 10px', fontSize: '0.8rem', fontWeight: 600 } : {}}>
+                                            <i className="bi bi-check2-square" style={{ marginRight: '6px' }} />
+                                            {selectedProductIds.size > 0 ? `${selectedProductIds.size} Products Selected` : '0 Products Selected'}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            className={`btn btn-sm ${selectedProductIds.size > 0 ? 'btn-outline-light' : 'btn-outline-primary'}`}
+                                            style={{ fontSize: '0.8rem', padding: '3px 10px' }}
+                                            onClick={() => handleSelectAllProducts(bulkFilteredProducts)}
+                                        >
+                                            <i className="bi bi-check-all" /> {bulkFilteredProducts.length > 0 && bulkFilteredProducts.every(p => selectedProductIds.has(p.id)) ? 'Deselect All' : `Select All Matching (${bulkFilteredProducts.length})`}
+                                        </button>
+                                    </div>
+
+                                    <div className="bulk-actions-controls">
+                                        <span style={{ fontSize: '0.85rem', color: selectedProductIds.size > 0 ? '#CBD5E1' : '#475569', fontWeight: 600 }}>
+                                            Target Subcategory:
+                                        </span>
+                                        <input
+                                            type="text"
+                                            list="bulk-tab-subcats"
+                                            className="bulk-subcat-input"
+                                            placeholder="Choose or enter new subcategory..."
+                                            value={bulkSubcategoryInput}
+                                            onChange={e => setBulkSubcategoryInput(e.target.value)}
+                                            style={selectedProductIds.size === 0 ? { background: '#F8FAFC', color: '#1E293B', border: '1px solid #CBD5E1' } : {}}
+                                        />
+                                        <datalist id="bulk-tab-subcats">
+                                            {allUniqueSubcategories.map(sub => (
+                                                <option key={sub} value={sub} />
+                                            ))}
+                                        </datalist>
+
+                                        <button
+                                            type="button"
+                                            className="btn btn-primary btn-sm"
+                                            disabled={bulkLoading || selectedProductIds.size === 0 || !bulkSubcategoryInput.trim()}
+                                            onClick={handleApplyBulkSubcategory}
+                                            style={{ fontWeight: 700 }}
+                                        >
+                                            <i className="bi bi-arrow-repeat" /> {bulkLoading ? 'Updating...' : `Assign to ${selectedProductIds.size} Selected`}
+                                        </button>
+
+                                        {selectedProductIds.size > 0 && (
+                                            <button
+                                                type="button"
+                                                className="btn btn-outline-light btn-sm"
+                                                onClick={() => setSelectedProductIds(new Set())}
+                                            >
+                                                Clear
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Filtered Products Table */}
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                    <span style={{ fontSize: '0.85rem', color: '#64748B' }}>
+                                        Showing <strong>{bulkFilteredProducts.length}</strong> products matching filters
+                                    </span>
+                                </div>
+
+                                <div className="table-responsive">
+                                    <table className="admin-table">
+                                        <thead>
+                                            <tr>
+                                                <th style={{ width: '65px', textAlign: 'center' }}>
+                                                    <input 
+                                                        type="checkbox" 
+                                                        className="admin-checkbox"
+                                                        checked={bulkFilteredProducts.length > 0 && bulkFilteredProducts.every(p => selectedProductIds.has(p.id))}
+                                                        onChange={() => handleSelectAllProducts(bulkFilteredProducts)}
+                                                        title="Select all"
+                                                    />
+                                                    <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: '#6B7280', marginTop: '2px', fontWeight: 700 }}>SELECT</div>
+                                                </th>
+                                                <th>ID</th>
+                                                <th>Image</th>
+                                                <th>Product Name</th>
+                                                <th>Current Category</th>
+                                                <th>Current Subcategory</th>
+                                                <th>Price</th>
+                                                <th>Brand</th>
+                                                <th>Stock</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {bulkFilteredProducts.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan="10" style={{ textAlign: 'center', padding: '40px 20px', color: '#6B7280' }}>
+                                                        <i className="bi bi-inbox" style={{ fontSize: '2rem', display: 'block', marginBottom: '8px', color: '#D1D5DB' }} />
+                                                        No products match the selected filters.
+                                                    </td>
+                                                </tr>
+                                            ) : (
+                                                bulkFilteredProducts.map(p => (
+                                                    <tr key={p.id} style={{ background: selectedProductIds.has(p.id) ? 'rgba(184, 132, 36, 0.08)' : undefined }}>
+                                                        <td style={{ textAlign: 'center' }}>
+                                                            <input 
+                                                                type="checkbox" 
+                                                                className="admin-checkbox"
+                                                                checked={selectedProductIds.has(p.id)}
+                                                                onChange={() => toggleSelectProduct(p.id)}
+                                                            />
+                                                        </td>
+                                                        <td>{p.id}</td>
+                                                        <td>
+                                                            <img 
+                                                                src={formatImageUrl(p.image_url)} 
+                                                                alt="" 
+                                                                width="40" 
+                                                                height="40" 
+                                                                loading="lazy"
+                                                                decoding="async"
+                                                                referrerPolicy="no-referrer"
+                                                                onError={handleAdminImgError} 
+                                                                style={{ objectFit: 'contain', borderRadius: '4px', border: '1px solid #E5E7EB', backgroundColor: '#F9FAFB' }} 
+                                                            />
+                                                        </td>
+                                                        <td>
+                                                            <strong>{p.name}</strong>
+                                                            {p.sku && (
+                                                                <div style={{ fontSize: '0.75rem', color: '#6B7280', fontFamily: 'monospace', marginTop: '2px' }}>
+                                                                    SKU: {p.sku}
+                                                                </div>
+                                                            )}
+                                                        </td>
+                                                        <td><span className="badge badge-secondary">{p.category}</span></td>
+                                                        <td>
+                                                            {p.subcategory ? (
+                                                                <span className="badge badge-light" style={{ border: '1px solid #D1D5DB', fontSize: '0.75rem', fontWeight: 600 }}>
+                                                                    {p.subcategory}
+                                                                </span>
+                                                            ) : (
+                                                                <span style={{ color: '#9CA3AF' }}>Unassigned</span>
+                                                            )}
+                                                        </td>
+                                                        <td>₹{p.price}</td>
+                                                        <td>{p.brand || '-'}</td>
+                                                        <td>{p.in_stock ? <span className="text-success">In Stock</span> : <span className="text-danger">Out</span>}</td>
+                                                        <td>
+                                                            <button className="btn btn-sm btn-outline-primary" onClick={() => openProductModal(p)} style={{ marginRight: 8 }}>
+                                                                <i className="bi bi-pencil" /> Edit
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                ))
+                                            )}
                                         </tbody>
                                     </table>
                                 </div>
@@ -616,14 +1819,19 @@ export default function AdminPage() {
                                 </div>
                             </div>
                         )}
+
+
                     </>
                 )}
             </div>
 
             {/* ── PRODUCT MODAL ── */}
-            {showProductModal && (
-                <div className="admin-modal-overlay" onClick={(e) => { if (e.target.className === 'admin-modal-overlay') setShowProductModal(false) }}>
-                    <div className="admin-modal">
+            {showProductModal && createPortal(
+                <div 
+                    className="admin-modal-overlay" 
+                    onClick={(e) => { if (e.target === e.currentTarget) setShowProductModal(false) }}
+                >
+                    <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
                         <div className="admin-modal__head">
                             <h3>{editingProductId ? 'Edit Product' : 'Add New Product'}</h3>
                             <button className="close-btn" onClick={() => setShowProductModal(false)}><i className="bi bi-x-lg" /></button>
@@ -672,6 +1880,22 @@ export default function AdminPage() {
                                     <datalist id="admin-categories">
                                         {categories.map(c => (
                                             <option key={c.id} value={c.id}>{c.name}</option>
+                                        ))}
+                                    </datalist>
+                                </div>
+                                <div className="form-group" style={{ flex: 1 }}>
+                                    <label style={{ marginBottom: '6px' }}>Subcategory</label>
+                                    <input 
+                                        type="text" 
+                                        list="admin-subcategories" 
+                                        className="form-control" 
+                                        value={productForm.subcategory || ''} 
+                                        onChange={e => setProductForm({ ...productForm, subcategory: e.target.value })} 
+                                        placeholder="Select or enter subcategory..." 
+                                    />
+                                    <datalist id="admin-subcategories">
+                                        {availableSubcategories.map((sub, i) => (
+                                            <option key={i} value={sub} />
                                         ))}
                                     </datalist>
                                 </div>
@@ -785,6 +2009,8 @@ export default function AdminPage() {
                                                             Cover
                                                         </span>
                                                     )}
+
+
                                                 </div>
 
                                                 {/* Hidden Native File Input */}
@@ -812,10 +2038,12 @@ export default function AdminPage() {
                                                             position: 'relative'
                                                         }}>
                                                             <img 
-                                                                src={val} 
+                                                                src={formatImageUrl(val)} 
                                                                 alt={slot.label} 
+                                                                loading="lazy"
+                                                                referrerPolicy="no-referrer"
                                                                 style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
-                                                                onError={e => e.currentTarget.style.display = 'none'}
+                                                                onError={handleAdminImgError}
                                                             />
                                                             {isDataUrl && (
                                                                 <span style={{
@@ -831,6 +2059,8 @@ export default function AdminPage() {
                                                                     {formatFileSize(getDataUrlSize(val))}
                                                                 </span>
                                                             )}
+
+
                                                         </div>
 
                                                         {/* Action Buttons */}
@@ -880,6 +2110,8 @@ export default function AdminPage() {
                                                                     onChange={e => setProductForm({ ...productForm, [slot.key]: e.target.value })} 
                                                                 />
                                                             )}
+
+
                                                         </div>
                                                     </div>
                                                 ) : (
@@ -921,6 +2153,8 @@ export default function AdminPage() {
                                                                     </span>
                                                                 </>
                                                             )}
+
+
                                                         </div>
 
                                                         {/* Or paste URL toggle */}
@@ -942,9 +2176,13 @@ export default function AdminPage() {
                                                                     onChange={e => setProductForm({ ...productForm, [slot.key]: e.target.value })} 
                                                                 />
                                                             )}
+
+
                                                         </div>
                                                     </div>
                                                 )}
+
+
                                             </div>
                                         );
                                     })}
@@ -1004,13 +2242,17 @@ export default function AdminPage() {
                             <button type="submit" className="btn btn-primary btn-full">Save Product</button>
                         </form>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
             {/* ── ORDER MANAGE MODAL ── */}
-            {showOrderModal && selectedOrder && (
-                <div className="admin-modal-overlay" onClick={(e) => { if (e.target.className === 'admin-modal-overlay') setShowOrderModal(false) }}>
-                    <div className="admin-modal" style={{ maxWidth: 800 }}>
+            {showOrderModal && selectedOrder && createPortal(
+                <div 
+                    className="admin-modal-overlay" 
+                    onClick={(e) => { if (e.target === e.currentTarget) setShowOrderModal(false) }}
+                >
+                    <div className="admin-modal" style={{ maxWidth: 800 }} onClick={(e) => e.stopPropagation()}>
                         <div className="admin-modal__head">
                             <h3>Manage Order: {selectedOrder.order_number}</h3>
                             <button className="close-btn" onClick={() => setShowOrderModal(false)}><i className="bi bi-x-lg" /></button>
@@ -1057,7 +2299,17 @@ export default function AdminPage() {
                                 <div style={{ maxHeight: 180, overflowY: 'auto', marginBottom: 25, border: '1px solid #eee', borderRadius: 8, padding: 10 }}>
                                     {(selectedOrder.order_items || []).map(item => (
                                         <div key={item.id} style={{ display: 'flex', gap: 15, padding: '10px 0', borderBottom: '1px solid #f1f5f9' }}>
-                                            <img src={item.image_url || '/placeholder-key.svg'} alt={item.name} width={50} height={50} onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/placeholder-key.svg'; }} style={{ objectFit: 'contain', borderRadius: 4, border: '1px solid #eee' }} />
+                                            <img 
+                                                src={formatImageUrl(item.image_url)} 
+                                                alt={item.name} 
+                                                width={50} 
+                                                height={50} 
+                                                loading="lazy"
+                                                decoding="async"
+                                                referrerPolicy="no-referrer"
+                                                onError={handleAdminImgError} 
+                                                style={{ objectFit: 'contain', borderRadius: 4, border: '1px solid #eee', backgroundColor: '#F9FAFB' }} 
+                                            />
                                             <div>
                                                 <p style={{ margin: 0, fontWeight: 600 }}>
                                                     {item.name} 
@@ -1125,7 +2377,81 @@ export default function AdminPage() {
                             </div>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
+            )}
+
+            {/* ── RENAME MODAL ── */}
+            {renameModal.open && createPortal(
+                <div 
+                    className="admin-modal-overlay" 
+                    onClick={(e) => { 
+                        if (e.target === e.currentTarget) setRenameModal({ open: false, type: 'category', category: '', oldName: '', newName: '', count: 0 }) 
+                    }}
+                >
+                    <div className="admin-modal" style={{ maxWidth: '520px' }} onClick={(e) => e.stopPropagation()}>
+                        <div className="admin-modal__head">
+                            <h3>
+                                <i className="bi bi-pencil-square" style={{ color: 'var(--primary-color)', marginRight: '8px' }} />
+                                Rename {renameModal.type === 'category' ? 'Category' : 'Subcategory'}
+                            </h3>
+                            <button 
+                                className="close-btn" 
+                                onClick={() => setRenameModal({ open: false, type: 'category', category: '', oldName: '', newName: '', count: 0 })}
+                            >
+                                <i className="bi bi-x-lg" />
+                            </button>
+                        </div>
+                        <form className="admin-modal__body" onSubmit={handleRenameSubmit}>
+                            <div style={{ marginBottom: '16px', padding: '12px 14px', background: '#F8FAFC', borderRadius: '10px', border: '1px solid #E2E8F0', fontSize: '0.88rem' }}>
+                                <div style={{ marginBottom: '6px' }}>
+                                    <span style={{ color: '#64748B' }}>Current Name: </span>
+                                    <strong>{renameModal.oldName}</strong>
+                                    {renameModal.type === 'subcategory' && (
+                                        <span style={{ marginLeft: '8px', color: '#64748B' }}>
+                                            (Category: <strong>{renameModal.category}</strong>)
+                                        </span>
+                                    )}
+                                </div>
+                                <div style={{ color: 'var(--primary-color)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <i className="bi bi-info-circle-fill" />
+                                    This will automatically update all {renameModal.count} associated products in the database.
+                                </div>
+                            </div>
+
+                            <div className="form-group mb-3">
+                                <label style={{ fontWeight: 600 }}>New {renameModal.type === 'category' ? 'Category' : 'Subcategory'} Name</label>
+                                <input 
+                                    type="text" 
+                                    className="form-control" 
+                                    value={renameModal.newName} 
+                                    onChange={e => setRenameModal({ ...renameModal, newName: e.target.value })} 
+                                    required 
+                                    autoFocus 
+                                    placeholder={`Enter new ${renameModal.type} name...`}
+                                />
+                            </div>
+
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' }}>
+                                <button 
+                                    type="button" 
+                                    className="btn btn-outline-secondary" 
+                                    onClick={() => setRenameModal({ open: false, type: 'category', category: '', oldName: '', newName: '', count: 0 })}
+                                >
+                                    Cancel
+                                </button>
+                                <button 
+                                    type="submit" 
+                                    className="btn btn-primary"
+                                    disabled={loading || !renameModal.newName.trim()}
+                                >
+                                    {loading ? 'Updating Products...' : 'Save & Update All Products'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>,
+                document.body
             )}
         </div>
     )
