@@ -47,8 +47,14 @@ function mapProduct(row) {
     image: formattedImageUrl,
     image_url: formattedImageUrl,
     badge: row.badge,
-    inStock: row.in_stock,
-    in_stock: row.in_stock,
+    inStock: row.in_stock && (row.stock_quantity === undefined || row.stock_quantity === null || parseInt(row.stock_quantity) > 0),
+    in_stock: row.in_stock && (row.stock_quantity === undefined || row.stock_quantity === null || parseInt(row.stock_quantity) > 0),
+    stock_quantity: row.stock_quantity !== undefined && row.stock_quantity !== null
+      ? parseInt(row.stock_quantity)
+      : (row.in_stock ? 5 : 0),
+    quantity: row.stock_quantity !== undefined && row.stock_quantity !== null
+      ? parseInt(row.stock_quantity)
+      : (row.in_stock ? 5 : 0),
     rating: parseFloat(row.rating || 0),
     review_count: parseInt(row.review_count || 0),
     reviews: parseInt(row.review_count || 0),
@@ -169,21 +175,63 @@ export async function fetchProducts(filters = {}, sortBy = 'featured') {
 
 export async function fetchFilterMeta() {
   try {
-    const brandsRow = await sql`SELECT DISTINCT brand FROM products WHERE brand IS NOT NULL AND brand != '' ORDER BY brand ASC`;
-    const subcatsRow = await sql`SELECT DISTINCT category, subcategory FROM products WHERE subcategory IS NOT NULL AND subcategory != '' ORDER BY subcategory ASC`;
+    const brandsRow = await sql`
+      SELECT DISTINCT category, brand 
+      FROM products 
+      WHERE brand IS NOT NULL AND brand != '' 
+      ORDER BY brand ASC
+    `;
+    const subcatsRow = await sql`
+      SELECT DISTINCT category, subcategory 
+      FROM products 
+      WHERE subcategory IS NOT NULL AND subcategory != '' 
+      ORDER BY subcategory ASC
+    `;
     const priceRow = await sql`SELECT MIN(price) as min_p, MAX(price) as max_p FROM products`;
 
-    const brands = ['All', ...brandsRow.map(b => b.brand)];
+    const allBrandsSet = new Set();
+    const brandsByCategory = {};
+    for (const row of brandsRow) {
+      if (!row.brand) continue;
+      const b = row.brand.trim();
+      if (!b || b === 'All') continue;
+      allBrandsSet.add(b);
+
+      if (!row.category) continue;
+      const cat = row.category.trim();
+      const lower = cat.toLowerCase();
+      const slug = lower.replace(/\s+/g, '-');
+      const unhyphen = lower.replace(/-/g, ' ');
+      const singular = lower.endsWith('s') ? lower.slice(0, -1) : lower;
+      const plural = `${lower}s`;
+
+      const keys = [cat, lower, slug, unhyphen, singular, plural];
+      for (const k of keys) {
+        if (!brandsByCategory[k]) brandsByCategory[k] = [];
+        if (!brandsByCategory[k].includes(b)) {
+          brandsByCategory[k].push(b);
+        }
+      }
+    }
+
+    const brands = ['All', ...Array.from(allBrandsSet).sort((a, b) => a.localeCompare(b))];
     const subcategories = Array.from(new Set(subcatsRow.map(s => s.subcategory)));
     const subcategoriesByCategory = {};
     for (const row of subcatsRow) {
       if (!row.category) continue;
-      const catKey = row.category.toLowerCase();
-      if (!subcategoriesByCategory[catKey]) {
-        subcategoriesByCategory[catKey] = [];
-      }
-      if (!subcategoriesByCategory[catKey].includes(row.subcategory)) {
-        subcategoriesByCategory[catKey].push(row.subcategory);
+      const cat = row.category.trim();
+      const lower = cat.toLowerCase();
+      const slug = lower.replace(/\s+/g, '-');
+      const unhyphen = lower.replace(/-/g, ' ');
+      const singular = lower.endsWith('s') ? lower.slice(0, -1) : lower;
+      const plural = `${lower}s`;
+
+      const keys = [cat, lower, slug, unhyphen, singular, plural];
+      for (const k of keys) {
+        if (!subcategoriesByCategory[k]) subcategoriesByCategory[k] = [];
+        if (!subcategoriesByCategory[k].includes(row.subcategory)) {
+          subcategoriesByCategory[k].push(row.subcategory);
+        }
       }
     }
 
@@ -192,6 +240,7 @@ export async function fetchFilterMeta() {
 
     return {
       brands,
+      brandsByCategory,
       subcategories,
       subcategoriesByCategory,
       colors: [],
@@ -202,6 +251,7 @@ export async function fetchFilterMeta() {
     console.error('Error fetching filter meta:', err);
     return {
       brands: ['All'],
+      brandsByCategory: {},
       subcategories: [],
       subcategoriesByCategory: {},
       colors: [],
@@ -239,30 +289,29 @@ export async function fetchSubcategories(category) {
 
 export async function fetchCategories() {
   try {
-    const counts = await sql`SELECT category, COUNT(*) as c FROM products GROUP BY category`;
+    const counts = await sql`
+      SELECT 
+        p1.category, 
+        COUNT(*) as c,
+        (
+          SELECT COALESCE(NULLIF(p2.image_url, ''), (p2.details->'images'->>0))
+          FROM products p2 
+          WHERE (p2.category = p1.category OR LOWER(p2.category) = LOWER(p1.category))
+            AND (
+              (p2.image_url IS NOT NULL AND TRIM(p2.image_url) != '' AND p2.image_url NOT LIKE '%placeholder%')
+              OR 
+              (p2.details->'images'->>0 IS NOT NULL AND TRIM(p2.details->'images'->>0) != '' AND p2.details->'images'->>0 NOT LIKE '%placeholder%')
+            )
+          ORDER BY p2.id ASC 
+          LIMIT 1
+        ) as first_product_image
+      FROM products p1
+      WHERE p1.category IS NOT NULL AND TRIM(p1.category) != ''
+      GROUP BY p1.category
+      ORDER BY p1.category ASC
+    `;
 
     const categoryMap = {
-      watches: {
-        name: 'Smart Watches',
-        description: 'Track your health and stay connected',
-        icon: '⌚',
-        color: '#0077FF',
-        image: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&h=400&fit=crop',
-      },
-      airpods: {
-        name: 'AirPods & Earbuds',
-        description: 'Immersive sound, total freedom',
-        icon: '🎧',
-        color: '#2EA8FF',
-        image: 'https://images.unsplash.com/photo-1606220588913-b3aacb4d2f46?w=600&h=400&fit=crop',
-      },
-      headphones: {
-        name: 'Headphones',
-        description: 'Professional studio-grade audio',
-        icon: '🎵',
-        color: '#6C5CE7',
-        image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=600&h=400&fit=crop',
-      },
       Remote: {
         name: 'Car Key Remotes',
         description: 'Universal smart remotes, key fobs & transponders',
@@ -659,13 +708,20 @@ export async function fetchCategories() {
         description: `Explore our ${cat} collection`,
         icon: '📦',
         color: '#2EA8FF',
-        image: 'https://via.placeholder.com/600x400'
       };
+
+      // Automatically take image from the first product in this category
+      let categoryImage = row.first_product_image;
+      if (!categoryImage || categoryImage.includes('via.placeholder.com')) {
+        categoryImage = (meta.image && !meta.image.includes('via.placeholder.com'))
+          ? meta.image
+          : '/placeholder-key.svg';
+      }
 
       return {
         id: cat,
         ...meta,
-        image: formatImageUrl(meta.image),
+        image: formatImageUrl(categoryImage),
         count: parseInt(row.c || 0)
       };
     });

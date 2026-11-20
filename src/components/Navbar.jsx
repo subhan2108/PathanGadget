@@ -42,7 +42,8 @@ export default function Navbar() {
     const navLinks = [
         { to: '/', label: 'Home', icon: 'bi-house' },
         { to: '/products', label: 'Products', icon: 'bi-grid-3x3-gap' },
-        { to: '/orders', label: 'My Orders', icon: 'bi-box-seam' },
+        { to: '/track', label: 'Track Order', icon: 'bi-geo-alt' },
+        { to: '/profile', label: 'My Orders & Profile', icon: 'bi-person-badge' },
     ]
 
     return (
@@ -61,17 +62,20 @@ export default function Navbar() {
 
                     {/* Desktop Nav */}
                     <nav className="navbar__links" aria-label="Main navigation">
-                        {navLinks.map(link => (
-                            <Link
-                                key={link.to}
-                                to={link.to}
-                                id={`nav-${link.label.toLowerCase().replace(/\s+/g, '-')}`}
-                                className={`navbar__link ${location.pathname === link.to ? 'active' : ''}`}
-                            >
-                                <i className={`bi ${link.icon}`} />
-                                {link.label}
-                            </Link>
-                        ))}
+                        {navLinks.map(link => {
+                            const isActive = location.pathname === link.to || (link.to === '/profile' && location.pathname === '/orders')
+                            return (
+                                <Link
+                                    key={link.to}
+                                    to={link.to}
+                                    id={`nav-${link.label.toLowerCase().replace(/\s+/g, '-')}`}
+                                    className={`navbar__link ${isActive ? 'active' : ''}`}
+                                >
+                                    <i className={`bi ${link.icon}`} />
+                                    {link.label}
+                                </Link>
+                            )
+                        })}
                     </nav>
 
                     {/* Right Actions */}
@@ -126,12 +130,15 @@ export default function Navbar() {
 
                 {/* Mobile Menu */}
                 <div className={`mobile-menu ${menuOpen ? 'open' : ''}`} id="mobile-menu">
-                    {navLinks.map(link => (
-                        <Link key={link.to} to={link.to} className={`mobile-menu__link ${location.pathname === link.to ? 'active' : ''}`}>
-                            <i className={`bi ${link.icon}`} />
-                            {link.label}
-                        </Link>
-                    ))}
+                    {navLinks.map(link => {
+                        const isActive = location.pathname === link.to || (link.to === '/profile' && location.pathname === '/orders')
+                        return (
+                            <Link key={link.to} to={link.to} className={`mobile-menu__link ${isActive ? 'active' : ''}`}>
+                                <i className={`bi ${link.icon}`} />
+                                {link.label}
+                            </Link>
+                        )
+                    })}
 
                     <SignedIn>
                         <button className="mobile-menu__link mobile-signout" onClick={() => signOut()}>

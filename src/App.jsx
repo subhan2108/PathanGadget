@@ -6,6 +6,7 @@ import HomePage from './pages/HomePage'
 import OrderListingPage from './pages/OrderListingPage'
 import OrderDetailsPage from './pages/OrderDetailsPage'
 import OrderTrackingPage from './pages/OrderTrackingPage'
+import ProfilePage from './pages/ProfilePage'
 import ProductDetailPage from './pages/ProductDetailPage'
 import ProductsPage from './pages/ProductsPage'
 import AdminPage from './pages/AdminPage'
@@ -37,8 +38,10 @@ export default function App() {
                             <Route path="/" element={<HomePage />} />
                             <Route path="/products" element={<ProductsPage />} />
                             <Route path="/products/:id" element={<ProductDetailPage />} />
-                            <Route path="/orders" element={<OrderListingPage />} />
+                            <Route path="/orders" element={<ProfilePage />} />
+                            <Route path="/profile" element={<ProfilePage />} />
                             <Route path="/orders/:id" element={<OrderDetailsPage />} />
+                            <Route path="/track" element={<OrderTrackingPage />} />
                             <Route path="/track/:id" element={<OrderTrackingPage />} />
                             <Route path="/admin" element={<AdminPage />} />
                             <Route path="/payment" element={<PaymentPage />} />

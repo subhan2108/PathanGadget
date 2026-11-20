@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
+import QRCode from 'react-qr-code'
 import {
     adminGetProducts,
     adminCreateProduct,
@@ -9,10 +10,16 @@ import {
     adminRenameCategory,
     adminRenameSubcategory,
     adminBulkUpdateSubcategory,
+    adminBulkUpdateCategory,
+    adminBulkUpdateCategoryAndSubcategory,
     adminGetOrders,
     adminGetOrderDetails,
     adminUpdateOrderStatus,
-    adminAddTrackingStep
+    adminAddTrackingStep,
+    adminApprovePayment,
+    adminDispatchOrder,
+    adminMarkDelivered,
+    adminExportToVyapar
 } from '../lib/adminService'
 const ADMIN_PASSWORD = (import.meta.env.VITE_ADMIN_PASSWORD || 'admin123').trim()
 import { useCategories } from '../hooks/useProducts'
@@ -78,6 +85,14 @@ export default function AdminPage() {
     const [editingProductId, setEditingProductId] = useState(null)
     const [selectedOrder, setSelectedOrder] = useState(null)
     const [trackingForm, setTrackingForm] = useState({ label: '', description: '', status: 'processing', is_current: true })
+
+    // Courier Dispatch & Vyapar States
+    const [dispatchModalOrder, setDispatchModalOrder] = useState(null)
+    const [dispatchForm, setDispatchForm] = useState({ courier_name: 'DTDC', tracking_number: '' })
+    const [orderFilter, setOrderFilter] = useState('all')
+    const [orderSearchQuery, setOrderSearchQuery] = useState('')
+    const [exportingVyapar, setExportingVyapar] = useState(false)
+    const [printLabelOrder, setPrintLabelOrder] = useState(null)
 
     // Image Upload States
     const [uploadingSlot, setUploadingSlot] = useState(null)
@@ -285,8 +300,18 @@ export default function AdminPage() {
             return true;
         });
     }, [products, bulkFilterCategory, bulkFilterSubcategory, bulkFilterSearch]);
+    const [bulkCategoryInput, setBulkCategoryInput] = useState('');
     const [bulkSubcategoryInput, setBulkSubcategoryInput] = useState('');
     const [bulkLoading, setBulkLoading] = useState(false);
+
+    // All unique categories across entire product catalog for autocomplete
+    const allUniqueCategories = React.useMemo(() => {
+        const cats = new Set();
+        products.forEach(p => {
+            if (p.category && p.category.trim()) cats.add(p.category.trim());
+        });
+        return Array.from(cats).sort();
+    }, [products]);
 
     const toggleSelectProduct = (id) => {
         setSelectedProductIds(prev => {
@@ -311,20 +336,32 @@ export default function AdminPage() {
         });
     };
 
-    const handleApplyBulkSubcategory = async () => {
+    const handleApplyBulkChanges = async () => {
         if (selectedProductIds.size === 0) return;
+        const targetCat = bulkCategoryInput.trim();
         const targetSub = bulkSubcategoryInput.trim();
-        if (!targetSub) {
-            alert('Please select or enter a subcategory name to assign.');
+
+        if (!targetCat && !targetSub) {
+            alert('Please select or enter a Category or Subcategory to assign.');
             return;
         }
-        if (!window.confirm(`Are you sure you want to assign subcategory "${targetSub}" to all ${selectedProductIds.size} selected products?`)) return;
+
+        const changesList = [];
+        if (targetCat) changesList.push(`Category -> "${targetCat}"`);
+        if (targetSub) changesList.push(`Subcategory -> "${targetSub}"`);
+        const confirmMsg = `Are you sure you want to assign ${changesList.join(' and ')} to all ${selectedProductIds.size} selected products?`;
+        
+        if (!window.confirm(confirmMsg)) return;
 
         try {
             setBulkLoading(true);
-            const res = await adminBulkUpdateSubcategory(Array.from(selectedProductIds), targetSub);
-            alert(`Successfully updated subcategory to "${targetSub}" for ${res.count} products!`);
+            const res = await adminBulkUpdateCategoryAndSubcategory(Array.from(selectedProductIds), {
+                category: targetCat || undefined,
+                subcategory: targetSub || undefined
+            });
+            alert(`Successfully updated ${res.count} products!`);
             setSelectedProductIds(new Set());
+            setBulkCategoryInput('');
             setBulkSubcategoryInput('');
             await loadProducts();
         } catch (err) {
@@ -333,6 +370,7 @@ export default function AdminPage() {
             setBulkLoading(false);
         }
     };
+    const handleApplyBulkSubcategory = handleApplyBulkChanges;
 
     // Lock background scroll when modal is open so it stays locked to current viewport
     useEffect(() => {
@@ -486,6 +524,8 @@ export default function AdminPage() {
             ...prod,
             sku: existingSku,
             subcategory: prod.subcategory || detailsObj.subcategory || defaultSubcategory || '',
+            stock_quantity: prod.stock_quantity !== undefined && prod.stock_quantity !== null ? prod.stock_quantity : (prod.in_stock !== false ? 5 : 0),
+            in_stock: prod.in_stock !== false && (prod.stock_quantity === undefined || prod.stock_quantity > 0),
             colors: prod.colors?.join(', ') || '',
             image_url: prod.image_url || prod.image || '',
             image2: existingExtraImages[0] || '',
@@ -504,6 +544,7 @@ export default function AdminPage() {
             category: defaultCategory || 'Key Cover', 
             subcategory: defaultSubcategory || '', 
             brand: '',
+            stock_quantity: 5,
             description: '', image_url: '', badge: '', in_stock: true,
             rating: 0, review_count: 0, colors: '', 
             image2: '', image3: '', image4: '', image5: '', image6: '',
@@ -558,9 +599,16 @@ export default function AdminPage() {
                 }
             };
 
+            const stockQty = restForm.stock_quantity !== undefined && restForm.stock_quantity !== null && restForm.stock_quantity !== ''
+                ? parseInt(restForm.stock_quantity)
+                : (restForm.in_stock !== false ? 5 : 0);
+            const inStockVal = stockQty > 0;
+
             const formattedForm = {
                 ...restForm,
                 sku: finalSku,
+                stock_quantity: stockQty,
+                in_stock: inStockVal,
                 colors: restForm.colors ? restForm.colors.split(',').map(c => c.trim()).filter(Boolean) : [],
                 details: parsedDetails,
             };
@@ -622,6 +670,206 @@ export default function AdminPage() {
         } catch (err) {
             alert('Failed to add tracking: ' + err.message)
         }
+    }
+
+    const handleApprovePayment = async (orderId) => {
+        try {
+            await adminApprovePayment(orderId)
+            alert('✅ Payment Approved! Order moved to Processing & Packing.')
+            loadOrders()
+            if (selectedOrder && selectedOrder.id === orderId) {
+                const refreshed = await adminGetOrderDetails(orderId)
+                setSelectedOrder(refreshed)
+            }
+        } catch (err) {
+            alert('Failed to approve payment: ' + err.message)
+        }
+    }
+
+    const openPrintLabelModal = async (order) => {
+        try {
+            if (!order.order_items || order.order_items.length === 0) {
+                const full = await adminGetOrderDetails(order.id)
+                setPrintLabelOrder(full || order)
+            } else {
+                setPrintLabelOrder(order)
+            }
+        } catch {
+            setPrintLabelOrder(order)
+        }
+    }
+
+    const handlePrintShippingLabel = () => {
+        const labelElem = document.getElementById('printable-shipping-label');
+        if (!labelElem) {
+            window.print();
+            return;
+        }
+
+        // Print via an isolated hidden iframe so ONLY the label document is sent to the printer (strictly 1 page)
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = '0';
+        document.body.appendChild(iframe);
+
+        const doc = iframe.contentWindow.document;
+        doc.open();
+        doc.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8" />
+                <title>Shipping_Label_${printLabelOrder?.order_number || 'Parcel'}</title>
+                <style>
+                    @page {
+                        size: auto;
+                        margin: 6mm;
+                    }
+                    * {
+                        box-sizing: border-box;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                    html, body {
+                        margin: 0;
+                        padding: 0;
+                        background: #FFFFFF;
+                        font-family: Arial, sans-serif;
+                    }
+                    .shipping-label-printable {
+                        width: 100% !important;
+                        max-width: 440px !important;
+                        margin: 0 auto !important;
+                        box-shadow: none !important;
+                        page-break-inside: avoid !important;
+                        break-inside: avoid !important;
+                    }
+                </style>
+            </head>
+            <body>
+                ${labelElem.outerHTML}
+            </body>
+            </html>
+        `);
+        doc.close();
+
+        setTimeout(() => {
+            try {
+                iframe.contentWindow.focus();
+                iframe.contentWindow.print();
+            } catch (err) {
+                console.error('Iframe print error:', err);
+                window.print();
+            } finally {
+                setTimeout(() => {
+                    if (document.body.contains(iframe)) {
+                        document.body.removeChild(iframe);
+                    }
+                }, 1000);
+            }
+        }, 200);
+    }
+
+    const openDispatchModal = (order) => {
+        setDispatchModalOrder(order)
+        setDispatchForm({
+            courier_name: order.courier_name || 'DTDC',
+            tracking_number: order.tracking_number || ''
+        })
+    }
+
+    const handleSaveDispatch = async (e) => {
+        if (e) e.preventDefault()
+        if (!dispatchModalOrder) return
+        if (!dispatchForm.tracking_number.trim()) {
+            alert('Please enter a tracking / consignment number.')
+            return
+        }
+        try {
+            await adminDispatchOrder(dispatchModalOrder.id, dispatchForm)
+            alert(`✅ Order #${dispatchModalOrder.order_number} marked as Dispatched via ${dispatchForm.courier_name}! Tracking number saved.`)
+            setDispatchModalOrder(null)
+            loadOrders()
+            if (selectedOrder && selectedOrder.id === dispatchModalOrder.id) {
+                const refreshed = await adminGetOrderDetails(dispatchModalOrder.id)
+                setSelectedOrder(refreshed)
+            }
+        } catch (err) {
+            alert('Failed to dispatch order: ' + err.message)
+        }
+    }
+
+    const handleMarkDelivered = async (orderId) => {
+        if (!window.confirm('Mark this order as Delivered?')) return
+        try {
+            await adminMarkDelivered(orderId)
+            alert('✅ Order marked as Delivered!')
+            loadOrders()
+            if (selectedOrder && selectedOrder.id === orderId) {
+                const refreshed = await adminGetOrderDetails(orderId)
+                setSelectedOrder(refreshed)
+            }
+        } catch (err) {
+            alert('Failed to mark delivered: ' + err.message)
+        }
+    }
+
+    const handleExportToVyapar = async (targetOrderIds = null) => {
+        setExportingVyapar(true)
+        try {
+            const res = await adminExportToVyapar(targetOrderIds)
+            if (!res || res.count === 0) {
+                alert('No orders found to export.')
+                return
+            }
+            const blob = new Blob([res.csvContent], { type: 'text/csv;charset=utf-8;' })
+            const url = URL.createObjectURL(blob)
+            const link = document.createElement('a')
+            link.href = url
+            link.download = `vyapar_sales_invoices_${new Date().toISOString().slice(0, 10)}.csv`
+            document.body.appendChild(link)
+            link.click()
+            document.body.removeChild(link)
+            URL.revokeObjectURL(url)
+
+            alert(`✅ Successfully generated Vyapar CSV with ${res.count} orders (${res.rows.length} line items)!\nAll exported orders have been marked as exported in the system.`)
+            loadOrders()
+        } catch (err) {
+            alert('Failed to export to Vyapar: ' + err.message)
+        } finally {
+            setExportingVyapar(false)
+        }
+    }
+
+    const handleWhatsAppOrder = (order) => {
+        const ship = typeof order.shipping_address === 'string' ? JSON.parse(order.shipping_address) : (order.shipping_address || {})
+        const rawPhone = order.customer_phone || ship.phone || ''
+        const cleanPhone = rawPhone.replace(/\D/g, '').slice(-10)
+        if (!cleanPhone) {
+            alert('No valid phone number found for this customer.')
+            return
+        }
+        const customerName = order.customer_shop_name || ship.shopName || ship.name || `${ship.firstName || ''} ${ship.lastName || ''}`.trim() || 'Customer'
+        const orderNo = order.order_number
+        const total = order.total
+        const trackingLink = `${window.location.origin}/track/${orderNo}`
+
+        let text = ''
+        if (order.status === 'pending_verification') {
+            text = `Hello ${customerName}! Thank you for placing Order #${orderNo} (Amount: ₹${total}) on Smiley N Traders. We have received your order details and are verifying your payment. We will notify you once dispatched!`
+        } else if (order.status === 'dispatched') {
+            text = `Hello ${customerName}! Good news! Your order #${orderNo} has been dispatched via ${order.courier_name || 'Courier'}.\n\n📦 *Tracking / Consignment No:* ${order.tracking_number}\n🔗 *Live Tracking Link:* ${trackingLink}\n\nThank you for choosing Smiley N Traders!`
+        } else if (order.status === 'delivered') {
+            text = `Hello ${customerName}! Your order #${orderNo} has been delivered. Thank you for your business! Let us know if you need any additional keys or tools.`
+        } else {
+            text = `Hello ${customerName}! Your order #${orderNo} is confirmed and currently being packed for dispatch. Track here: ${trackingLink}`
+        }
+
+        window.open(`https://wa.me/91${cleanPhone}?text=${encodeURIComponent(text)}`, '_blank')
     }
 
     if (!isAuthenticated) {
@@ -800,7 +1048,7 @@ export default function AdminPage() {
                     <i className="bi bi-grid-3x3-gap-fill" /> Collections
                 </button>
                 <button className={`admin-tab ${tab === 'bulk' ? 'active' : ''}`} onClick={() => setTab('bulk')}>
-                    <i className="bi bi-check2-square" /> Bulk Subcategory Editor
+                    <i className="bi bi-check2-square" /> Bulk Category & Subcategory Editor
                 </button>
                 <button className={`admin-tab ${tab === 'orders' ? 'active' : ''}`} onClick={() => setTab('orders')}>
                     <i className="bi bi-receipt" /> Orders
@@ -869,19 +1117,34 @@ export default function AdminPage() {
                                         </button>
                                         {selectedProductIds.size === 0 && (
                                             <span style={{ fontSize: '0.82rem', color: '#6B7280' }}>
-                                                Check product boxes below to reassign subcategories in bulk.
+                                                Check product boxes below to reassign categories or subcategories in bulk.
                                             </span>
                                         )}
                                     </div>
 
                                     {selectedProductIds.size > 0 && (
                                         <div className="bulk-actions-controls">
-                                            <span style={{ fontSize: '0.85rem', color: '#CBD5E1' }}>Change Subcategory to:</span>
+                                            <span style={{ fontSize: '0.85rem', color: '#CBD5E1', fontWeight: 600 }}>Category:</span>
+                                            <input
+                                                type="text"
+                                                list="bulk-categories-list-main"
+                                                className="bulk-subcat-input"
+                                                placeholder="Assign Category..."
+                                                value={bulkCategoryInput}
+                                                onChange={e => setBulkCategoryInput(e.target.value)}
+                                            />
+                                            <datalist id="bulk-categories-list-main">
+                                                {allUniqueCategories.map(cat => (
+                                                    <option key={cat} value={cat} />
+                                                ))}
+                                            </datalist>
+
+                                            <span style={{ fontSize: '0.85rem', color: '#CBD5E1', fontWeight: 600 }}>Subcategory:</span>
                                             <input
                                                 type="text"
                                                 list="bulk-subcategories-list-main"
                                                 className="bulk-subcat-input"
-                                                placeholder="Choose or enter new subcategory..."
+                                                placeholder="Assign Subcategory..."
                                                 value={bulkSubcategoryInput}
                                                 onChange={e => setBulkSubcategoryInput(e.target.value)}
                                             />
@@ -894,8 +1157,8 @@ export default function AdminPage() {
                                             <button
                                                 type="button"
                                                 className="btn btn-primary btn-sm"
-                                                disabled={bulkLoading || !bulkSubcategoryInput.trim()}
-                                                onClick={handleApplyBulkSubcategory}
+                                                disabled={bulkLoading || (!bulkCategoryInput.trim() && !bulkSubcategoryInput.trim())}
+                                                onClick={handleApplyBulkChanges}
                                                 style={{ fontWeight: 700 }}
                                             >
                                                 <i className="bi bi-check2-circle" /> {bulkLoading ? 'Updating...' : `Apply to ${selectedProductIds.size} Products`}
@@ -903,7 +1166,11 @@ export default function AdminPage() {
                                             <button
                                                 type="button"
                                                 className="btn btn-outline-light btn-sm"
-                                                onClick={() => setSelectedProductIds(new Set())}
+                                                onClick={() => {
+                                                    setSelectedProductIds(new Set());
+                                                    setBulkCategoryInput('');
+                                                    setBulkSubcategoryInput('');
+                                                }}
                                             >
                                                 Clear
                                             </button>
@@ -972,7 +1239,17 @@ export default function AdminPage() {
                                                     <td>₹{p.price}</td>
                                                     <td><span className="badge badge-secondary">{p.category}</span></td>
                                                     <td>{p.subcategory ? <span className="badge badge-light" style={{ border: '1px solid #D1D5DB', fontSize: '0.75rem', fontWeight: 600 }}>{p.subcategory}</span> : <span style={{ color: '#9CA3AF' }}>-</span>}</td>
-                                                    <td>{p.in_stock ? <span className="text-success">In Stock</span> : <span className="text-danger">Out</span>}</td>
+                                                    <td>
+                                                        {Number(p.stock_quantity) > 3 ? (
+                                                            <span className="text-success" style={{ fontWeight: 600 }}>{p.stock_quantity} in stock</span>
+                                                        ) : Number(p.stock_quantity) > 0 ? (
+                                                            <span className="badge" style={{ backgroundColor: '#FEF3C7', color: '#B45309', border: '1px solid #FCD34D', fontSize: '0.75rem', fontWeight: 700, padding: '3px 8px' }}>
+                                                                Only {p.stock_quantity} left!
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-danger" style={{ fontWeight: 600 }}>Out of Stock (0)</span>
+                                                        )}
+                                                    </td>
                                                     <td>
                                                         <button className="btn btn-sm btn-outline-primary" onClick={() => openProductModal(p)} style={{ marginRight: 8 }}>
                                                             <i className="bi bi-pencil" /> Edit
@@ -1391,19 +1668,34 @@ export default function AdminPage() {
                                                 </button>
                                                 {selectedProductIds.size === 0 && (
                                                     <span style={{ fontSize: '0.82rem', color: '#6B7280' }}>
-                                                        Check product boxes below to reassign subcategories.
+                                                        Check product boxes below to reassign categories or subcategories in bulk.
                                                     </span>
                                                 )}
                                             </div>
 
                                             {selectedProductIds.size > 0 && (
                                                 <div className="bulk-actions-controls">
-                                                    <span style={{ fontSize: '0.85rem', color: '#CBD5E1' }}>Change Subcategory to:</span>
+                                                    <span style={{ fontSize: '0.85rem', color: '#CBD5E1', fontWeight: 600 }}>Category:</span>
+                                                    <input
+                                                        type="text"
+                                                        list="bulk-categories-list-coll"
+                                                        className="bulk-subcat-input"
+                                                        placeholder="Assign Category..."
+                                                        value={bulkCategoryInput}
+                                                        onChange={e => setBulkCategoryInput(e.target.value)}
+                                                    />
+                                                    <datalist id="bulk-categories-list-coll">
+                                                        {allUniqueCategories.map(cat => (
+                                                            <option key={cat} value={cat} />
+                                                        ))}
+                                                    </datalist>
+
+                                                    <span style={{ fontSize: '0.85rem', color: '#CBD5E1', fontWeight: 600 }}>Subcategory:</span>
                                                     <input
                                                         type="text"
                                                         list="bulk-subcategories-list-coll"
                                                         className="bulk-subcat-input"
-                                                        placeholder="Choose or enter new subcategory..."
+                                                        placeholder="Assign Subcategory..."
                                                         value={bulkSubcategoryInput}
                                                         onChange={e => setBulkSubcategoryInput(e.target.value)}
                                                     />
@@ -1416,8 +1708,8 @@ export default function AdminPage() {
                                                     <button
                                                         type="button"
                                                         className="btn btn-primary btn-sm"
-                                                        disabled={bulkLoading || !bulkSubcategoryInput.trim()}
-                                                        onClick={handleApplyBulkSubcategory}
+                                                        disabled={bulkLoading || (!bulkCategoryInput.trim() && !bulkSubcategoryInput.trim())}
+                                                        onClick={handleApplyBulkChanges}
                                                         style={{ fontWeight: 700 }}
                                                     >
                                                         <i className="bi bi-check2-circle" /> {bulkLoading ? 'Updating...' : `Apply to ${selectedProductIds.size} Products`}
@@ -1425,7 +1717,11 @@ export default function AdminPage() {
                                                     <button
                                                         type="button"
                                                         className="btn btn-outline-light btn-sm"
-                                                        onClick={() => setSelectedProductIds(new Set())}
+                                                        onClick={() => {
+                                                            setSelectedProductIds(new Set());
+                                                            setBulkCategoryInput('');
+                                                            setBulkSubcategoryInput('');
+                                                        }}
                                                     >
                                                         Clear
                                                     </button>
@@ -1505,7 +1801,17 @@ export default function AdminPage() {
                                                                         {p.subcategory || selectedCollectionSubcategory}
                                                                     </span>
                                                                 </td>
-                                                                <td>{p.in_stock ? <span className="text-success">In Stock</span> : <span className="text-danger">Out</span>}</td>
+                                                                <td>
+                                                                    {Number(p.stock_quantity) > 3 ? (
+                                                                        <span className="text-success" style={{ fontWeight: 600 }}>{p.stock_quantity} in stock</span>
+                                                                    ) : Number(p.stock_quantity) > 0 ? (
+                                                                        <span className="badge" style={{ backgroundColor: '#FEF3C7', color: '#B45309', border: '1px solid #FCD34D', fontSize: '0.75rem', fontWeight: 700, padding: '3px 8px' }}>
+                                                                            Only {p.stock_quantity} left!
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span className="text-danger" style={{ fontWeight: 600 }}>Out of Stock (0)</span>
+                                                                    )}
+                                                                </td>
                                                                 <td>
                                                                     <button className="btn btn-sm btn-outline-primary" onClick={() => openProductModal(p)} style={{ marginRight: 8 }}>
                                                                         <i className="bi bi-pencil" /> Edit
@@ -1525,17 +1831,17 @@ export default function AdminPage() {
                             </div>
                         )}
 
-                        {/* ── BULK SUBCATEGORY EDITOR TAB ── */}
+                        {/* ── BULK CATEGORY & SUBCATEGORY EDITOR TAB ── */}
                         {tab === 'bulk' && (
                             <div className="admin-panel">
                                 <div className="admin-panel__header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
                                     <div>
                                         <h2 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
                                             <i className="bi bi-check2-square" style={{ color: 'var(--primary-color)' }} />
-                                            Bulk Subcategory Editor
+                                            Bulk Category & Subcategory Editor
                                         </h2>
                                         <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#6B7280' }}>
-                                            Select multiple products across any category and reassign their subcategory in a single click.
+                                            Select multiple products across any category and reassign their Category and/or Subcategory in a single click.
                                         </p>
                                     </div>
                                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -1638,13 +1944,31 @@ export default function AdminPage() {
 
                                     <div className="bulk-actions-controls">
                                         <span style={{ fontSize: '0.85rem', color: selectedProductIds.size > 0 ? '#CBD5E1' : '#475569', fontWeight: 600 }}>
-                                            Target Subcategory:
+                                            Category:
+                                        </span>
+                                        <input
+                                            type="text"
+                                            list="bulk-tab-cats"
+                                            className="bulk-subcat-input"
+                                            placeholder="Assign Category..."
+                                            value={bulkCategoryInput}
+                                            onChange={e => setBulkCategoryInput(e.target.value)}
+                                            style={selectedProductIds.size === 0 ? { background: '#F8FAFC', color: '#1E293B', border: '1px solid #CBD5E1' } : {}}
+                                        />
+                                        <datalist id="bulk-tab-cats">
+                                            {allUniqueCategories.map(cat => (
+                                                <option key={cat} value={cat} />
+                                            ))}
+                                        </datalist>
+
+                                        <span style={{ fontSize: '0.85rem', color: selectedProductIds.size > 0 ? '#CBD5E1' : '#475569', fontWeight: 600 }}>
+                                            Subcategory:
                                         </span>
                                         <input
                                             type="text"
                                             list="bulk-tab-subcats"
                                             className="bulk-subcat-input"
-                                            placeholder="Choose or enter new subcategory..."
+                                            placeholder="Assign Subcategory..."
                                             value={bulkSubcategoryInput}
                                             onChange={e => setBulkSubcategoryInput(e.target.value)}
                                             style={selectedProductIds.size === 0 ? { background: '#F8FAFC', color: '#1E293B', border: '1px solid #CBD5E1' } : {}}
@@ -1658,8 +1982,8 @@ export default function AdminPage() {
                                         <button
                                             type="button"
                                             className="btn btn-primary btn-sm"
-                                            disabled={bulkLoading || selectedProductIds.size === 0 || !bulkSubcategoryInput.trim()}
-                                            onClick={handleApplyBulkSubcategory}
+                                            disabled={bulkLoading || selectedProductIds.size === 0 || (!bulkCategoryInput.trim() && !bulkSubcategoryInput.trim())}
+                                            onClick={handleApplyBulkChanges}
                                             style={{ fontWeight: 700 }}
                                         >
                                             <i className="bi bi-arrow-repeat" /> {bulkLoading ? 'Updating...' : `Assign to ${selectedProductIds.size} Selected`}
@@ -1669,7 +1993,11 @@ export default function AdminPage() {
                                             <button
                                                 type="button"
                                                 className="btn btn-outline-light btn-sm"
-                                                onClick={() => setSelectedProductIds(new Set())}
+                                                onClick={() => {
+                                                    setSelectedProductIds(new Set());
+                                                    setBulkCategoryInput('');
+                                                    setBulkSubcategoryInput('');
+                                                }}
                                             >
                                                 Clear
                                             </button>
@@ -1762,7 +2090,17 @@ export default function AdminPage() {
                                                         </td>
                                                         <td>₹{p.price}</td>
                                                         <td>{p.brand || '-'}</td>
-                                                        <td>{p.in_stock ? <span className="text-success">In Stock</span> : <span className="text-danger">Out</span>}</td>
+                                                        <td>
+                                                            {Number(p.stock_quantity) > 3 ? (
+                                                                <span className="text-success" style={{ fontWeight: 600 }}>{p.stock_quantity} in stock</span>
+                                                            ) : Number(p.stock_quantity) > 0 ? (
+                                                                <span className="badge" style={{ backgroundColor: '#FEF3C7', color: '#B45309', border: '1px solid #FCD34D', fontSize: '0.75rem', fontWeight: 700, padding: '3px 8px' }}>
+                                                                    Only {p.stock_quantity} left!
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-danger" style={{ fontWeight: 600 }}>Out of Stock (0)</span>
+                                                            )}
+                                                        </td>
                                                         <td>
                                                             <button className="btn btn-sm btn-outline-primary" onClick={() => openProductModal(p)} style={{ marginRight: 8 }}>
                                                                 <i className="bi bi-pencil" /> Edit
@@ -1778,47 +2116,311 @@ export default function AdminPage() {
                         )}
 
                         {/* ── ORDERS TAB ── */}
-                        {tab === 'orders' && (
-                            <div className="admin-panel">
-                                <div className="admin-panel__header">
-                                    <h2>Customer Orders</h2>
-                                </div>
-                                <div className="table-responsive">
-                                    <table className="admin-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Order Number</th>
-                                                <th>Customer</th>
-                                                <th>Total</th>
-                                                <th>Status</th>
-                                                <th>Date</th>
-                                                <th>Actions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {orders.map(o => {
-                                                const shipping = o.shipping_address || {};
-                                                const customerName = shipping.firstName ? `${shipping.firstName} ${shipping.lastName}` : 'Guest';
-                                                return (
-                                                    <tr key={o.id}>
-                                                        <td><strong>{o.order_number}</strong></td>
-                                                        <td>{customerName}</td>
-                                                        <td>₹{o.total}</td>
-                                                        <td><span className={`badge badge-${o.status === 'delivered' ? 'success' : o.status === 'processing' ? 'warning' : o.status === 'shipped' ? 'info' : 'primary'}`}>{o.status}</span></td>
-                                                        <td>{new Date(o.created_at).toLocaleDateString()}</td>
-                                                        <td>
-                                                            <button className="btn btn-sm btn-primary" onClick={() => openOrderModal(o.id)}>
-                                                                <i className="bi bi-gear" /> Manage Order
-                                                            </button>
+                        {tab === 'orders' && (() => {
+                            const unexportedOrders = orders.filter(o => !o.is_exported_to_vyapar);
+                            const pendingOrders = orders.filter(o => o.status === 'pending_verification' || o.status === 'pending');
+                            const readyOrders = orders.filter(o => o.status === 'processing' || o.status === 'confirmed');
+                            const dispatchedOrders = orders.filter(o => o.status === 'dispatched');
+
+                            const displayedOrders = orders.filter(o => {
+                                if (orderFilter === 'pending' && o.status !== 'pending_verification' && o.status !== 'pending') return false;
+                                if (orderFilter === 'ready' && o.status !== 'processing' && o.status !== 'confirmed') return false;
+                                if (orderFilter === 'dispatched' && o.status !== 'dispatched') return false;
+                                if (orderFilter === 'delivered' && o.status !== 'delivered') return false;
+                                if (orderFilter === 'unexported' && o.is_exported_to_vyapar) return false;
+
+                                if (orderSearchQuery.trim()) {
+                                    const q = orderSearchQuery.toLowerCase().trim();
+                                    const ship = typeof o.shipping_address === 'string' ? JSON.parse(o.shipping_address) : (o.shipping_address || {});
+                                    const str = `${o.order_number || ''} ${o.customer_phone || ''} ${ship.phone || ''} ${o.customer_shop_name || ''} ${ship.shopName || ''} ${ship.firstName || ''} ${ship.lastName || ''} ${o.tracking_number || ''} ${o.utr_number || ''}`.toLowerCase();
+                                    if (!str.includes(q)) return false;
+                                }
+                                return true;
+                            });
+
+                            return (
+                                <div className="admin-panel" id="admin-orders-panel">
+                                    {/* Panel Header & Vyapar Export Toolbar */}
+                                    <div className="admin-panel__header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px', marginBottom: '20px' }}>
+                                        <div>
+                                            <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                <i className="bi bi-box-seam-fill" style={{ color: '#D97706' }} />
+                                                Customer Orders ({orders.length})
+                                            </h2>
+                                            <p style={{ margin: '4px 0 0', color: '#6B7280', fontSize: '0.875rem' }}>
+                                                Manage verification, DTDC / Shree Maruti shipping labels, and 1-click Vyapar app export.
+                                            </p>
+                                        </div>
+
+                                        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                            <button 
+                                                type="button" 
+                                                className="btn btn-outline-secondary btn-sm"
+                                                onClick={loadOrders}
+                                                disabled={loading}
+                                                title="Refresh orders from database"
+                                            >
+                                                <i className="bi bi-arrow-clockwise" /> Refresh
+                                            </button>
+
+                                            <button 
+                                                type="button" 
+                                                className="btn btn-sm"
+                                                style={{ background: '#059669', color: '#FFFFFF', fontWeight: 700, padding: '8px 16px', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+                                                onClick={() => handleExportToVyapar()}
+                                                disabled={exportingVyapar || unexportedOrders.length === 0}
+                                                title="Generate Excel/CSV file formatted specifically for Vyapar Sales Invoice import"
+                                            >
+                                                {exportingVyapar ? (
+                                                    <>
+                                                        <span className="spinner-border spinner-border-sm" />
+                                                        Exporting...
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <i className="bi bi-file-earmark-spreadsheet-fill" />
+                                                        Export to Vyapar ({unexportedOrders.length} New)
+                                                    </>
+                                                )}
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Search & Filter Bar */}
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', background: '#F9FAFB', padding: '14px', borderRadius: '10px', border: '1px solid #E5E7EB', marginBottom: '18px' }}>
+                                        {/* Status Filter Pills */}
+                                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                            {[
+                                                { id: 'all', label: `All (${orders.length})` },
+                                                { id: 'pending', label: `⏳ Pending Payment (${pendingOrders.length})` },
+                                                { id: 'ready', label: `⚙️ Ready to Dispatch (${readyOrders.length})` },
+                                                { id: 'dispatched', label: `🚚 Dispatched (${dispatchedOrders.length})` },
+                                                { id: 'unexported', label: `📥 Vyapar Unexported (${unexportedOrders.length})` }
+                                            ].map(filter => (
+                                                <button
+                                                    key={filter.id}
+                                                    type="button"
+                                                    onClick={() => setOrderFilter(filter.id)}
+                                                    style={{
+                                                        padding: '5px 12px',
+                                                        borderRadius: '999px',
+                                                        border: orderFilter === filter.id ? '2px solid #D97706' : '1px solid #D1D5DB',
+                                                        background: orderFilter === filter.id ? '#FEF3C7' : '#FFFFFF',
+                                                        color: orderFilter === filter.id ? '#92400E' : '#374151',
+                                                        fontWeight: orderFilter === filter.id ? 800 : 500,
+                                                        fontSize: '0.8125rem',
+                                                        cursor: 'pointer'
+                                                    }}
+                                                >
+                                                    {filter.label}
+                                                </button>
+                                            ))}
+                                        </div>
+
+                                        {/* Search Input */}
+                                        <div style={{ minWidth: '260px' }}>
+                                            <input 
+                                                type="text"
+                                                className="form-control form-control-sm"
+                                                placeholder="Search Order #, phone, shop, UTR..."
+                                                value={orderSearchQuery}
+                                                onChange={(e) => setOrderSearchQuery(e.target.value)}
+                                                style={{ borderRadius: '6px' }}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Orders Table */}
+                                    <div className="table-responsive">
+                                        <table className="admin-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Order Number</th>
+                                                    <th>Customer & Phone</th>
+                                                    <th>Total</th>
+                                                    <th>Payment & UTR</th>
+                                                    <th>Shipping & Courier</th>
+                                                    <th>Vyapar Sync</th>
+                                                    <th>Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {displayedOrders.length === 0 ? (
+                                                    <tr>
+                                                        <td colSpan="7" style={{ textAlign: 'center', padding: '36px', color: '#9CA3AF' }}>
+                                                            <i className="bi bi-inbox" style={{ fontSize: '2rem', display: 'block', marginBottom: '8px' }} />
+                                                            No orders found matching the filter.
                                                         </td>
                                                     </tr>
-                                                );
-                                            })}
-                                        </tbody>
-                                    </table>
+                                                ) : (
+                                                    displayedOrders.map(o => {
+                                                        const shipping = typeof o.shipping_address === 'string' ? JSON.parse(o.shipping_address) : (o.shipping_address || {});
+                                                        const customerName = o.customer_shop_name || shipping.shopName || shipping.name || `${shipping.firstName || ''} ${shipping.lastName || ''}`.trim() || 'Guest';
+                                                        const customerPhone = o.customer_phone || shipping.phone || '';
+                                                        const customerCity = o.customer_city || shipping.city || '';
+
+                                                        return (
+                                                            <tr key={o.id}>
+                                                                {/* Order Number & Date */}
+                                                                <td>
+                                                                    <strong style={{ fontFamily: 'monospace', color: '#111827', fontSize: '0.9375rem' }}>
+                                                                        {o.order_number}
+                                                                    </strong>
+                                                                    <div style={{ fontSize: '0.75rem', color: '#9CA3AF', marginTop: '2px' }}>
+                                                                        {new Date(o.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                                                    </div>
+                                                                </td>
+
+                                                                {/* Customer Details */}
+                                                                <td>
+                                                                    <div style={{ fontWeight: 700, color: '#1F2937' }}>
+                                                                        {customerName}
+                                                                    </div>
+                                                                    {customerPhone && (
+                                                                        <div style={{ fontSize: '0.8125rem', color: '#4B5563' }}>
+                                                                            <i className="bi bi-telephone-fill" style={{ fontSize: '0.75rem', marginRight: '4px', color: '#D97706' }} />
+                                                                            +91 {customerPhone}
+                                                                        </div>
+                                                                    )}
+                                                                    {customerCity && (
+                                                                        <div style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>
+                                                                            {customerCity}
+                                                                        </div>
+                                                                    )}
+                                                                </td>
+
+                                                                {/* Total */}
+                                                                <td>
+                                                                    <strong style={{ color: '#B45309', fontSize: '0.95rem' }}>
+                                                                        ₹{o.total}
+                                                                    </strong>
+                                                                    <div style={{ fontSize: '0.75rem', color: '#6B7280' }}>
+                                                                        {o.payment_method || 'UPI'}
+                                                                    </div>
+                                                                </td>
+
+                                                                {/* Payment & Status */}
+                                                                <td>
+                                                                    {(o.status === 'pending_verification' || o.status === 'pending') ? (
+                                                                        <div>
+                                                                            <span style={{ background: '#FEF3C7', color: '#92400E', fontSize: '0.75rem', fontWeight: 800, padding: '2px 8px', borderRadius: '4px', display: 'inline-block', marginBottom: '4px' }}>
+                                                                                ⏳ Pending Verification
+                                                                            </span>
+                                                                            {o.utr_number && (
+                                                                                <div style={{ fontSize: '0.75rem', color: '#1F2937' }}>
+                                                                                    UTR: <code>{o.utr_number}</code>
+                                                                                </div>
+                                                                            )}
+                                                                            <button 
+                                                                                type="button" 
+                                                                                className="btn btn-sm"
+                                                                                style={{ background: '#059669', color: '#FFFFFF', padding: '3px 8px', fontSize: '0.75rem', fontWeight: 700, borderRadius: '4px', marginTop: '4px', display: 'block' }}
+                                                                                onClick={() => handleApprovePayment(o.id)}
+                                                                            >
+                                                                                <i className="bi bi-check-lg" /> Approve
+                                                                            </button>
+                                                                        </div>
+                                                                    ) : (
+                                                                        <div>
+                                                                            <span style={{ background: '#E0F2FE', color: '#0369A1', fontSize: '0.75rem', fontWeight: 700, padding: '2px 8px', borderRadius: '4px', display: 'inline-block' }}>
+                                                                                ✓ {o.status?.toUpperCase()}
+                                                                            </span>
+                                                                            {o.utr_number && (
+                                                                                <div style={{ fontSize: '0.72rem', color: '#6B7280', marginTop: '2px' }}>
+                                                                                    UTR: {o.utr_number}
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    )}
+                                                                </td>
+
+                                                                {/* Shipping & Courier */}
+                                                                <td>
+                                                                    {o.tracking_number ? (
+                                                                        <div>
+                                                                            <span style={{ background: '#FFFBEB', border: '1px solid #FCD34D', color: '#78350F', fontSize: '0.75rem', fontWeight: 800, padding: '2px 6px', borderRadius: '4px' }}>
+                                                                                {o.courier_name || 'Courier'}
+                                                                            </span>
+                                                                            <div style={{ fontSize: '0.8125rem', fontFamily: 'monospace', fontWeight: 700, color: '#111827', marginTop: '3px' }}>
+                                                                                {o.tracking_number}
+                                                                            </div>
+                                                                            {o.status === 'dispatched' && (
+                                                                                <button 
+                                                                                    type="button"
+                                                                                    className="btn btn-link btn-sm"
+                                                                                    style={{ padding: 0, fontSize: '0.75rem', color: '#059669', fontWeight: 700, textDecoration: 'none', display: 'block', marginTop: '2px' }}
+                                                                                    onClick={() => handleMarkDelivered(o.id)}
+                                                                                >
+                                                                                    ✓ Mark Delivered
+                                                                                </button>
+                                                                            )}
+                                                                        </div>
+                                                                    ) : (
+                                                                        <button 
+                                                                            type="button" 
+                                                                            className="btn btn-sm btn-outline-warning"
+                                                                            style={{ padding: '3px 8px', fontSize: '0.75rem', fontWeight: 700 }}
+                                                                            onClick={() => openDispatchModal(o)}
+                                                                        >
+                                                                            <i className="bi bi-truck" /> Dispatch
+                                                                        </button>
+                                                                    )}
+                                                                </td>
+
+                                                                {/* Vyapar Sync */}
+                                                                <td>
+                                                                    {o.is_exported_to_vyapar ? (
+                                                                        <span style={{ background: '#D1FAE5', color: '#065F46', fontSize: '0.75rem', fontWeight: 700, padding: '2px 8px', borderRadius: '4px' }}>
+                                                                            ✓ Exported
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span style={{ background: '#F3F4F6', color: '#6B7280', fontSize: '0.75rem', fontWeight: 600, padding: '2px 8px', borderRadius: '4px' }}>
+                                                                            Unexported
+                                                                        </span>
+                                                                    )}
+                                                                </td>
+
+                                                                {/* Actions */}
+                                                                <td>
+                                                                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                                                        <button 
+                                                                            type="button"
+                                                                            className="btn btn-sm"
+                                                                            style={{ background: '#25D366', color: '#FFFFFF', padding: '4px 8px', fontSize: '0.8125rem', borderRadius: '4px' }}
+                                                                            onClick={() => handleWhatsAppOrder(o)}
+                                                                            title="Send WhatsApp update to customer"
+                                                                        >
+                                                                            <i className="bi bi-whatsapp" />
+                                                                        </button>
+                                                                        <button 
+                                                                            type="button"
+                                                                            className="btn btn-sm btn-outline-dark" 
+                                                                            onClick={() => openPrintLabelModal(o)}
+                                                                            style={{ padding: '4px 8px', fontSize: '0.8125rem' }}
+                                                                            title="Print Courier Shipping Label (TO & FROM)"
+                                                                        >
+                                                                            <i className="bi bi-printer" /> Label
+                                                                        </button>
+                                                                        <button 
+                                                                            type="button"
+                                                                            className="btn btn-sm btn-primary" 
+                                                                            onClick={() => openOrderModal(o.id)}
+                                                                            style={{ padding: '4px 8px', fontSize: '0.8125rem' }}
+                                                                        >
+                                                                            <i className="bi bi-gear" /> Manage
+                                                                        </button>
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
-                            </div>
-                        )}
+                            );
+                        })()}
 
 
                     </>
@@ -2235,9 +2837,50 @@ export default function AdminPage() {
                                     <input type="number" className="form-control" placeholder="e.g. 15" value={productForm.buy3Discount || ''} onChange={e => setProductForm({ ...productForm, buy3Discount: Number(e.target.value) })} />
                                 </div>
                             </div>
-                            <div className="form-check" style={{ marginBottom: 20 }}>
-                                <input type="checkbox" id="stockCheck" className="form-check-input" checked={productForm.in_stock || false} onChange={e => setProductForm({ ...productForm, in_stock: e.target.checked })} />
-                                <label htmlFor="stockCheck" className="form-check-label">In Stock</label>
+                            <div style={{ display: 'flex', gap: '20px', alignItems: 'center', backgroundColor: '#F8FAFC', padding: '16px', borderRadius: '10px', border: '1px solid #E2E8F0', marginBottom: 20 }}>
+                                <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
+                                    <label htmlFor="stockQtyInput" style={{ fontWeight: 700, marginBottom: '6px', color: '#1E293B', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <i className="bi bi-boxes" style={{ color: 'var(--cta)' }} /> Stock Quantity
+                                    </label>
+                                    <input 
+                                        type="number" 
+                                        id="stockQtyInput"
+                                        min="0"
+                                        className="form-control" 
+                                        placeholder="e.g. 5" 
+                                        value={productForm.stock_quantity !== undefined && productForm.stock_quantity !== null ? productForm.stock_quantity : ''} 
+                                        onChange={e => {
+                                            const val = e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0);
+                                            setProductForm({ 
+                                                ...productForm, 
+                                                stock_quantity: val,
+                                                in_stock: val === '' ? true : val > 0 
+                                            });
+                                        }} 
+                                    />
+                                    <span style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '4px', display: 'block' }}>
+                                        Set to 0 to mark as Out of Stock.
+                                    </span>
+                                </div>
+                                <div className="form-check" style={{ paddingTop: '10px', marginBottom: 0 }}>
+                                    <input 
+                                        type="checkbox" 
+                                        id="stockCheck" 
+                                        className="form-check-input" 
+                                        checked={Boolean(productForm.in_stock)} 
+                                        onChange={e => {
+                                            const checked = e.target.checked;
+                                            setProductForm({ 
+                                                ...productForm, 
+                                                in_stock: checked,
+                                                stock_quantity: checked ? (productForm.stock_quantity > 0 ? productForm.stock_quantity : 5) : 0
+                                            });
+                                        }} 
+                                    />
+                                    <label htmlFor="stockCheck" className="form-check-label" style={{ fontWeight: 700, color: productForm.in_stock ? '#059669' : '#DC2626' }}>
+                                        {productForm.in_stock ? 'In Stock' : 'Out of Stock'}
+                                    </label>
+                                </div>
                             </div>
                             <button type="submit" className="btn btn-primary btn-full">Save Product</button>
                         </form>
@@ -2263,23 +2906,95 @@ export default function AdminPage() {
                                 <div style={{ marginBottom: 20, backgroundColor: '#f8fafc', padding: 15, borderRadius: 8, fontSize: '0.9rem' }}>
                                     <h5 style={{ marginTop: 0, marginBottom: 15, borderBottom: '1px solid #ddd', paddingBottom: 5 }}>Order Overview</h5>
 
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 15 }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 15, flexWrap: 'wrap', gap: '10px' }}>
                                         <div>
-                                            <p style={{ margin: '0 0 5px 0' }}><strong>Customer:</strong> {selectedOrder.shipping_address?.firstName} {selectedOrder.shipping_address?.lastName} ({selectedOrder.shipping_address?.phone || 'No Phone'})</p>
-                                            <p style={{ margin: '0 0 5px 0' }}><strong>Payment:</strong> {selectedOrder.payment_method?.toUpperCase()}
-                                                <span className={`badge badge-${selectedOrder.payment_status === 'paid' ? 'success' : 'warning'}`} style={{ marginLeft: 6 }}>
-                                                    {selectedOrder.payment_status}
-                                                </span>
-                                            </p>
-                                            <p style={{ margin: '0 0 5px 0' }}><strong>UTR/Transaction ID:</strong> <code>{selectedOrder.payment_id || selectedOrder.razorpay_id || 'N/A'}</code></p>
-                                            <p style={{ margin: 0 }}><strong>Date:</strong> {new Date(selectedOrder.created_at).toLocaleString()}</p>
+                                            {(() => {
+                                                const ship = typeof selectedOrder.shipping_address === 'string' ? JSON.parse(selectedOrder.shipping_address) : (selectedOrder.shipping_address || {});
+                                                const custName = selectedOrder.customer_shop_name || ship.shopName || ship.name || `${ship.firstName || ''} ${ship.lastName || ''}`.trim();
+                                                const custPhone = selectedOrder.customer_phone || ship.phone || '';
+                                                return (
+                                                    <>
+                                                        <p style={{ margin: '0 0 5px 0' }}><strong>Customer:</strong> {custName} {custPhone ? `(+91 ${custPhone})` : ''}</p>
+                                                        <p style={{ margin: '0 0 5px 0' }}><strong>Payment:</strong> {selectedOrder.payment_method?.toUpperCase()}
+                                                            <span style={{ 
+                                                                marginLeft: 6, 
+                                                                background: selectedOrder.status === 'pending_verification' ? '#FEF3C7' : '#DCFCE7',
+                                                                color: selectedOrder.status === 'pending_verification' ? '#92400E' : '#15803D',
+                                                                padding: '2px 8px',
+                                                                borderRadius: '4px',
+                                                                fontSize: '0.75rem',
+                                                                fontWeight: 700
+                                                            }}>
+                                                                {selectedOrder.status === 'pending_verification' ? 'Pending Verification' : 'Verified / Confirmed'}
+                                                            </span>
+                                                        </p>
+                                                        <p style={{ margin: '0 0 5px 0' }}><strong>UTR / Ref Number:</strong> <code>{selectedOrder.utr_number || selectedOrder.payment_id || 'N/A'}</code></p>
+                                                        {selectedOrder.tracking_number && (
+                                                            <p style={{ margin: '0 0 5px 0' }}>
+                                                                <strong>Courier:</strong> <span style={{ color: '#92400E', fontWeight: 700 }}>{selectedOrder.courier_name || 'Courier'}</span> ({selectedOrder.tracking_number})
+                                                            </p>
+                                                        )}
+                                                        <p style={{ margin: 0 }}><strong>Date:</strong> {new Date(selectedOrder.created_at).toLocaleString()}</p>
+                                                    </>
+                                                );
+                                            })()}
                                         </div>
                                         <div style={{ textAlign: 'right' }}>
                                             <p style={{ margin: '0 0 5px 0' }}>Subtotal: ₹{selectedOrder.subtotal}</p>
                                             {selectedOrder.discount > 0 && <p style={{ margin: '0 0 5px 0', color: 'green' }}>Discount: -₹{selectedOrder.discount}</p>}
                                             <p style={{ margin: '0 0 5px 0' }}>Delivery: {selectedOrder.delivery_fee ? `₹${selectedOrder.delivery_fee}` : 'Free'}</p>
-                                            <p style={{ margin: 0, fontWeight: 'bold', fontSize: '1.1rem' }}>Total: ₹{selectedOrder.total}</p>
+                                            <p style={{ margin: 0, fontWeight: 'bold', fontSize: '1.2rem', color: '#B45309' }}>Total: ₹{selectedOrder.total}</p>
                                         </div>
+                                    </div>
+
+                                    {/* Action Shortcuts */}
+                                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', paddingTop: '10px', borderTop: '1px solid #E2E8F0', marginTop: '10px' }}>
+                                        {selectedOrder.status === 'pending_verification' && (
+                                            <button 
+                                                type="button" 
+                                                className="btn btn-sm"
+                                                style={{ background: '#059669', color: '#FFFFFF', fontWeight: 700 }}
+                                                onClick={() => handleApprovePayment(selectedOrder.id)}
+                                            >
+                                                <i className="bi bi-check-lg" /> Approve Payment
+                                            </button>
+                                        )}
+
+                                        <button 
+                                            type="button" 
+                                            className="btn btn-sm btn-outline-warning"
+                                            style={{ fontWeight: 700 }}
+                                            onClick={() => openDispatchModal(selectedOrder)}
+                                        >
+                                            <i className="bi bi-truck" /> {selectedOrder.tracking_number ? 'Update Courier Tracking' : 'Dispatch via Courier'}
+                                        </button>
+
+                                        <button 
+                                            type="button" 
+                                            className="btn btn-sm"
+                                            style={{ background: '#25D366', color: '#FFFFFF', fontWeight: 700 }}
+                                            onClick={() => handleWhatsAppOrder(selectedOrder)}
+                                        >
+                                            <i className="bi bi-whatsapp" /> WhatsApp Customer
+                                        </button>
+
+                                        <button 
+                                            type="button" 
+                                            className="btn btn-sm btn-outline-dark"
+                                            style={{ fontWeight: 700 }}
+                                            onClick={() => openPrintLabelModal(selectedOrder)}
+                                        >
+                                            <i className="bi bi-printer-fill" /> Print Shipping Label
+                                        </button>
+
+                                        <a 
+                                            href={`/track/${selectedOrder.order_number}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="btn btn-sm btn-outline-secondary"
+                                        >
+                                            <i className="bi bi-box-arrow-up-right" /> Customer Tracking Page
+                                        </a>
                                     </div>
 
                                     {/* Handle relation vs jsonb shipping details based on what exists */}
@@ -2375,6 +3090,272 @@ export default function AdminPage() {
                                     </button>
                                 </form>
                             </div>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
+
+            {/* ── QUICK COURIER DISPATCH MODAL ── */}
+            {dispatchModalOrder && createPortal(
+                <div 
+                    className="admin-modal-overlay" 
+                    onClick={(e) => { if (e.target === e.currentTarget) setDispatchModalOrder(null) }}
+                >
+                    <div className="admin-modal" style={{ maxWidth: '520px' }} onClick={(e) => e.stopPropagation()}>
+                        <div className="admin-modal__head">
+                            <h3>
+                                <i className="bi bi-truck" style={{ color: '#D97706', marginRight: '8px' }} />
+                                Dispatch: {dispatchModalOrder.order_number}
+                            </h3>
+                            <button className="close-btn" onClick={() => setDispatchModalOrder(null)}>
+                                <i className="bi bi-x-lg" />
+                            </button>
+                        </div>
+                        <form className="admin-modal__body" onSubmit={handleSaveDispatch}>
+                            {(() => {
+                                const ship = typeof dispatchModalOrder.shipping_address === 'string' ? JSON.parse(dispatchModalOrder.shipping_address) : (dispatchModalOrder.shipping_address || {});
+                                const name = dispatchModalOrder.customer_shop_name || ship.shopName || ship.name || `${ship.firstName || ''} ${ship.lastName || ''}`.trim();
+                                const phone = dispatchModalOrder.customer_phone || ship.phone || '';
+                                const addr = `${dispatchModalOrder.customer_address || ship.address || ''}, ${dispatchModalOrder.customer_city || ship.city || ''} (${dispatchModalOrder.customer_pincode || ship.pincode || ''})`.trim();
+                                return (
+                                    <div style={{ background: '#FFFBEB', padding: '14px', borderRadius: '8px', border: '1px solid #FCD34D', marginBottom: '16px' }}>
+                                        <div style={{ fontWeight: 700, color: '#92400E' }}>
+                                            Customer: {name} {phone ? `(+91 ${phone})` : ''}
+                                        </div>
+                                        <div style={{ fontSize: '0.85rem', color: '#78350F', marginTop: '4px' }}>
+                                            Deliver to: {addr}
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+
+                            <div className="form-group mb-3">
+                                <label style={{ fontWeight: 700 }}>Select Courier Partner *</label>
+                                <select 
+                                    className="form-control"
+                                    value={dispatchForm.courier_name}
+                                    onChange={(e) => setDispatchForm({ ...dispatchForm, courier_name: e.target.value })}
+                                    required
+                                >
+                                    <option value="DTDC">DTDC Courier</option>
+                                    <option value="Shree Maruti">Shree Maruti Courier</option>
+                                    <option value="Delhivery">Delhivery</option>
+                                    <option value="Other">Other Courier</option>
+                                </select>
+                            </div>
+
+                            <div className="form-group mb-3">
+                                <label style={{ fontWeight: 700 }}>Consignment / Tracking Number *</label>
+                                <input 
+                                    type="text" 
+                                    className="form-control"
+                                    placeholder="e.g. D12345678 or SMC98765432"
+                                    value={dispatchForm.tracking_number}
+                                    onChange={(e) => setDispatchForm({ ...dispatchForm, tracking_number: e.target.value })}
+                                    required
+                                    autoFocus
+                                    style={{ fontSize: '1.05rem', fontWeight: 700, letterSpacing: '0.5px' }}
+                                />
+                                <small className="form-text text-muted" style={{ display: 'block', marginTop: '4px' }}>
+                                    This tracking number will automatically generate live tracking deep-links on your website.
+                                </small>
+                            </div>
+
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' }}>
+                                <button 
+                                    type="button" 
+                                    className="btn btn-outline-secondary"
+                                    onClick={() => setDispatchModalOrder(null)}
+                                >
+                                    Cancel
+                                </button>
+                                <button 
+                                    type="submit" 
+                                    className="btn btn-primary"
+                                    style={{ background: '#D97706', borderColor: '#D97706', fontWeight: 700 }}
+                                >
+                                    <i className="bi bi-check2-circle" /> Save & Mark Dispatched
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>,
+                document.body
+            )}
+
+            {/* ── COURIER SHIPPING LABEL (TO & FROM) PRINT MODAL ── */}
+            {printLabelOrder && createPortal(
+                <div 
+                    className="admin-modal-overlay" 
+                    style={{ overflowY: 'auto', padding: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    onClick={(e) => { if (e.target === e.currentTarget) setPrintLabelOrder(null) }}
+                >
+                    <div 
+                        className="admin-modal" 
+                        style={{ 
+                            maxWidth: '560px', 
+                            width: '100%',
+                            maxHeight: '90vh', 
+                            display: 'flex', 
+                            flexDirection: 'column', 
+                            borderRadius: '16px',
+                            overflow: 'hidden',
+                            boxShadow: '0 25px 60px rgba(0,0,0,0.3)',
+                            margin: 'auto'
+                        }} 
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Pinned Modal Header */}
+                        <div className="admin-modal__head no-print" style={{ flexShrink: 0, padding: '14px 20px', background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <h3 style={{ margin: 0, fontSize: '1.15rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <i className="bi bi-printer-fill" style={{ color: '#D97706' }} />
+                                Courier Shipping Label (TO & FROM)
+                            </h3>
+                            <button className="close-btn" onClick={() => setPrintLabelOrder(null)}>
+                                <i className="bi bi-x-lg" />
+                            </button>
+                        </div>
+
+                        {/* Scrollable Modal Body */}
+                        <div className="admin-modal__body" style={{ flex: '1 1 auto', minHeight: 0, overflowY: 'auto', padding: '16px 20px', background: '#F8FAFC' }}>
+                            {/* Printable Label Box */}
+                            <div className="shipping-label-printable" id="printable-shipping-label" style={{
+                                background: '#FFFFFF',
+                                border: '2px solid #111827',
+                                borderRadius: '8px',
+                                padding: '16px',
+                                color: '#111827',
+                                fontFamily: 'Arial, sans-serif',
+                                boxShadow: '0 4px 12px rgba(0,0,0,0.06)'
+                            }}>
+                                {/* Header */}
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #111827', paddingBottom: '10px', marginBottom: '12px' }}>
+                                    <div>
+                                        <div style={{ fontSize: '1.25rem', fontWeight: 900, letterSpacing: '0.5px' }}>
+                                            SMILEY N TRADERS
+                                        </div>
+                                        <div style={{ fontSize: '0.75rem', color: '#4B5563', textTransform: 'uppercase', fontWeight: 700 }}>
+                                            Automotive Key Blanks, Flip Keys & Remotes
+                                        </div>
+                                    </div>
+                                    <div style={{ textAlign: 'right' }}>
+                                        <div style={{ background: '#111827', color: '#FFFFFF', padding: '3px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 800 }}>
+                                            {printLabelOrder.courier_name ? printLabelOrder.courier_name.toUpperCase() : 'PREPAID PARCEL'}
+                                        </div>
+                                        <div style={{ fontSize: '0.8125rem', fontWeight: 700, fontFamily: 'monospace', marginTop: '4px' }}>
+                                            {printLabelOrder.order_number}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Consignment Barcode / Tracking Number if present */}
+                                {printLabelOrder.tracking_number && (
+                                    <div style={{ background: '#F3F4F6', padding: '6px 10px', borderRadius: '6px', marginBottom: '12px', border: '1px dashed #9CA3AF', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <span style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase' }}>
+                                            {printLabelOrder.courier_name || 'Courier'} AWB / Consignment No:
+                                        </span>
+                                        <code style={{ fontSize: '1.1rem', fontWeight: 900, color: '#111827' }}>
+                                            {printLabelOrder.tracking_number}
+                                        </code>
+                                    </div>
+                                )}
+
+                                {/* TO SECTION (Large, High Contrast) */}
+                                {(() => {
+                                    const ship = typeof printLabelOrder.shipping_address === 'string' ? JSON.parse(printLabelOrder.shipping_address) : (printLabelOrder.shipping_address || {});
+                                    const recipientName = printLabelOrder.customer_shop_name || ship.shopName || ship.name || `${ship.firstName || ''} ${ship.lastName || ''}`.trim() || 'Customer';
+                                    const contactPerson = ship.firstName ? `${ship.firstName} ${ship.lastName || ''}`.trim() : '';
+                                    const phone = printLabelOrder.customer_phone || ship.phone || '';
+                                    const address = printLabelOrder.customer_address || ship.address || '';
+                                    const city = printLabelOrder.customer_city || ship.city || '';
+                                    const state = printLabelOrder.customer_state || ship.state || '';
+                                    const pincode = printLabelOrder.customer_pincode || ship.pincode || '';
+
+                                    return (
+                                        <>
+                                            <div style={{ border: '2px solid #111827', borderRadius: '6px', padding: '12px', marginBottom: '12px' }}>
+                                                <div style={{ fontSize: '0.75rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.5px', color: '#4B5563', borderBottom: '1px solid #E5E7EB', paddingBottom: '4px', marginBottom: '8px' }}>
+                                                    DELIVER TO (Consignee):
+                                                </div>
+                                                <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#000000' }}>
+                                                    {recipientName}
+                                                </div>
+                                                {contactPerson && contactPerson !== recipientName && (
+                                                    <div style={{ fontSize: '0.875rem', fontWeight: 600, color: '#374151', marginTop: '2px' }}>
+                                                        Attn: {contactPerson}
+                                                    </div>
+                                                )}
+                                                <div style={{ fontSize: '1rem', lineHeight: '1.4', marginTop: '6px', fontWeight: 600, color: '#111827' }}>
+                                                    {address}
+                                                </div>
+                                                <div style={{ fontSize: '1.15rem', fontWeight: 900, marginTop: '4px', color: '#000000' }}>
+                                                    {city ? `${city}, ` : ''}{state ? `${state} ` : ''}- {pincode}
+                                                </div>
+                                                <div style={{ marginTop: '8px', paddingTop: '6px', borderTop: '1px dashed #D1D5DB', fontSize: '1.15rem', fontWeight: 900, color: '#000000' }}>
+                                                    📞 PHONE: +91 {phone}
+                                                </div>
+                                            </div>
+
+                                            {/* FROM SECTION */}
+                                            <div style={{ border: '1px solid #6B7280', borderRadius: '6px', padding: '8px 10px', marginBottom: '12px', background: '#FAFAFA' }}>
+                                                <div style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', color: '#4B5563', marginBottom: '4px' }}>
+                                                    IF UNDELIVERED, RETURN TO (Consignor / Sender):
+                                                </div>
+                                                <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#111827' }}>
+                                                    SMILEY N TRADERS
+                                                </div>
+                                                <div style={{ fontSize: '0.8125rem', color: '#374151', lineHeight: '1.3' }}>
+                                                    Automotive Spare Parts & Key Blank Hub, India
+                                                </div>
+                                                <div style={{ fontSize: '0.875rem', fontWeight: 800, marginTop: '4px', color: '#111827' }}>
+                                                    📞 PHONE: +91 81787 68308
+                                                </div>
+                                            </div>
+                                        </>
+                                    );
+                                })()}
+
+                                {/* Footer Info & Tracking QR */}
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #111827', paddingTop: '8px' }}>
+                                    <div style={{ fontSize: '0.78rem', color: '#374151', lineHeight: 1.4 }}>
+                                        <div><strong>Total Items:</strong> {printLabelOrder.order_items?.length || 1} item(s)</div>
+                                        <div><strong>Payment Mode:</strong> {printLabelOrder.payment_method || 'Prepaid'} (₹{printLabelOrder.total})</div>
+                                        <div><strong>Date:</strong> {new Date(printLabelOrder.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+                                    </div>
+
+                                    <div style={{ textAlign: 'center' }}>
+                                        <QRCode 
+                                            value={`${window.location.origin}/track/${printLabelOrder.order_number}`}
+                                            size={54}
+                                            style={{ height: '54px', width: '54px' }}
+                                            viewBox="0 0 54 54"
+                                        />
+                                        <div style={{ fontSize: '0.625rem', color: '#6B7280', marginTop: '2px', fontWeight: 700 }}>
+                                            SCAN TO TRACK
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Pinned Action Footer */}
+                        <div className="no-print" style={{ flexShrink: 0, padding: '12px 20px', background: '#FFFFFF', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                            <button 
+                                type="button" 
+                                className="btn btn-outline-secondary" 
+                                onClick={() => setPrintLabelOrder(null)}
+                            >
+                                Close
+                            </button>
+                            <button 
+                                type="button" 
+                                className="btn btn-primary"
+                                style={{ background: '#111827', borderColor: '#111827', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+                                onClick={handlePrintShippingLabel}
+                            >
+                                <i className="bi bi-printer-fill" /> Print / Save as PDF
+                            </button>
                         </div>
                     </div>
                 </div>,

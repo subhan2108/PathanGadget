@@ -54,26 +54,41 @@ export function CartProvider({ children }) {
     }, [user])
 
     const addToCart = async (product, qty = 1) => {
+        const productStock = Number(product.stock_quantity ?? (product.in_stock !== false && product.inStock !== false ? 5 : 0))
+        const exists = cartItems.find(i => i.id === product.id)
+        const currentQtyInCart = exists ? exists.quantity : 0
+        const targetTotalQty = currentQtyInCart + qty
+
+        if (productStock <= 0) {
+            alert(`Sorry, "${product.name}" is currently out of stock.`)
+            return { success: false, message: 'Item is out of stock' }
+        }
+
+        if (targetTotalQty > productStock) {
+            alert(`Cannot order more than available stock. Only ${productStock} items in stock (${currentQtyInCart} already in your cart).`)
+            return { success: false, message: `Only ${productStock} items available in stock.` }
+        }
+
         setCartItems(prev => {
-            const exists = prev.find(i => i.id === product.id)
+            const itemExists = prev.find(i => i.id === product.id)
             let newCart;
-            if (exists) {
-                newCart = prev.map(i => i.id === product.id ? { ...i, quantity: i.quantity + qty } : i)
+            if (itemExists) {
+                newCart = prev.map(i => i.id === product.id ? { ...i, quantity: i.quantity + qty, stock_quantity: productStock } : i)
             } else {
-                newCart = [...prev, { ...product, quantity: qty }]
+                newCart = [...prev, { ...product, quantity: qty, stock_quantity: productStock }]
             }
             if (!user) localStorage.setItem('local_cart', JSON.stringify(newCart))
             return newCart
         })
 
         if (user) {
-            const exists = cartItems.find(i => i.id === product.id)
             if (exists) {
                 await updateCartQtyDB(user.id, product.id, exists.quantity + qty)
             } else {
-                await addToCartDB(user.id, { ...product, quantity: qty })
+                await addToCartDB(user.id, { ...product, quantity: qty, stock_quantity: productStock })
             }
         }
+        return { success: true }
     }
 
     const removeFromCart = async (productId) => {
@@ -87,6 +102,14 @@ export function CartProvider({ children }) {
 
     const updateQty = async (productId, qty) => {
         if (qty < 1) return removeFromCart(productId)
+
+        const item = cartItems.find(i => i.id === productId)
+        const maxStock = Number(item?.stock_quantity ?? 5)
+
+        if (qty > maxStock) {
+            alert(`Cannot order more than available stock (${maxStock} remaining).`)
+            return
+        }
 
         setCartItems(prev => {
             const newCart = prev.map(i => i.id === productId ? { ...i, quantity: qty } : i)

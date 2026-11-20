@@ -9,10 +9,6 @@ import './ProductsPage.css'
 
 /* ─── Constants ────────────────────────────────── */
 const CATEGORY_ICONS = {
-    watches: 'bi-smartwatch',
-    airpods: 'bi-earbuds',
-    headphones: 'bi-headphones',
-    smartphones: 'bi-phone',
     'Xhorse Smart Key': 'bi-key-fill',
     'xhorse smart key': 'bi-key-fill',
     'Xhorse Wireless Remote': 'bi-broadcast',
@@ -109,98 +105,7 @@ const SORT_OPTIONS = [
     { value: 'discount', label: 'Best Discount' },
 ]
 
-// Colors/Brands/Price bounds are now fetched live from Supabase via useFilterMeta()
-
-/* ─── Price Range Slider ────────────────────────── */
-function PriceRangeSlider({ min, max, value, onChange }) {
-    const [dragging, setDragging] = useState(null)
-    const trackRef = useRef(null)
-
-    const range = Math.max(1, max - min)
-    const step = Math.max(1, Math.round(range * 0.005))
-    const minGap = Math.max(5, step * 2)
-
-    const getPercent = (val) => Math.max(0, Math.min(100, ((val - min) / range) * 100))
-
-    const handleTrackClick = useCallback((e) => {
-        const rect = trackRef.current.getBoundingClientRect()
-        const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
-        const rawVal = min + pct * range
-        const val = Math.round(rawVal / step) * step
-        const diffLow = Math.abs(val - value[0])
-        const diffHigh = Math.abs(val - value[1])
-        if (diffLow < diffHigh) {
-            onChange([Math.max(min, Math.min(val, value[1] - minGap)), value[1]])
-        } else {
-            onChange([value[0], Math.min(max, Math.max(val, value[0] + minGap))])
-        }
-    }, [min, max, range, step, minGap, value, onChange])
-
-    const startDrag = (e, thumb) => {
-        e.preventDefault()
-        setDragging(thumb)
-    }
-
-    useEffect(() => {
-        if (!dragging) return
-        const onMove = (e) => {
-            const rect = trackRef.current?.getBoundingClientRect()
-            if (!rect) return
-            const clientX = e.touches ? e.touches[0].clientX : e.clientX
-            const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
-            const rawVal = min + pct * range
-            const val = Math.round(rawVal / step) * step
-            if (dragging === 'low') {
-                onChange([Math.max(min, Math.min(val, value[1] - minGap)), value[1]])
-            } else {
-                onChange([value[0], Math.min(max, Math.max(val, value[0] + minGap))])
-            }
-        }
-        const stopDrag = () => setDragging(null)
-        window.addEventListener('mousemove', onMove)
-        window.addEventListener('mouseup', stopDrag)
-        window.addEventListener('touchmove', onMove)
-        window.addEventListener('touchend', stopDrag)
-        return () => {
-            window.removeEventListener('mousemove', onMove)
-            window.removeEventListener('mouseup', stopDrag)
-            window.removeEventListener('touchmove', onMove)
-            window.removeEventListener('touchend', stopDrag)
-        }
-    }, [dragging, min, max, range, step, minGap, value, onChange])
-
-    const lowPct = getPercent(value[0])
-    const highPct = getPercent(value[1])
-
-    return (
-        <div className="price-slider">
-            <div className="price-slider__track" ref={trackRef} onClick={handleTrackClick}>
-                <div
-                    className="price-slider__fill"
-                    style={{ left: `${lowPct}%`, width: `${highPct - lowPct}%` }}
-                />
-                <button
-                    className={`price-slider__thumb ${dragging === 'low' ? 'dragging' : ''}`}
-                    style={{ left: `${lowPct}%` }}
-                    onMouseDown={(e) => startDrag(e, 'low')}
-                    onTouchStart={(e) => startDrag(e, 'low')}
-                    aria-label="Minimum price"
-                />
-                <button
-                    className={`price-slider__thumb ${dragging === 'high' ? 'dragging' : ''}`}
-                    style={{ left: `${highPct}%` }}
-                    onMouseDown={(e) => startDrag(e, 'high')}
-                    onTouchStart={(e) => startDrag(e, 'high')}
-                    aria-label="Maximum price"
-                />
-            </div>
-            <div className="price-slider__labels">
-                <span>{formatPrice(value[0])}</span>
-                <span>{formatPrice(value[1])}</span>
-            </div>
-        </div>
-    )
-}
+// Colors/Brands bounds are now fetched live from Supabase via useFilterMeta()
 
 /* ─── Main Page ─────────────────────────────────── */
 /* ── Reusable, stable Filter Sidebar Content (Defined outside to preserve scroll position on mobile) ── */
@@ -209,10 +114,6 @@ function FilterSidebarContent({
     activeFilterCount,
     resetFilters,
     setSidebarOpen,
-    MIN_PRICE,
-    MAX_PRICE,
-    priceRange,
-    onPriceChange,
     ALL_COLORS,
     selectedColors,
     onToggleColor,
@@ -222,8 +123,6 @@ function FilterSidebarContent({
     ALL_SUBCATEGORIES = [],
     selectedSubcategories = [],
     onToggleSubcategory,
-    minRating,
-    onMinRating,
     inStockOnly,
     onInStockOnly,
     filteredCount,
@@ -263,19 +162,6 @@ function FilterSidebarContent({
             </div>
 
             <div className={isDropdown ? "plp-dropdown-scrollable" : "plp-sidebar-body"}>
-                {/* Price Range */}
-                <div className="filter-section">
-                    <h4 className="filter-section__title">
-                        <i className="bi bi-currency-rupee" /> Price Range
-                    </h4>
-                    <PriceRangeSlider
-                        min={MIN_PRICE}
-                        max={MAX_PRICE}
-                        value={priceRange}
-                        onChange={onPriceChange}
-                    />
-                </div>
-
                 {/* Colors */}
                 {ALL_COLORS && ALL_COLORS.length > 0 && (
                     <div className="filter-section">
@@ -435,29 +321,6 @@ function FilterSidebarContent({
                     </div>
                 )}
 
-                {/* Min Rating */}
-                <div className="filter-section">
-                    <h4 className="filter-section__title">
-                        <i className="bi bi-star-fill" /> Minimum Rating
-                    </h4>
-                    <div className="rating-filter-list">
-                        {[4.5, 4, 3.5, 3, 0].map(r => (
-                            <button
-                                key={r}
-                                type="button"
-                                id={`rf-${r}`}
-                                className={`rating-filter-btn ${minRating === r ? 'active' : ''}`}
-                                onClick={() => onMinRating(r)}
-                            >
-                                {r === 0
-                                    ? <><i className="bi bi-grid" /> All Ratings</>
-                                    : <><i className="bi bi-star-fill" /> {r}+ Stars</>
-                                }
-                            </button>
-                        ))}
-                    </div>
-                </div>
-
                 {/* Availability */}
                 <div className="filter-section">
                     <h4 className="filter-section__title">
@@ -513,34 +376,82 @@ export default function ProductsPage() {
     const { meta, loading: metaLoading } = useFilterMeta()
     const { categories, loading: catsLoading } = useCategories()
 
-    // Price range initialises once filter metadata arrives, but we don't WAIT for it to show products
-    const [priceRange, setPriceRange] = useState([0, 200000])
-    const [priceInit, setPriceInit] = useState(false)
-    useEffect(() => {
-        if (!metaLoading && meta.maxPrice > 0 && !priceInit) {
-            setPriceRange([meta.minPrice, meta.maxPrice])
-            setPriceInit(true)
-        }
-    }, [metaLoading, meta.minPrice, meta.maxPrice, priceInit])
-
-    const MIN_PRICE = meta.minPrice || 0
-    const MAX_PRICE = meta.maxPrice || 200000
     const ALL_COLORS = meta.colors || []
-    // Stable alphabetical brand ordering so checkboxes never jump or change sequence
+
+    // Dynamic brands: filtered by activeCategory when a category is selected, or all brands
     const ALL_BRANDS = React.useMemo(() => {
+        if (activeCategory && activeCategory !== 'all' && activeCategory !== 'All') {
+            const rawCat = activeCategory.trim()
+            const lowerCat = rawCat.toLowerCase()
+            const slugCat = lowerCat.replace(/\s+/g, '-')
+            const unhyphenCat = lowerCat.replace(/-/g, ' ')
+            const singularCat = lowerCat.endsWith('s') ? lowerCat.slice(0, -1) : lowerCat
+            const pluralCat = `${lowerCat}s`
+
+            const list = 
+                meta.brandsByCategory?.[rawCat] ||
+                meta.brandsByCategory?.[lowerCat] ||
+                meta.brandsByCategory?.[slugCat] ||
+                meta.brandsByCategory?.[unhyphenCat] ||
+                meta.brandsByCategory?.[singularCat] ||
+                meta.brandsByCategory?.[pluralCat] ||
+                []
+
+            if (list.length > 0) {
+                return [...list].sort((a, b) => a.localeCompare(b))
+            }
+            if (!metaLoading && meta.brandsByCategory) {
+                return []
+            }
+        }
         const raw = meta.brands || []
         return raw.filter(b => b && b !== 'All').sort((a, b) => a.localeCompare(b))
-    }, [meta.brands])
+    }, [meta.brands, meta.brandsByCategory, activeCategory, metaLoading])
 
     // Dynamic subcategories: filtered by activeCategory when a category is selected, or all subcategories
     const ALL_SUBCATEGORIES = React.useMemo(() => {
-        if (activeCategory && activeCategory !== 'all') {
-            const catKey = activeCategory.toLowerCase();
-            const list = meta.subcategoriesByCategory?.[catKey] || [];
-            if (list.length > 0) return [...list].sort((a, b) => a.localeCompare(b));
+        if (activeCategory && activeCategory !== 'all' && activeCategory !== 'All') {
+            const rawCat = activeCategory.trim()
+            const lowerCat = rawCat.toLowerCase()
+            const slugCat = lowerCat.replace(/\s+/g, '-')
+            const unhyphenCat = lowerCat.replace(/-/g, ' ')
+            const singularCat = lowerCat.endsWith('s') ? lowerCat.slice(0, -1) : lowerCat
+            const pluralCat = `${lowerCat}s`
+
+            const list = 
+                meta.subcategoriesByCategory?.[rawCat] ||
+                meta.subcategoriesByCategory?.[lowerCat] ||
+                meta.subcategoriesByCategory?.[slugCat] ||
+                meta.subcategoriesByCategory?.[unhyphenCat] ||
+                meta.subcategoriesByCategory?.[singularCat] ||
+                meta.subcategoriesByCategory?.[pluralCat] ||
+                []
+
+            if (list.length > 0) return [...list].sort((a, b) => a.localeCompare(b))
+            if (!metaLoading && meta.subcategoriesByCategory) return []
         }
-        return (meta.subcategories || []).filter(Boolean).sort((a, b) => a.localeCompare(b));
-    }, [meta.subcategories, meta.subcategoriesByCategory, activeCategory]);
+        return (meta.subcategories || []).filter(Boolean).sort((a, b) => a.localeCompare(b))
+    }, [meta.subcategories, meta.subcategoriesByCategory, activeCategory, metaLoading])
+
+    // Automatically prune selected brands/subcategories that do not exist in the active category
+    useEffect(() => {
+        if (activeCategory && activeCategory !== 'all') {
+            if (ALL_BRANDS.length > 0) {
+                setSelectedBrands(prev => {
+                    if (prev.length === 0) return prev
+                    const valid = prev.filter(b => ALL_BRANDS.includes(b))
+                    return valid.length === prev.length ? prev : valid
+                })
+            }
+            if (ALL_SUBCATEGORIES.length > 0) {
+                setSelectedSubcategories(prev => {
+                    if (prev.length === 0) return prev
+                    const valid = prev.filter(s => ALL_SUBCATEGORIES.includes(s))
+                    return valid.length === prev.length ? prev : valid
+                })
+            }
+        }
+    }, [activeCategory, ALL_BRANDS, ALL_SUBCATEGORIES])
 
     // Build filter object passed to the hook
     const filters = {
@@ -549,9 +460,6 @@ export default function ProductsPage() {
         subcategories: selectedSubcategories.length ? selectedSubcategories : undefined,
         colors: selectedColors.length ? selectedColors : undefined,
         brands: selectedBrands.length ? selectedBrands : undefined,
-        // Only apply price filter IF meta has finally loaded, otherwise show all
-        priceRange: priceInit ? priceRange : undefined,
-        minRating,
         inStockOnly,
     }
 
@@ -595,14 +503,6 @@ export default function ProductsPage() {
         setIsUserFiltering(true)
         setSelectedSubcategories(prev => prev.includes(sub) ? prev.filter(x => x !== sub) : [...prev, sub])
     }
-    const handlePriceChange = (val) => {
-        setIsUserFiltering(true)
-        setPriceRange(val)
-    }
-    const handleMinRating = (r) => {
-        setIsUserFiltering(true)
-        setMinRating(r)
-    }
     const handleInStockOnly = (val) => {
         setIsUserFiltering(true)
         setInStockOnly(val)
@@ -610,10 +510,12 @@ export default function ProductsPage() {
     const handleResetFilters = () => {
         setIsUserFiltering(true)
         setSearch(''); setSearchInput('')
-        setActiveCategory('all')
-        setSelectedColors([]); setSelectedBrands([]); setSelectedSubcategories([])
-        setPriceRange([MIN_PRICE, MAX_PRICE])
-        setMinRating(0); setInStockOnly(false); setSortBy('featured')
+        // Keep activeCategory intact as requested - do not reset to 'all'
+        setSelectedColors([])
+        setSelectedBrands([])
+        setSelectedSubcategories([])
+        setInStockOnly(false)
+        setSortBy('featured')
     }
     const resetFilters = handleResetFilters
     const toggleColor = handleToggleColor
@@ -621,8 +523,7 @@ export default function ProductsPage() {
     const toggleSubcategory = handleToggleSubcategory
 
     const activeFilterCount = selectedColors.length + selectedBrands.length + selectedSubcategories.length +
-        (priceRange[0] > MIN_PRICE || priceRange[1] < MAX_PRICE ? 1 : 0) +
-        (minRating > 0 ? 1 : 0) + (inStockOnly ? 1 : 0)
+        (inStockOnly ? 1 : 0)
 
     // Category count map from live data
     const categoryCountMap = { all: filtered.length }
@@ -861,10 +762,6 @@ export default function ProductsPage() {
                                             activeFilterCount={activeFilterCount}
                                             resetFilters={handleResetFilters}
                                             setSidebarOpen={setSidebarOpen}
-                                            MIN_PRICE={MIN_PRICE}
-                                            MAX_PRICE={MAX_PRICE}
-                                            priceRange={priceRange}
-                                            onPriceChange={handlePriceChange}
                                             ALL_COLORS={ALL_COLORS}
                                             selectedColors={selectedColors}
                                             onToggleColor={handleToggleColor}
@@ -874,8 +771,6 @@ export default function ProductsPage() {
                                             ALL_SUBCATEGORIES={ALL_SUBCATEGORIES}
                                             selectedSubcategories={selectedSubcategories}
                                             onToggleSubcategory={handleToggleSubcategory}
-                                            minRating={minRating}
-                                            onMinRating={handleMinRating}
                                             inStockOnly={inStockOnly}
                                             onInStockOnly={handleInStockOnly}
                                             filteredCount={filtered.length}
@@ -946,19 +841,6 @@ export default function ProductsPage() {
                                 <button onClick={() => handleToggleSubcategory(sub)}><i className="bi bi-x" /></button>
                             </span>
                         ))}
-                        {(priceRange[0] > MIN_PRICE || priceRange[1] < MAX_PRICE) && (
-                            <span className="filter-chip">
-                                <i className="bi bi-currency-rupee" />
-                                {formatPrice(priceRange[0])} – {formatPrice(priceRange[1])}
-                                <button onClick={() => handlePriceChange([MIN_PRICE, MAX_PRICE])}><i className="bi bi-x" /></button>
-                            </span>
-                        )}
-                        {minRating > 0 && (
-                            <span className="filter-chip">
-                                <i className="bi bi-star-fill" /> {minRating}+ Stars
-                                <button onClick={() => handleMinRating(0)}><i className="bi bi-x" /></button>
-                            </span>
-                        )}
                         {inStockOnly && (
                             <span className="filter-chip">
                                 <i className="bi bi-check-circle-fill" /> In Stock
@@ -983,10 +865,6 @@ export default function ProductsPage() {
                             activeFilterCount={activeFilterCount}
                             resetFilters={handleResetFilters}
                             setSidebarOpen={setSidebarOpen}
-                            MIN_PRICE={MIN_PRICE}
-                            MAX_PRICE={MAX_PRICE}
-                            priceRange={priceRange}
-                            onPriceChange={handlePriceChange}
                             ALL_COLORS={ALL_COLORS}
                             selectedColors={selectedColors}
                             onToggleColor={handleToggleColor}
@@ -996,8 +874,6 @@ export default function ProductsPage() {
                             ALL_SUBCATEGORIES={ALL_SUBCATEGORIES}
                             selectedSubcategories={selectedSubcategories}
                             onToggleSubcategory={handleToggleSubcategory}
-                            minRating={minRating}
-                            onMinRating={handleMinRating}
                             inStockOnly={inStockOnly}
                             onInStockOnly={handleInStockOnly}
                             filteredCount={filtered.length}

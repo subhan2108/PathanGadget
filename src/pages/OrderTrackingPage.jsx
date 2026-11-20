@@ -1,225 +1,434 @@
-import { useState, useEffect } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import React, { useState, useEffect } from 'react'
+import { Link, useParams, useNavigate } from 'react-router-dom'
 import { fetchOrderDetails } from '../lib/orderService'
+import { formatPrice } from '../lib/productsService'
 import './OrderTrackingPage.css'
 
-// Bootstrap icon names for each tracking step
-const STEP_ICONS = ['bi-box-seam', 'bi-building', 'bi-truck', 'bi-scooter', 'bi-gift']
+const WHATSAPP_PHONE = '918178768308'
 
 export default function OrderTrackingPage() {
     const { id } = useParams()
+    const navigate = useNavigate()
+    const [searchInput, setSearchInput] = useState(id || '')
     const [order, setOrder] = useState(null)
-    const [loading, setLoading] = useState(true)
-    const [animatedStep, setAnimatedStep] = useState(-1)
+    const [loading, setLoading] = useState(Boolean(id))
+    const [errorMsg, setErrorMsg] = useState('')
+    const [copiedTracking, setCopiedTracking] = useState(false)
+
+    const loadOrder = async (query, isSilentAuto = false) => {
+        if (!query || !query.trim()) return
+        setLoading(true)
+        if (!isSilentAuto) setErrorMsg('')
+        try {
+            const data = await fetchOrderDetails(query.trim())
+            if (data) {
+                setOrder(data)
+                setErrorMsg('')
+            } else {
+                setOrder(null)
+                if (!isSilentAuto) {
+                    setErrorMsg('No order found matching this Order Number, Mobile Number, or Tracking ID. Please double check and try again.')
+                }
+            }
+        } catch (err) {
+            console.error('Error fetching order tracking:', err)
+            if (!isSilentAuto) {
+                setErrorMsg('Unable to retrieve tracking information right now. Please try again.')
+            }
+        } finally {
+            setLoading(false)
+        }
+    }
 
     useEffect(() => {
-        setLoading(true)
-        fetchOrderDetails(id, true).then(data => {
-            setOrder(data)
-            setLoading(false)
-            if (data?.order_tracking) {
-                data.order_tracking.forEach((_, i) => {
-                    setTimeout(() => setAnimatedStep(i), i * 350 + 200)
-                })
+        if (id) {
+            setSearchInput(id)
+            loadOrder(id, false)
+        } else {
+            // Check if there's a saved customer phone in localStorage to auto-track recent order silently
+            try {
+                const profile = localStorage.getItem('sm_customer_profile')
+                if (profile) {
+                    const parsed = JSON.parse(profile)
+                    if (parsed.phone) {
+                        setSearchInput(parsed.phone)
+                        loadOrder(parsed.phone, true)
+                    }
+                }
+            } catch (e) {
+                // Ignore
             }
-        })
+        }
     }, [id])
 
+    const handleSearch = (e) => {
+        e.preventDefault()
+        if (searchInput.trim()) {
+            navigate(`/track/${encodeURIComponent(searchInput.trim())}`, { replace: true })
+            loadOrder(searchInput.trim())
+        }
+    }
 
+    const handleCopyTracking = (trackingNo) => {
+        if (!trackingNo) return
+        navigator.clipboard.writeText(trackingNo)
+        setCopiedTracking(true)
+        setTimeout(() => setCopiedTracking(false), 2500)
+    }
 
-    if (loading) return (
-        <div className="tracking-page page-enter">
-            <div className="container" style={{ padding: '100px 0', textAlign: 'center' }}>
-                <div className="spinner-border text-primary" />
-                <p style={{ marginTop: 20 }}>Fetching live tracking data...</p>
-            </div>
-        </div>
-    )
+    // Build official courier deep link
+    const getCourierLink = (courierName, trackingNo) => {
+        if (!trackingNo) return null
+        const cName = (courierName || '').toLowerCase()
+        if (cName.includes('dtdc')) {
+            return {
+                name: 'DTDC Courier',
+                url: `https://track.dtdc.com/ct/tracking?trNo=${encodeURIComponent(trackingNo)}`,
+                icon: 'bi-truck'
+            }
+        }
+        if (cName.includes('maruti')) {
+            return {
+                name: 'Shree Maruti Courier',
+                url: `https://www.shreemaruticourier.com/track-consignment/?consignment_no=${encodeURIComponent(trackingNo)}`,
+                icon: 'bi-box-seam'
+            }
+        }
+        if (cName.includes('delhivery')) {
+            return {
+                name: 'Delhivery',
+                url: `https://www.delhivery.com/track/package/${encodeURIComponent(trackingNo)}`,
+                icon: 'bi-truck'
+            }
+        }
+        return {
+            name: courierName || 'Courier',
+            url: `https://www.google.com/search?q=${encodeURIComponent((courierName || 'courier') + ' tracking ' + trackingNo)}`,
+            icon: 'bi-box-seam'
+        }
+    }
 
-    if (!order) return (
-        <div className="tracking-page page-enter">
-            <div className="container" style={{ padding: '100px 0', textAlign: 'center' }}>
-                <h3>Tracking information not available</h3>
-                <Link to="/orders" className="btn btn-primary">Back to Orders</Link>
-            </div>
-        </div>
-    )
+    // Stepper logic based on order status
+    const getStepperState = (orderStatus) => {
+        const s = (orderStatus || '').toLowerCase()
+        if (s === 'delivered') return 5
+        if (s === 'dispatched') return 4
+        if (s === 'processing' || s === 'packed') return 3
+        if (s === 'confirmed') return 2
+        // Default pending verification
+        return 1
+    }
 
-    const steps = order.order_tracking || []
-    const doneCount = steps.length
-    const progressPct = steps.length > 0 ? (steps.length / 4) * 100 : 25
-
+    const activeStep = order ? getStepperState(order.status) : 1
+    const courierLink = order?.tracking_number ? getCourierLink(order.courier_name, order.tracking_number) : null
+    const shipping = order ? (typeof order.shipping_address === 'string' ? JSON.parse(order.shipping_address) : (order.shipping_address || {})) : {}
 
     return (
         <div className="tracking-page page-enter" id="tracking-page">
-
-            {/* Page Header */}
-            <div className="tracking-header" id="tracking-header">
-                <div className="tracking-header__bg" />
-                <div className="container tracking-header__inner">
+            {/* Header with Search */}
+            <div className="tracking-header" style={{ padding: '40px 0 32px' }}>
+                <div className="container">
                     <nav className="breadcrumb">
                         <Link to="/"><i className="bi bi-house" /> Home</Link><span>›</span>
-                        <Link to="/orders"><i className="bi bi-box-seam" /> My Orders</Link><span>›</span>
+                        <Link to="/products">Catalog</Link><span>›</span>
                         <span>Track Order</span>
                     </nav>
 
-                    <div className="tracking-hero">
-                        <div className="tracking-status-badge" id="tracking-status-badge">
-                            <i className="bi bi-truck status-icon" />
-                            <span className="status-text">Your Order is On the Way!</span>
-                        </div>
-                        <h1 className="tracking-title">Live Order Tracking</h1>
-                        <p className="tracking-subtitle">
-                            We're delivering your package as fast as possible. You can track every step below.
+                    <div style={{ maxWidth: '640px', margin: '0 auto', textAlign: 'center' }}>
+                        <h1 style={{ fontSize: '2rem', fontWeight: 800, color: '#111827', marginBottom: '8px' }}>
+                            <i className="bi bi-geo-alt-fill" style={{ color: '#D97706', marginRight: '10px' }} />
+                            Live Order & Courier Tracking
+                        </h1>
+                        <p style={{ color: '#6B7280', fontSize: '1rem', marginBottom: '24px' }}>
+                            Track your shipment status by entering your <strong>Mobile Number</strong>, <strong>Order Number</strong>, or <strong>Courier Tracking ID</strong>.
                         </p>
-                    </div>
 
-                    {/* Meta Cards */}
-                    <div className="tracking-meta-cards" id="tracking-meta-cards">
-                        <div className="tracking-meta-card" id="tracking-order-id">
-                            <span className="meta-label"><i className="bi bi-hash" /> Order ID</span>
-                            <code className="meta-value">{order.id}</code>
-                        </div>
-                        <div className="tracking-meta-card" id="tracking-number">
-                            <span className="meta-label"><i className="bi bi-upc-scan" /> Order No.</span>
-                            <code className="meta-value">{order.order_number}</code>
-                        </div>
-                        <div className="tracking-meta-card tracking-meta-card--eta" id="tracking-eta">
-                            <span className="meta-label"><i className="bi bi-calendar3" /> Est. Delivery</span>
-                            <span className="meta-value meta-value--eta">2–4 Days</span>
-                        </div>
-                        <div className="tracking-meta-card" id="tracking-carrier">
-                            <span className="meta-label"><i className="bi bi-buildings" /> Carrier</span>
-                            <span className="meta-value">FastTrack India</span>
-                        </div>
+                        {/* Search Bar */}
+                        <form onSubmit={handleSearch} style={{ display: 'flex', gap: '8px', maxWidth: '520px', margin: '0 auto' }}>
+                            <input 
+                                type="text"
+                                placeholder="Enter Mobile No / Order ID / Tracking ID"
+                                value={searchInput}
+                                onChange={(e) => setSearchInput(e.target.value)}
+                                style={{ flex: 1, padding: '12px 16px', borderRadius: '8px', border: '2px solid #D97706', fontSize: '1rem', outline: 'none' }}
+                            />
+                            <button 
+                                type="submit" 
+                                className="btn btn-primary"
+                                style={{ padding: '12px 24px', fontWeight: 700, borderRadius: '8px', background: '#D97706', borderColor: '#D97706' }}
+                            >
+                                <i className="bi bi-search" /> Track
+                            </button>
+                        </form>
                     </div>
-
                 </div>
             </div>
 
-            <div className="container tracking-body">
-                <div className="tracking-grid" id="tracking-grid">
+            <div className="container" style={{ padding: '32px 0 64px' }}>
+                {loading && (
+                    <div style={{ textAlign: 'center', padding: '60px 0' }}>
+                        <div className="spinner-border text-warning" role="status" style={{ width: '3rem', height: '3rem' }} />
+                        <p style={{ marginTop: '16px', color: '#6B7280', fontWeight: 600 }}>Fetching live order & courier details...</p>
+                    </div>
+                )}
 
-                    {/* Left: Timeline */}
-                    <div className="tracking-left">
-                        <div className="tracking-card" id="tracking-timeline-card">
-                            <div className="tracking-card__header">
-                                <h2><i className="bi bi-activity" /> Tracking Timeline</h2>
-                                <span className="tracking-progress-chip">
-                                    <i className="bi bi-check-circle" /> {doneCount} Milestone{doneCount !== 1 ? 's' : ''}
-                                </span>
+                {errorMsg && !loading && (
+                    <div style={{ maxWidth: '600px', margin: '20px auto', background: '#FEF2F2', border: '1px solid #F87171', borderRadius: '10px', padding: '20px', textAlign: 'center' }}>
+                        <i className="bi bi-exclamation-triangle-fill" style={{ fontSize: '2rem', color: '#DC2626', marginBottom: '8px', display: 'block' }} />
+                        <h4 style={{ color: '#991B1B', fontWeight: 700, marginBottom: '6px' }}>Order Not Found</h4>
+                        <p style={{ color: '#7F1D1D', fontSize: '0.9375rem', margin: 0 }}>{errorMsg}</p>
+                    </div>
+                )}
+
+                {order && !loading && (
+                    <div className="tracking-results-container" style={{ maxWidth: '960px', margin: '0 auto' }}>
+                        
+                        {/* Status Summary Banner */}
+                        <div style={{ background: '#FFFFFF', border: '1px solid #E5E7EB', borderRadius: '12px', padding: '24px', marginBottom: '24px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', borderBottom: '1px solid #F3F4F6', paddingBottom: '18px', marginBottom: '20px' }}>
+                                <div>
+                                    <div style={{ fontSize: '0.8125rem', color: '#6B7280', textTransform: 'uppercase', fontWeight: 700 }}>
+                                        Order Number
+                                    </div>
+                                    <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#111827', fontFamily: 'monospace' }}>
+                                        {order.order_number}
+                                    </div>
+                                    <div style={{ fontSize: '0.8125rem', color: '#9CA3AF', marginTop: '2px' }}>
+                                        Placed on {new Date(order.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                    </div>
+                                </div>
+
+                                <div style={{ textAlign: 'right' }}>
+                                    <div style={{ fontSize: '0.8125rem', color: '#6B7280', textTransform: 'uppercase', fontWeight: 700 }}>
+                                        Current Status
+                                    </div>
+                                    <div style={{ marginTop: '4px' }}>
+                                        {order.status === 'pending_verification' && (
+                                            <span style={{ background: '#FEF3C7', color: '#92400E', padding: '6px 14px', borderRadius: '999px', fontSize: '0.875rem', fontWeight: 800 }}>
+                                                ⏳ Payment Verification Pending
+                                            </span>
+                                        )}
+                                        {(order.status === 'processing' || order.status === 'confirmed') && (
+                                            <span style={{ background: '#E0F2FE', color: '#0369A1', padding: '6px 14px', borderRadius: '999px', fontSize: '0.875rem', fontWeight: 800 }}>
+                                                ⚙️ Processing & Packing
+                                            </span>
+                                        )}
+                                        {order.status === 'dispatched' && (
+                                            <span style={{ background: '#FEF08A', color: '#854D0E', padding: '6px 14px', borderRadius: '999px', fontSize: '0.875rem', fontWeight: 800 }}>
+                                                🚚 Dispatched in Transit
+                                            </span>
+                                        )}
+                                        {order.status === 'delivered' && (
+                                            <span style={{ background: '#DCFCE7', color: '#15803D', padding: '6px 14px', borderRadius: '999px', fontSize: '0.875rem', fontWeight: 800 }}>
+                                                ✅ Successfully Delivered
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
 
-                            {/* Progress Bar */}
-                            <div className="tracking-progress-bar" id="tracking-progress-bar" role="progressbar" aria-valuenow={progressPct} aria-valuemin={0} aria-valuemax={100}>
-                                <div className="tracking-progress-bar__fill" style={{ width: `${progressPct}%` }} />
-                            </div>
-
-                            {/* Steps */}
-                            <ol className="tracking-steps" id="tracking-steps">
-                                {steps.map((step, i) => {
-                                    const isAnimated = animatedStep >= i
-                                    return (
-                                        <li
-                                            key={step.id}
-                                            id={`tracking-step-${i}`}
-                                            className={`tracking-step done visible ${isAnimated ? 'animated' : ''}`}
-                                        >
-                                            <div className="step-icon-wrap">
-                                                <i className={`bi ${STEP_ICONS[i] || 'bi-circle-fill'}`} />
-                                            </div>
-                                            <div className="step-content">
-                                                <div className="step-header">
-                                                    <h3 className="step-label">{step.label}</h3>
-                                                    <span className="step-date">
-                                                        <i className="bi bi-clock" /> {new Date(step.timestamp || step.event_time).toLocaleString()}
-                                                    </span>
+                            {/* 5-Step Progress Stepper */}
+                            <div className="stepper-wrapper" style={{ padding: '10px 0 20px' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '8px', position: 'relative', textAlign: 'center' }}>
+                                    {[
+                                        { step: 1, label: 'Order Placed', icon: 'bi-cart-check' },
+                                        { step: 2, label: 'Payment Verified', icon: 'bi-shield-check' },
+                                        { step: 3, label: 'Packed & Ready', icon: 'bi-box-seam' },
+                                        { step: 4, label: `Dispatched (${order.courier_name || 'Courier'})`, icon: 'bi-truck' },
+                                        { step: 5, label: 'Delivered', icon: 'bi-house-check' }
+                                    ].map((s) => {
+                                        const isDone = activeStep >= s.step
+                                        const isCurrent = activeStep === s.step
+                                        return (
+                                            <div key={s.step} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                                <div 
+                                                    style={{ 
+                                                        width: '42px', 
+                                                        height: '42px', 
+                                                        borderRadius: '50%', 
+                                                        background: isDone ? '#D97706' : '#F3F4F6', 
+                                                        color: isDone ? '#FFFFFF' : '#9CA3AF',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        fontSize: '1.2rem',
+                                                        fontWeight: 700,
+                                                        border: isCurrent ? '3px solid #B45309' : 'none',
+                                                        boxShadow: isCurrent ? '0 0 0 4px rgba(217,119,6,0.2)' : 'none',
+                                                        marginBottom: '8px'
+                                                    }}
+                                                >
+                                                    <i className={`bi ${s.icon}`} />
                                                 </div>
-                                                <p className="step-desc">{step.description}</p>
+                                                <div style={{ fontSize: '0.8125rem', fontWeight: isDone ? 700 : 500, color: isDone ? '#111827' : '#9CA3AF' }}>
+                                                    {s.label}
+                                                </div>
                                             </div>
-                                        </li>
-                                    )
-                                })}
-                            </ol>
+                                        )
+                                    })}
+                                </div>
+                            </div>
 
+                            {/* Courier Smart 1-Tap Deep Link Card */}
+                            {courierLink && (
+                                <div style={{ background: '#FFFBEB', border: '2px solid #FCD34D', borderRadius: '10px', padding: '20px', marginTop: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+                                    <div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                                            <span style={{ background: '#B45309', color: '#FFFFFF', fontSize: '0.75rem', fontWeight: 800, padding: '2px 8px', borderRadius: '4px' }}>
+                                                {order.courier_name || 'Courier Partner'}
+                                            </span>
+                                            <strong style={{ fontSize: '1rem', color: '#78350F' }}>Consignment / Tracking Number:</strong>
+                                        </div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                            <code style={{ fontSize: '1.35rem', fontWeight: 800, color: '#111827', letterSpacing: '0.5px' }}>
+                                                {order.tracking_number}
+                                            </code>
+                                            <button 
+                                                type="button"
+                                                onClick={() => handleCopyTracking(order.tracking_number)}
+                                                className="btn btn-secondary btn-sm"
+                                                style={{ padding: '2px 8px', fontSize: '0.75rem' }}
+                                            >
+                                                {copiedTracking ? '✓ Copied' : 'Copy'}
+                                            </button>
+                                        </div>
+                                        <p style={{ margin: '6px 0 0', fontSize: '0.8125rem', color: '#92400E' }}>
+                                            Tap the button below to view live transit location directly on {courierLink.name}.
+                                        </p>
+                                    </div>
+
+                                    <div>
+                                        <a 
+                                            href={courierLink.url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="btn"
+                                            style={{ background: '#D97706', color: '#FFFFFF', padding: '12px 20px', borderRadius: '8px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '8px', boxShadow: '0 2px 6px rgba(217,119,6,0.3)' }}
+                                        >
+                                            <i className="bi bi-box-arrow-up-right" />
+                                            View Live Tracking on {courierLink.name}
+                                        </a>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Real Shipment Activity Log (Milestones from Admin) */}
+                            {order.order_tracking && order.order_tracking.length > 0 && (
+                                <div style={{ marginTop: '20px', background: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: '10px', padding: '16px 20px' }}>
+                                    <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#1F2937', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <i className="bi bi-clock-history" style={{ color: '#D97706' }} />
+                                        Shipment Milestones & Activity History
+                                    </h4>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                        {order.order_tracking.map((m, idx) => (
+                                            <div key={idx} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', paddingBottom: '10px', borderBottom: idx !== order.order_tracking.length - 1 ? '1px solid #E5E7EB' : 'none' }}>
+                                                <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: m.is_current ? '#D97706' : '#E5E7EB', color: m.is_current ? '#FFFFFF' : '#6B7280', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.85rem', flexShrink: 0, marginTop: '2px' }}>
+                                                    <i className={`bi ${m.status === 'delivered' ? 'bi-check-circle-fill' : m.status === 'dispatched' ? 'bi-truck' : 'bi-check'}`} />
+                                                </div>
+                                                <div style={{ flex: 1 }}>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '4px' }}>
+                                                        <strong style={{ fontSize: '0.9rem', color: '#111827' }}>
+                                                            {m.label} {m.is_current && <span style={{ background: '#DCFCE7', color: '#15803D', fontSize: '0.72rem', padding: '1px 6px', borderRadius: '4px', marginLeft: '6px' }}>Current</span>}
+                                                        </strong>
+                                                        <span style={{ fontSize: '0.75rem', color: '#6B7280' }}>
+                                                            {new Date(m.timestamp || m.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                                        </span>
+                                                    </div>
+                                                    {m.description && (
+                                                        <p style={{ margin: '3px 0 0', fontSize: '0.8125rem', color: '#4B5563' }}>{m.description}</p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
+
+                        {/* Order Details & Items Grid */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
+                            {/* Shipping & Payment Info */}
+                            <div style={{ background: '#FFFFFF', border: '1px solid #E5E7EB', borderRadius: '12px', padding: '20px' }}>
+                                <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#1F2937', marginBottom: '14px', borderBottom: '1px solid #F3F4F6', paddingBottom: '10px' }}>
+                                    <i className="bi bi-truck" style={{ color: '#D97706', marginRight: '8px' }} />
+                                    Delivery & Contact Details
+                                </h3>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.875rem', color: '#374151' }}>
+                                    <div>
+                                        <strong style={{ color: '#111827' }}>Shop / Customer Name:</strong>{' '}
+                                        {order.customer_shop_name || shipping.shopName || shipping.name || 'Direct Customer'}
+                                    </div>
+                                    <div>
+                                        <strong style={{ color: '#111827' }}>Phone Number:</strong>{' '}
+                                        +91 {order.customer_phone || shipping.phone}
+                                    </div>
+                                    <div>
+                                        <strong style={{ color: '#111827' }}>Delivery Address:</strong>{' '}
+                                        {order.customer_address || shipping.address}, {order.customer_city || shipping.city}, {order.customer_state || shipping.state} - {order.customer_pincode || shipping.pincode}
+                                    </div>
+                                    <div style={{ borderTop: '1px solid #F3F4F6', paddingTop: '8px', marginTop: '4px' }}>
+                                        <strong style={{ color: '#111827' }}>Payment Method:</strong> {order.payment_method || 'UPI'}
+                                        {order.utr_number && (
+                                            <div style={{ color: '#6B7280', fontSize: '0.8125rem', marginTop: '2px' }}>
+                                                UTR / Ref ID: <code>{order.utr_number}</code>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Items List */}
+                            <div style={{ background: '#FFFFFF', border: '1px solid #E5E7EB', borderRadius: '12px', padding: '20px' }}>
+                                <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#1F2937', marginBottom: '14px', borderBottom: '1px solid #F3F4F6', paddingBottom: '10px' }}>
+                                    <i className="bi bi-box2-fill" style={{ color: '#D97706', marginRight: '8px' }} />
+                                    Ordered Items ({order.items?.length || 0})
+                                </h3>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '240px', overflowY: 'auto' }}>
+                                    {(order.items || []).map((item, idx) => (
+                                        <div key={idx} style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                                            <img 
+                                                src={item.image || item.image_url || '/logo.png'} 
+                                                alt={item.name} 
+                                                referrerPolicy="no-referrer"
+                                                style={{ width: '40px', height: '40px', objectFit: 'contain', background: '#F9FAFB', borderRadius: '6px', border: '1px solid #E5E7EB' }}
+                                            />
+                                            <div style={{ flex: 1, minWidth: 0 }}>
+                                                <div style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1F2937', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                    {item.name}
+                                                </div>
+                                                <div style={{ fontSize: '0.75rem', color: '#6B7280' }}>
+                                                    Qty: {item.quantity} × {formatPrice(item.price)} {item.sku ? `[${item.sku}]` : ''}
+                                                </div>
+                                            </div>
+                                            <div style={{ fontSize: '0.875rem', fontWeight: 700, color: '#111827' }}>
+                                                {formatPrice(Number(item.price) * Number(item.quantity))}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div style={{ borderTop: '1px solid #F3F4F6', paddingTop: '10px', marginTop: '10px', display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '1.05rem', color: '#111827' }}>
+                                    <span>Total:</span>
+                                    <span style={{ color: '#D97706' }}>{formatPrice(order.total)}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* WhatsApp Support CTA */}
+                        <div style={{ textAlign: 'center', marginTop: '32px' }}>
+                            <a 
+                                href={`https://wa.me/${WHATSAPP_PHONE}?text=${encodeURIComponent(`Hello! I have a question regarding my order #${order.order_number}`)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="btn"
+                                style={{ background: '#25D366', color: '#FFFFFF', padding: '12px 24px', fontWeight: 700, borderRadius: '8px', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+                            >
+                                <i className="bi bi-whatsapp" /> Need Help? Chat with Store on WhatsApp
+                            </a>
+                        </div>
+
                     </div>
-
-                    {/* Right: Details + Map + Support */}
-                    <div className="tracking-right">
-
-                        {/* Shipment Details */}
-                        <div className="tracking-card" id="shipment-details">
-                            <h3 className="tracking-card__subtitle"><i className="bi bi-geo-alt-fill" /> Shipment Details</h3>
-                            <div className="shipment-detail-rows">
-                                <div className="shipment-row">
-                                    <span><i className="bi bi-building" /> From</span>
-                                    <span>Mumbai Warehouse, MH</span>
-                                </div>
-                                <div className="shipment-row">
-                                    <span><i className="bi bi-house-door" /> To</span>
-                                    <span>Bandra West, Mumbai 400050</span>
-                                </div>
-                                <div className="shipment-row">
-                                    <span><i className="bi bi-box2" /> Weight</span>
-                                    <span>450g</span>
-                                </div>
-                                <div className="shipment-row">
-                                    <span><i className="bi bi-rocket-takeoff" /> Service</span>
-                                    <span>Express Delivery</span>
-                                </div>
-                                <div className="shipment-row">
-                                    <span><i className="bi bi-truck" /> Carrier</span>
-                                    <span>FastTrack India</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Map Placeholder */}
-                        <div className="tracking-map-placeholder" id="tracking-map">
-                            <div className="map-placeholder__content">
-                                <div className="map-pulse">
-                                    <div className="map-pulse__dot" />
-                                    <div className="map-pulse__ring map-pulse__ring--1" />
-                                    <div className="map-pulse__ring map-pulse__ring--2" />
-                                </div>
-                                <p className="map-placeholder__label"><i className="bi bi-geo-alt-fill" /> Live Map Tracking</p>
-                                <p className="map-placeholder__sub">Your package is currently in transit.</p>
-                                <p className="map-placeholder__sub" style={{ marginTop: 4, fontWeight: 600 }}>
-                                    <i className="bi bi-arrow-right" /> Mumbai → Bandra West
-                                </p>
-                            </div>
-                        </div>
-
-                        {/* Delivery Info */}
-                        <div className="tracking-card tracking-delivery-card" id="delivery-info">
-                            <i className="bi bi-calendar-event delivery-icon" />
-                            <div>
-                                <p className="delivery-heading"><i className="bi bi-clock" /> Estimated Delivery</p>
-                                <p className="delivery-date">2–4 Business Days</p>
-                                <p className="delivery-note"><i className="bi bi-sun" /> Between 10 AM – 8 PM</p>
-                            </div>
-                        </div>
-
-                        {/* Support CTA */}
-                        <div className="tracking-support" id="tracking-support">
-                            <i className="bi bi-headset support-icon" />
-                            <h3>Need Help?</h3>
-                            <p>Our support team is available 24/7 to assist with your order.</p>
-                            <div className="support-actions">
-                                <button id="call-support" className="btn btn-primary btn-full">
-                                    <i className="bi bi-telephone-fill" /> Call Support
-                                </button>
-                                <button id="chat-support" className="btn btn-secondary btn-full">
-                                    <i className="bi bi-chat-dots-fill" /> Live Chat
-                                </button>
-                            </div>
-                        </div>
-
-                    </div>
-                </div>
+                )}
             </div>
-
         </div>
     )
 }

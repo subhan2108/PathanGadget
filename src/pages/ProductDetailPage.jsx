@@ -7,31 +7,7 @@ import { useAuth } from '../context/AuthContext'
 import { ProductCard } from '@/components/ui/product-card-2'
 import './ProductDetailPage.css'
 
-const DEFAULT_CATEGORY_GALLERIES = {
-    watches: [
-        'https://images.unsplash.com/photo-1508685096489-7aacd43bd3b1?w=600&h=600&fit=crop',
-        'https://images.unsplash.com/photo-1524805444758-089113d48a6d?w=600&h=600&fit=crop',
-        'https://images.unsplash.com/photo-1546868871-7041f2a55e12?w=600&h=600&fit=crop',
-        'https://images.unsplash.com/photo-1510017803434-a899398421b3?w=600&h=600&fit=crop',
-    ],
-    airpods: [
-        'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=600&h=600&fit=crop',
-        'https://images.unsplash.com/photo-1572536147248-ac59a8abfa4b?w=600&h=600&fit=crop',
-        'https://images.unsplash.com/photo-1588423771073-b8903fbb85b5?w=600&h=600&fit=crop',
-        'https://images.unsplash.com/photo-1572645315416-6c5bc4fcabba?w=600&h=600&fit=crop',
-    ],
-    headphones: [
-        'https://images.unsplash.com/photo-1484704849700-f032a568e944?w=600&h=600&fit=crop',
-        'https://images.unsplash.com/photo-1546435770-a3e426bf472b?w=600&h=600&fit=crop',
-        'https://images.unsplash.com/photo-1583394838336-acd977736f90?w=600&h=600&fit=crop',
-        'https://images.unsplash.com/photo-1524678606370-a47ad25cb82a?w=600&h=600&fit=crop',
-    ],
-    smartphones: [
-        'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=600&h=600&fit=crop',
-        'https://images.unsplash.com/photo-1598327105666-5b89351aff97?w=600&h=600&fit=crop',
-        'https://images.unsplash.com/photo-1580910051074-3eb694886505?w=600&h=600&fit=crop',
-    ]
-};
+const DEFAULT_CATEGORY_GALLERIES = {};
 
 export default function ProductDetailPage() {
     const { id } = useParams()
@@ -179,7 +155,7 @@ export default function ProductDetailPage() {
         : rawSpecs
 
     const mappedSpecs = Object.entries(specsWithSku)
-        .filter(([k, v]) => k.toLowerCase() !== 'source' && v !== undefined && v !== null && String(v).trim() !== '')
+        .filter(([k, v]) => k.toLowerCase() !== 'source' && k.toLowerCase() !== 'availability' && v !== undefined && v !== null && String(v).trim() !== '')
         .map(([k, v]) => ({
             label: k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
             value: String(v)
@@ -218,8 +194,10 @@ export default function ProductDetailPage() {
     const finalPrice = activeVariant ? activeVariant.price : basePrice * quantity
     const finalUnitCost = activeVariant ? (activeVariant.price / activeVariant.qty) : basePrice
 
-    const hasStockInfo = product ? (product.in_stock !== undefined || product.inStock !== undefined) : false
-    const isInStock = product ? (product.in_stock !== false && product.inStock !== false) : true
+    const stockQuantity = Number(product?.stock_quantity ?? (product?.in_stock !== false ? 5 : 0))
+    const hasStockInfo = product ? (product.in_stock !== undefined || product.inStock !== undefined || product.stock_quantity !== undefined) : false
+    const isInStock = product ? (product.in_stock !== false && product.inStock !== false && stockQuantity > 0) : true
+    const isLowStock = isInStock && stockQuantity > 0 && stockQuantity <= 3
 
     // Set initial color based on what actually exists
     useEffect(() => {
@@ -229,25 +207,44 @@ export default function ProductDetailPage() {
     }, [product, colors.length])
 
     const handleAddToCart = async () => {
-        if (!isInStock) return
-        await addToCart({
+        if (!isInStock || stockQuantity <= 0) {
+            alert('Sorry, this product is currently out of stock.');
+            return;
+        }
+        if (finalQty > stockQuantity) {
+            alert(`Cannot order ${finalQty} items. Only ${stockQuantity} items available in stock.`);
+            return;
+        }
+        const res = await addToCart({
             ...product,
+            stock_quantity: stockQuantity,
+            quantity: stockQuantity,
             sku: product.sku || `SMN-${(product.category || 'GEN').substring(0, 3).toUpperCase()}-${String(product.id).padStart(4, '0')}`,
             name: product.name,
             price: finalUnitCost,
             image: gallery[0] || product.image_url || null,
             image_url: gallery[0] || product.image_url || null,
             originalPrice: baseOriginalPrice,
-            selectedColor: selectedColor || (colors[0] || null),
-            variantId: activeVariant?.discountApplied > 0 ? `Buy ${activeVariant.qty} (${activeVariant.discountApplied}% Off)` : (selectedColor ? `Color: ${selectedColor}` : undefined),
+            selectedColor: selectedColor && selectedColor.toLowerCase() !== 'standard' ? selectedColor : null,
+            variantId: activeVariant?.discountApplied > 0 ? `Buy ${activeVariant.qty} (${activeVariant.discountApplied}% Off)` : (selectedColor && selectedColor.toLowerCase() !== 'standard' ? `Color: ${selectedColor}` : undefined),
             appliedOffer: activeVariant?.discountApplied > 0 ? `Buy ${activeVariant.qty} (${activeVariant.discountApplied}% Off)` : null
         }, finalQty)
+        if (res && res.success === false) {
+            return;
+        }
         setAdded(true)
         setTimeout(() => setAdded(false), 1600)
     }
 
     const handleBuyNow = async () => {
-        if (!isInStock) return
+        if (!isInStock || stockQuantity <= 0) {
+            alert('Sorry, this product is currently out of stock.');
+            return;
+        }
+        if (finalQty > stockQuantity) {
+            alert(`Cannot order ${finalQty} items. Only ${stockQuantity} items available in stock.`);
+            return;
+        }
         await handleAddToCart()
         checkout()
     }
@@ -507,8 +504,8 @@ export default function ProductDetailPage() {
                             {hasStockInfo && (
                                 <div style={{
                                     marginLeft: hasRatingOrReviews ? 'auto' : '0',
-                                    backgroundColor: isInStock ? '#D1FAE5' : '#FEE2E2',
-                                    color: isInStock ? '#065F46' : '#DC2626',
+                                    backgroundColor: !isInStock ? '#FEE2E2' : (isLowStock ? '#FEF3C7' : '#D1FAE5'),
+                                    color: !isInStock ? '#DC2626' : (isLowStock ? '#B45309' : '#065F46'),
                                     padding: '4px 12px',
                                     borderRadius: '20px',
                                     fontSize: '0.825rem',
@@ -517,8 +514,8 @@ export default function ProductDetailPage() {
                                     alignItems: 'center',
                                     gap: '6px'
                                 }}>
-                                    <i className={`bi ${isInStock ? 'bi-check-circle-fill' : 'bi-x-circle-fill'}`} />
-                                    {isInStock ? 'In Stock' : 'Out of Stock'}
+                                    <i className={`bi ${!isInStock ? 'bi-x-circle-fill' : (isLowStock ? 'bi-fire' : 'bi-check-circle-fill')}`} />
+                                    {!isInStock ? 'Out of Stock' : (isLowStock ? `Only ${stockQuantity} remaining!` : 'In Stock')}
                                 </div>
                             )}
                         </div>
@@ -545,37 +542,6 @@ export default function ProductDetailPage() {
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#059669', fontSize: '0.95rem', fontWeight: '600', marginBottom: '24px' }}>
                                 <i className="bi bi-piggy-bank" style={{ fontSize: '1.15rem' }} />
                                 <span>You save <strong style={{ fontWeight: '800' }}>₹{(savingsAmount * finalQty).toLocaleString()}</strong> on this order</span>
-                            </div>
-                        )}
-
-                        {/* Colors (Only if available in backend) */}
-                        {colors.length > 0 && (
-                            <div style={{ marginBottom: '24px', marginTop: hasDiscount ? '0' : '16px' }}>
-                                <div style={{ fontSize: '0.875rem', fontWeight: '700', color: '#374151', marginBottom: '8px' }}>
-                                    Color: <span style={{ color: '#111827', fontWeight: '800' }}>{selectedColor || colors[0]}</span>
-                                </div>
-                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                                    {colors.map((c, i) => (
-                                        <button
-                                            key={i}
-                                            type="button"
-                                            onClick={() => setSelectedColor(c)}
-                                            style={{
-                                                padding: '6px 14px',
-                                                borderRadius: '20px',
-                                                border: `1.5px solid ${(selectedColor || colors[0]) === c ? 'var(--cta)' : '#E5E7EB'}`,
-                                                backgroundColor: (selectedColor || colors[0]) === c ? 'rgba(229, 184, 36, 0.12)' : '#FFFFFF',
-                                                color: (selectedColor || colors[0]) === c ? '#8C5E0F' : '#374151',
-                                                fontSize: '0.85rem',
-                                                fontWeight: '700',
-                                                cursor: 'pointer',
-                                                transition: 'all 0.2s'
-                                            }}
-                                        >
-                                            {c}
-                                        </button>
-                                    ))}
-                                </div>
                             </div>
                         )}
 
@@ -640,32 +606,47 @@ export default function ProductDetailPage() {
                         )}
 
                         {/* Quantity Stepper (When no bundle variants configured) */}
-                        {!hasRealBundleOffer && (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '20px' }}>
-                                <span style={{ fontSize: '0.875rem', fontWeight: '700', color: '#374151' }}>Quantity:</span>
-                                <div style={{ display: 'inline-flex', alignItems: 'center', border: '1.5px solid #E5E7EB', borderRadius: '10px', overflow: 'hidden', height: '38px', background: '#FFFFFF' }}>
-                                    <button
-                                        type="button"
-                                        onClick={() => setQuantity(q => Math.max(1, q - 1))}
-                                        style={{ width: '36px', height: '100%', border: 'none', background: '#F9FAFB', cursor: 'pointer', fontSize: '1rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4B5563', transition: 'background 0.2s' }}
-                                        onMouseOver={e => e.currentTarget.style.background = '#F3F4F6'}
-                                        onMouseOut={e => e.currentTarget.style.background = '#F9FAFB'}
-                                        aria-label="Decrease quantity"
-                                    >
-                                        <i className="bi bi-dash" />
-                                    </button>
-                                    <span style={{ minWidth: '40px', textAlign: 'center', fontWeight: '700', fontSize: '0.95rem', color: '#111827' }}>{quantity}</span>
-                                    <button
-                                        type="button"
-                                        onClick={() => setQuantity(q => q + 1)}
-                                        style={{ width: '36px', height: '100%', border: 'none', background: '#F9FAFB', cursor: 'pointer', fontSize: '1rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4B5563', transition: 'background 0.2s' }}
-                                        onMouseOver={e => e.currentTarget.style.background = '#F3F4F6'}
-                                        onMouseOut={e => e.currentTarget.style.background = '#F9FAFB'}
-                                        aria-label="Increase quantity"
-                                    >
-                                        <i className="bi bi-plus" />
-                                    </button>
+                        {!hasRealBundleOffer && isInStock && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                                    <span style={{ fontSize: '0.875rem', fontWeight: '700', color: '#374151' }}>Quantity:</span>
+                                    <div style={{ display: 'inline-flex', alignItems: 'center', border: '1.5px solid #E5E7EB', borderRadius: '10px', overflow: 'hidden', height: '38px', background: '#FFFFFF' }}>
+                                        <button
+                                            type="button"
+                                            onClick={() => setQuantity(q => Math.max(1, q - 1))}
+                                            style={{ width: '36px', height: '100%', border: 'none', background: '#F9FAFB', cursor: 'pointer', fontSize: '1rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4B5563', transition: 'background 0.2s' }}
+                                            onMouseOver={e => e.currentTarget.style.background = '#F3F4F6'}
+                                            onMouseOut={e => e.currentTarget.style.background = '#F9FAFB'}
+                                            aria-label="Decrease quantity"
+                                        >
+                                            <i className="bi bi-dash" />
+                                        </button>
+                                        <span style={{ minWidth: '40px', textAlign: 'center', fontWeight: '700', fontSize: '0.95rem', color: '#111827' }}>{quantity}</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                if (quantity >= stockQuantity) {
+                                                    alert(`Cannot add more. Only ${stockQuantity} items in stock.`);
+                                                    return;
+                                                }
+                                                setQuantity(q => q + 1);
+                                            }}
+                                            disabled={quantity >= stockQuantity}
+                                            style={{ width: '36px', height: '100%', border: 'none', background: quantity >= stockQuantity ? '#F3F4F6' : '#F9FAFB', cursor: quantity >= stockQuantity ? 'not-allowed' : 'pointer', fontSize: '1rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', color: quantity >= stockQuantity ? '#9CA3AF' : '#4B5563', transition: 'background 0.2s' }}
+                                            aria-label="Increase quantity"
+                                        >
+                                            <i className="bi bi-plus" />
+                                        </button>
+                                    </div>
+                                    <span style={{ fontSize: '0.8rem', color: '#6B7280' }}>
+                                        ({stockQuantity} available)
+                                    </span>
                                 </div>
+                                {isLowStock && (
+                                    <div style={{ fontSize: '0.825rem', fontWeight: '700', color: '#DC2626', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <i className="bi bi-fire" /> Only {stockQuantity} remaining in stock - order soon!
+                                    </div>
+                                )}
                             </div>
                         )}
 
@@ -775,134 +756,6 @@ export default function ProductDetailPage() {
                                 </div>
                             </div>
                         )}
-
-                    </div>
-                </div>
-            </div>
-
-            {/* Customer Reviews Section */}
-            <div style={{ marginTop: '60px', borderTop: '1px solid #F3F4F6', backgroundColor: '#FFFFFF', padding: '60px 0' }}>
-                <div className="container" style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 20px' }}>
-                    <h3 style={{ fontSize: '1.8rem', fontWeight: '900', color: '#111827', marginBottom: '32px' }}>Customer Reviews</h3>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '32px', alignItems: 'flex-start' }}>
-
-                        {/* Left Card: Summary & Write Review */}
-                        <div style={{ flex: '1 1 300px', backgroundColor: 'white', padding: '32px', borderRadius: '16px', border: '1px solid #E5E7EB', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
-                            {hasRatingOrReviews ? (
-                                <>
-                                    <div style={{ fontSize: '3.75rem', fontWeight: '900', color: '#111827', lineHeight: '1' }}>
-                                        {computedAvgRating}
-                                    </div>
-                                    <div style={{ color: '#FBBF24', fontSize: '1.4rem', margin: '14px 0' }}>
-                                        {[1, 2, 3, 4, 5].map(i => (
-                                            <i key={i} className={`bi bi-star${i <= Math.round(Number(computedAvgRating) || 0) ? '-fill' : ''}`} />
-                                        ))}
-                                    </div>
-                                    <div style={{ color: '#6B7280', marginBottom: '24px', fontSize: '0.95rem' }}>
-                                        {reviewCount > 0 ? `${reviewCount} verified ratings` : 'Ratings recorded'}
-                                    </div>
-                                </>
-                            ) : (
-                                <div style={{ padding: '8px 0 20px', color: '#6B7280' }}>
-                                    <i className="bi bi-star" style={{ fontSize: '2.5rem', color: '#D1D5DB', display: 'block', marginBottom: '8px' }} />
-                                    <div style={{ fontWeight: '700', color: '#374151', fontSize: '1.1rem' }}>No Ratings Yet</div>
-                                    <div style={{ fontSize: '0.875rem', marginTop: '4px' }}>Be the first customer to rate this product!</div>
-                                </div>
-                            )}
-
-                            {!user ? (
-                                <p style={{ color: '#6B7280', fontSize: '0.95rem' }}>Please log in to write a review.</p>
-                            ) : (
-                                <form onSubmit={handleReviewSubmit} style={{ marginTop: '28px', textAlign: 'left', borderTop: '1px solid #E5E7EB', paddingTop: '20px' }}>
-                                    <h4 style={{ fontSize: '1.05rem', fontWeight: '700', marginBottom: '14px' }}>Write a Review</h4>
-
-                                    <div style={{ display: 'flex', gap: '6px', marginBottom: '14px', color: '#FBBF24', fontSize: '1.4rem', cursor: 'pointer' }}>
-                                        {[1, 2, 3, 4, 5].map(i => (
-                                            <i key={i} onClick={() => setReviewRating(i)} className={`bi bi-star${i <= reviewRating ? '-fill' : ''}`} />
-                                        ))}
-                                    </div>
-
-                                    <input
-                                        type="text"
-                                        placeholder="Review Title"
-                                        value={reviewTitle}
-                                        onChange={(e) => setReviewTitle(e.target.value)}
-                                        required
-                                        style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #D1D5DB', marginBottom: '10px', fontFamily: 'inherit' }}
-                                    />
-
-                                    <textarea
-                                        placeholder="Write your review here..."
-                                        value={reviewComment}
-                                        onChange={(e) => setReviewComment(e.target.value)}
-                                        required
-                                        rows="4"
-                                        style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #D1D5DB', marginBottom: '14px', fontFamily: 'inherit', resize: 'vertical' }}
-                                    />
-
-                                    <button
-                                        type="submit"
-                                        disabled={submittingReview}
-                                        style={{
-                                            width: '100%',
-                                            padding: '12px',
-                                            backgroundColor: 'var(--cta)',
-                                            color: 'white',
-                                            border: 'none',
-                                            borderRadius: '8px',
-                                            fontWeight: '700',
-                                            cursor: submittingReview ? 'not-allowed' : 'pointer',
-                                            opacity: submittingReview ? 0.7 : 1
-                                        }}
-                                    >
-                                        {submittingReview ? 'Submitting...' : 'Submit Review'}
-                                    </button>
-                                </form>
-                            )}
-                        </div>
-
-                        {/* Right Card: Review List */}
-                        <div style={{ flex: '2 1 500px', backgroundColor: 'white', padding: '32px', borderRadius: '16px', border: '1px solid #E5E7EB', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
-                            {reviewsLoading ? (
-                                <div style={{ textAlign: 'center', padding: '40px 0', color: '#9CA3AF' }}>Loading reviews...</div>
-                            ) : reviews && reviews.length > 0 ? (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
-                                    {reviews.map((rev, idx) => (
-                                        <div key={rev.id || idx} style={{ borderBottom: idx !== reviews.length - 1 ? '1px solid #E5E7EB' : 'none', paddingBottom: idx !== reviews.length - 1 ? '24px' : '0' }}>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                    <div style={{ width: '38px', height: '38px', borderRadius: '50%', backgroundColor: 'var(--cta)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800', fontSize: '1.1rem' }}>
-                                                        {(rev.user_name || rev.author || 'U')[0].toUpperCase()}
-                                                    </div>
-                                                    <div style={{ fontWeight: '700', color: '#111827' }}>{rev.user_name || rev.author || 'Verified Customer'}</div>
-                                                </div>
-                                                {rev.created_at && (
-                                                    <div style={{ fontSize: '0.85rem', color: '#9CA3AF', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                        <i className="bi bi-calendar3" />
-                                                        {new Date(rev.created_at).toLocaleDateString()}
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                                                <div style={{ color: '#FBBF24', fontSize: '0.9rem', display: 'flex', gap: '2px' }}>
-                                                    {[1, 2, 3, 4, 5].map(i => <i key={i} className={`bi bi-star${i <= (Number(rev.rating) || 5) ? '-fill' : ''}`} />)}
-                                                </div>
-                                                {rev.title && <div style={{ fontWeight: '700', color: '#111827', fontSize: '0.95rem' }}>{rev.title}</div>}
-                                            </div>
-
-                                            <p style={{ color: '#4B5563', lineHeight: '1.6', margin: '0' }}>{rev.body || rev.comment || rev.content}</p>
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <div style={{ textAlign: 'center', padding: '40px 0' }}>
-                                    <i className="bi bi-chat-square-text" style={{ fontSize: '2rem', color: '#D1D5DB', marginBottom: '12px', display: 'block' }} />
-                                    <h4 style={{ fontWeight: '700', color: '#4B5563', marginBottom: '8px' }}>No Reviews Yet</h4>
-                                    <p style={{ color: '#6B7280', fontSize: '0.9rem' }}>Be the first to share your thoughts on this product!</p>
-                                </div>
-                            )}
-                        </div>
 
                     </div>
                 </div>

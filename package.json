@@ -1,7 +1,7 @@
 {
   "name": "electrocart",
   "version": "1.0.0",
-  "description": "Premium wearable electronics ecommerce frontend",
+  "description": "Smiley N Traders - Automotive Key Blanks, Flip Keys & Remotes",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

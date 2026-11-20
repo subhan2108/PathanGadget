@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { formatPrice } from '../lib/productsService'
 import { useProducts, useCategories } from '../hooks/useProducts'
@@ -91,10 +91,6 @@ const HERO_SLIDES = [
 
 
 const CATEGORY_ICONS = {
-    watches: 'bi-smartwatch',
-    airpods: 'bi-earbuds',
-    headphones: 'bi-headphones',
-    smartphones: 'bi-phone',
     'Xhorse Smart Key': 'bi-key-fill',
     'xhorse smart key': 'bi-key-fill',
     'Xhorse Wireless Remote': 'bi-broadcast',
@@ -146,6 +142,26 @@ const CATEGORY_ICONS = {
     Remote: 'bi-key',
 }
 
+const getCategoryIcon = (id = '', name = '') => {
+    if (CATEGORY_ICONS[id]) return CATEGORY_ICONS[id]
+    const key = `${id} ${name}`.toLowerCase()
+    if (key.includes('pad')) return 'bi-grid-3x3'
+    if (key.includes('blade')) return 'bi-slash-square'
+    if (key.includes('batter')) return 'bi-battery-charging'
+    if (key.includes('domestic') || key.includes('house')) return 'bi-house-lock'
+    if (key.includes('cover')) return 'bi-shield-shaded'
+    if (key.includes('bike') || key.includes('wheeler')) return 'bi-bicycle'
+    if (key.includes('light') || key.includes('led') || key.includes('lamp')) return 'bi-lightbulb-fill'
+    if (key.includes('fragrance') || key.includes('perfume')) return 'bi-droplet-fill'
+    if (key.includes('chain')) return 'bi-link-45deg'
+    if (key.includes('tool')) return 'bi-tools'
+    if (key.includes('camera') || key.includes('electronic')) return 'bi-camera-video'
+    if (key.includes('remote') || key.includes('key')) return 'bi-key'
+    if (key.includes('shell')) return 'bi-shield-check'
+    if (key.includes('chip') || key.includes('transponder')) return 'bi-memory'
+    return 'bi-tag'
+}
+
 function ProductCardSkeleton() {
     return (
         <div className="glass-card relative flex h-full w-full flex-col items-center justify-between p-6 text-center animate-pulse min-h-[440px]">
@@ -170,6 +186,117 @@ export default function HomePage() {
     const { categories } = useCategories()
 
     const displayed = filtered.slice(0, visibleCount)
+
+    // Horizontal category tabs scroll state and drag handling (matching Products Page)
+    const tabsRef = useRef(null)
+    const [canScrollLeft, setCanScrollLeft] = useState(false)
+    const [canScrollRight, setCanScrollRight] = useState(false)
+    const isDraggingRef = useRef(false)
+    const hasDraggedRef = useRef(false)
+    const dragStartXRef = useRef(0)
+    const dragScrollLeftRef = useRef(0)
+
+    const totalCount = useMemo(() => {
+        return categories.reduce((sum, c) => sum + (c.count || 0), 0)
+    }, [categories])
+
+    const allCategoryTabs = useMemo(() => {
+        return [
+            { id: 'all', name: 'All Products', icon: 'bi-grid', count: totalCount },
+            ...categories.map(c => ({
+                id: c.id,
+                name: c.name || c.id,
+                icon: getCategoryIcon(c.id, c.name),
+                count: c.count || 0,
+            }))
+        ]
+    }, [categories, totalCount])
+
+    const checkTabsScroll = useCallback(() => {
+        const el = tabsRef.current
+        if (!el) return
+        const { scrollLeft, scrollWidth, clientWidth } = el
+        setCanScrollLeft(scrollLeft > 4)
+        setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 4)
+    }, [])
+
+    const scrollTabs = (direction) => {
+        const el = tabsRef.current
+        if (!el) return
+        const scrollAmount = direction === 'left' ? -280 : 280
+        el.scrollBy({ left: scrollAmount, behavior: 'smooth' })
+    }
+
+    const handleMouseDownTabs = (e) => {
+        if (e.button !== 0) return
+        isDraggingRef.current = true
+        hasDraggedRef.current = false
+        dragStartXRef.current = e.pageX
+        dragScrollLeftRef.current = tabsRef.current?.scrollLeft || 0
+    }
+
+    const handleMouseMoveTabs = (e) => {
+        if (!isDraggingRef.current || !tabsRef.current) return
+        const deltaX = e.pageX - dragStartXRef.current
+        if (Math.abs(deltaX) > 4) {
+            hasDraggedRef.current = true
+        }
+        tabsRef.current.scrollLeft = dragScrollLeftRef.current - deltaX
+        checkTabsScroll()
+    }
+
+    const handleMouseUpTabs = () => {
+        isDraggingRef.current = false
+        setTimeout(() => {
+            hasDraggedRef.current = false
+        }, 60)
+    }
+
+    // Wheel event to translate vertical wheel into horizontal scrolling on tabs
+    useEffect(() => {
+        const el = tabsRef.current
+        if (!el) return
+
+        const handleWheel = (e) => {
+            if (el.scrollWidth > el.clientWidth) {
+                const canLeft = el.scrollLeft > 0
+                const canRight = el.scrollLeft < el.scrollWidth - el.clientWidth - 1
+
+                if ((e.deltaY > 0 && canRight) || (e.deltaY < 0 && canLeft)) {
+                    e.preventDefault()
+                    el.scrollLeft += e.deltaY
+                    checkTabsScroll()
+                }
+            }
+        }
+
+        el.addEventListener('wheel', handleWheel, { passive: false })
+        return () => el.removeEventListener('wheel', handleWheel)
+    }, [checkTabsScroll])
+
+    // Update scroll indicators on resize, category changes, or scroll
+    useEffect(() => {
+        checkTabsScroll()
+        const el = tabsRef.current
+        if (el) {
+            el.addEventListener('scroll', checkTabsScroll, { passive: true })
+        }
+        window.addEventListener('resize', checkTabsScroll)
+        return () => {
+            if (el) el.removeEventListener('scroll', checkTabsScroll)
+            window.removeEventListener('resize', checkTabsScroll)
+        }
+    }, [categories, checkTabsScroll])
+
+    // Auto-scroll active tab into view when activeCategory changes
+    useEffect(() => {
+        if (!tabsRef.current) return
+        const tabs = Array.from(tabsRef.current.querySelectorAll('.featured-tab'))
+        const activeBtn = tabs.find(btn => btn.dataset.categoryId === String(activeCategory))
+        if (activeBtn) {
+            activeBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
+        }
+    }, [activeCategory])
 
     return (
         <div className="home-page page-enter" id="home-page">
@@ -213,12 +340,12 @@ export default function HomePage() {
                                 >
                                     <div className="category-card__img-wrap">
                                         <img
-                                            src={cat.image}
+                                            src={cat.image || '/placeholder-key.svg'}
                                             alt={cat.name}
                                             className="category-card__img"
                                             loading="lazy"
                                             onError={(e) => {
-                                                if (!e.currentTarget.src.includes('placeholder')) {
+                                                if (!e.currentTarget.src.includes('placeholder-key.svg')) {
                                                     e.currentTarget.src = '/placeholder-key.svg';
                                                 }
                                             }}
@@ -249,23 +376,64 @@ export default function HomePage() {
                         <h2>Featured Products</h2>
                     </div>
 
-                    {/* Filter Tabs */}
-                    <div className="filter-tabs" id="product-filters" role="tablist">
-                        {[
-                            { id: 'all', label: 'All Products', icon: 'bi-grid' },
-                            ...categories.map(c => ({ id: c.id, label: c.name, icon: CATEGORY_ICONS[c.id] || c.icon || 'bi-box' }))
-                        ].map(cat => (
+                    {/* Featured Category Tabs (Horizontal Scrollable Carousel matching Products Page) */}
+                    <div className={`featured-tabs-wrapper ${canScrollLeft ? 'can-scroll-left' : ''} ${canScrollRight ? 'can-scroll-right' : ''}`}>
+                        {canScrollLeft && (
                             <button
-                                key={cat.id}
-                                id={`filter-${cat.id}`}
-                                role="tab"
-                                aria-selected={activeCategory === cat.id}
-                                className={`filter-tab ${activeCategory === cat.id ? 'active' : ''}`}
-                                onClick={() => { setActiveCategory(cat.id); setVisibleCount(8) }}
+                                type="button"
+                                className="featured-cat-arrow featured-cat-arrow--left"
+                                onClick={() => scrollTabs('left')}
+                                aria-label="Scroll categories left"
+                                title="Scroll left"
                             >
-                                <i className={`bi ${cat.icon}`} /> {cat.label}
+                                <i className="bi bi-chevron-left" />
                             </button>
-                        ))}
+                        )}
+
+                        <div
+                            ref={tabsRef}
+                            className="featured-tabs"
+                            id="product-filters"
+                            role="tablist"
+                            onMouseDown={handleMouseDownTabs}
+                            onMouseMove={handleMouseMoveTabs}
+                            onMouseUp={handleMouseUpTabs}
+                            onMouseLeave={handleMouseUpTabs}
+                        >
+                            {allCategoryTabs.map(cat => (
+                                <button
+                                    key={cat.id}
+                                    id={`filter-${cat.id}`}
+                                    data-category-id={cat.id}
+                                    role="tab"
+                                    aria-selected={activeCategory === cat.id}
+                                    className={`featured-tab ${activeCategory === cat.id ? 'active' : ''}`}
+                                    onClick={() => {
+                                        if (hasDraggedRef.current) return
+                                        setActiveCategory(cat.id)
+                                        setVisibleCount(8)
+                                    }}
+                                >
+                                    <i className={`bi ${cat.icon}`} />
+                                    <span>{cat.name}</span>
+                                    <span className={`featured-tab-count ${activeCategory === cat.id ? 'active' : ''}`}>
+                                        {cat.count}
+                                    </span>
+                                </button>
+                            ))}
+                        </div>
+
+                        {canScrollRight && (
+                            <button
+                                type="button"
+                                className="featured-cat-arrow featured-cat-arrow--right"
+                                onClick={() => scrollTabs('right')}
+                                aria-label="Scroll categories right"
+                                title="Scroll right"
+                            >
+                                <i className="bi bi-chevron-right" />
+                            </button>
+                        )}
                     </div>
 
                     {/* Products Grid */}
@@ -284,7 +452,7 @@ export default function HomePage() {
                                     ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
                                     : 0
                                 const offerText = product.badge || (discount > 0 ? `${discount}% Off` : 'Special Deal')
-                                const tagline = product.tagline || product.description || (product.category ? `${product.category.toUpperCase()} Collection` : 'Premium Audio & Wearables')
+                                const tagline = product.tagline || product.description || (product.category ? `${product.category.toUpperCase()} Collection` : 'Automotive Key Blanks & Remotes')
 
                                 return (
                                     <ProductCard
@@ -350,32 +518,32 @@ export default function HomePage() {
                                     <span className="cta-badge__ping" />
                                 </span>
                                 <i className="bi bi-lightning-charge-fill cta-badge__icon" />
-                                <span>VIP Member Privileges</span>
+                                <span>B2B & Retail Partner Benefits</span>
                             </div>
 
                             <h2 className="cta-card__title">
-                                Ready to Elevate <br className="hidden sm:inline" />
-                                <span className="cta-card__title-highlight">Your Tech Lifestyle?</span>
+                                Ready to Upgrade <br className="hidden sm:inline" />
+                                <span className="cta-card__title-highlight">Your Key & Locksmith Inventory?</span>
                             </h2>
 
                             <p className="cta-card__desc">
-                                Join 50,000+ satisfied customers. Experience authentic luxury audio, smartwatches & guaranteed fast delivery with free priority shipping on your first order.
+                                Trusted by locksmiths and automotive retailers across India. Genuine key blanks, remote shells, transponder chips & guaranteed fast courier dispatch.
                             </p>
 
                             <div className="cta-card__trust">
                                 <div className="cta-trust-item">
                                     <i className="bi bi-patch-check-fill" />
-                                    <span>100% Authentic Tech</span>
+                                    <span>100% Genuine Quality</span>
                                 </div>
                                 <div className="cta-trust-divider" />
                                 <div className="cta-trust-item">
                                     <i className="bi bi-truck" />
-                                    <span>Free Express Shipping</span>
+                                    <span>Fast DTDC & Maruti Courier</span>
                                 </div>
                                 <div className="cta-trust-divider" />
                                 <div className="cta-trust-item">
-                                    <i className="bi bi-arrow-repeat" />
-                                    <span>7-Day Return Guarantee</span>
+                                    <i className="bi bi-whatsapp" />
+                                    <span>Direct WhatsApp Orders</span>
                                 </div>
                             </div>
                         </div>
@@ -387,7 +555,7 @@ export default function HomePage() {
                                     <i className="bi bi-arrow-right" />
                                 </span>
                             </a>
-                            <Link to="/track/ORD-2024-002" className="cta-btn cta-btn--glass" id="cta-track">
+                            <Link to="/track" className="cta-btn cta-btn--glass" id="cta-track">
                                 <i className="bi bi-geo-alt-fill" />
                                 <span>Track Order</span>
                             </Link>

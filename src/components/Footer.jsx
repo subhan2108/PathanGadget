@@ -14,9 +14,11 @@ export default function Footer() {
                             <img src="/logo.png" alt="Smiley N Traders" className="footer__logo-img" />
                             <span>Smiley N <strong>Traders</strong></span>
                         </Link>
-                        <p className="footer__tagline">Premium wearable tech delivered to your doorstep. Curated. Trusted. Fast.</p>
+                        <p className="footer__tagline">
+                            India's trusted B2B wholesale & retail supplier of automotive key blanks, remote shells, flip keys, transponder chips & locksmith tools.
+                        </p>
                         <div className="footer__social">
-                            <a href="#" id="footer-twitter" aria-label="Twitter" className="social-link"><i className="bi bi-twitter-x" /></a>
+                            <a href="https://wa.me/918178768308" target="_blank" rel="noopener noreferrer" id="footer-whatsapp" aria-label="WhatsApp" className="social-link" title="Chat on WhatsApp"><i className="bi bi-whatsapp" /></a>
                             <a href="#" id="footer-instagram" aria-label="Instagram" className="social-link"><i className="bi bi-instagram" /></a>
                             <a href="#" id="footer-youtube" aria-label="YouTube" className="social-link"><i className="bi bi-youtube" /></a>
                             <a href="#" id="footer-facebook" aria-label="Facebook" className="social-link"><i className="bi bi-facebook" /></a>
@@ -25,22 +27,24 @@ export default function Footer() {
 
                     {/* Shop */}
                     <div className="footer__col">
-                        <h4>Shop</h4>
+                        <h4>Shop Automotive</h4>
                         <ul>
-                            <li><Link to="/?category=watches"><i className="bi bi-smartwatch" /> Smart Watches</Link></li>
-                            <li><Link to="/?category=airpods"><i className="bi bi-earbuds" /> AirPods & Earbuds</Link></li>
-                            <li><Link to="/?category=headphones"><i className="bi bi-headphones" /> Headphones</Link></li>
-                            <li><Link to="/"><i className="bi bi-stars" /> New Arrivals</Link></li>
-                            <li><Link to="/"><i className="bi bi-trophy" /> Best Sellers</Link></li>
+                            <li><Link to="/products?category=Remote%20Shell"><i className="bi bi-shield-check" /> Remote Shells</Link></li>
+                            <li><Link to="/products?category=Car%20Remote"><i className="bi bi-key" /> Car Key Remotes</Link></li>
+                            <li><Link to="/products?category=Smart%20Keys"><i className="bi bi-key-fill" /> Smart Keys</Link></li>
+                            <li><Link to="/products?category=Flip%20Blades"><i className="bi bi-slash-square" /> Flip Key Blades</Link></li>
+                            <li><Link to="/products?category=Transponder%20Chips"><i className="bi bi-cpu" /> Transponder Chips</Link></li>
+                            <li><Link to="/products?category=Locksmith%20Tools"><i className="bi bi-tools" /> Locksmith Tools</Link></li>
                         </ul>
                     </div>
 
                     {/* Account */}
                     <div className="footer__col">
-                        <h4>Account</h4>
+                        <h4>Account & Orders</h4>
                         <ul>
-                            <li><Link to="/orders"><i className="bi bi-box-seam" /> My Orders</Link></li>
-                            <li><Link to="/track/ORD-2024-002"><i className="bi bi-geo-alt" /> Track Order</Link></li>
+                            <li><Link to="/profile"><i className="bi bi-person-badge" /> My Profile & Orders</Link></li>
+                            <li><Link to="/track"><i className="bi bi-geo-alt" /> Live Order Tracking</Link></li>
+                            <li><a href="https://wa.me/918178768308?text=Hello%20Smiley%20N%20Traders,%20I%20need%20assistance" target="_blank" rel="noopener noreferrer"><i className="bi bi-whatsapp" /> WhatsApp Support</a></li>
                             <li><Link to="/refund"><i className="bi bi-arrow-return-left" /> Returns & Refunds</Link></li>
                         </ul>
                     </div>
