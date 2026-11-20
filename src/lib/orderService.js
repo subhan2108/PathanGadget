@@ -378,20 +378,6 @@ export async function placeOrder(orderData) {
                     )
                 `;
             }
-
-            // Automatically deduct stock quantity and update in_stock status
-            if (item.id) {
-                try {
-                    await sql`
-                        UPDATE products
-                        SET stock_quantity = GREATEST(0, COALESCE(stock_quantity, 5) - ${item.quantity}),
-                            in_stock = CASE WHEN GREATEST(0, COALESCE(stock_quantity, 5) - ${item.quantity}) > 0 THEN true ELSE false END
-                        WHERE id = ${item.id}
-                    `;
-                } catch (stockErr) {
-                    console.warn('Could not deduct stock for product:', item.id, stockErr);
-                }
-            }
         }
 
         return { success: true, id: newOrder.id, order_number: orderData.order_number };

@@ -1,48 +1,65 @@
 /* ============================================
-   Payment Page
+   Payment Page — Modern Mobile-Friendly Checkout
    ============================================ */
 .payment-page {
     min-height: 100vh;
-    background: #FFFFFF;
+    background: #F8FAFC;
 }
 
 /* ── Header ── */
 .payment-header {
     background: #FFFFFF;
-    border-bottom: 1px solid var(--border);
-    padding: 36px 0;
+    border-bottom: 1px solid var(--border, #E2E8F0);
+    padding: 28px 0 24px;
+}
+
+.payment-header .breadcrumb {
+    margin-bottom: 12px;
 }
 
 .payment-header h1 {
     display: flex;
     align-items: center;
     gap: 10px;
-    margin-bottom: 10px;
+    font-size: 1.65rem;
+    font-weight: 800;
+    color: #111827;
+    margin: 0 0 12px 0;
+    line-height: 1.25;
 }
 
 .payment-header__trust {
     display: flex;
-    gap: 16px;
+    gap: 12px;
     flex-wrap: wrap;
+    align-items: center;
 }
 
 .payment-header__trust span {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
+    gap: 6px;
     font-size: 0.8125rem;
     font-weight: 600;
-    color: var(--text-muted);
+    color: #475569;
+    background: #F1F5F9;
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid #E2E8F0;
 }
 
 .payment-header__trust i {
-    color: var(--cta);
+    color: #D97706;
     font-size: 0.875rem;
+}
+
+.payment-header__trust span:nth-child(2) i {
+    color: #25D366;
 }
 
 /* ── Body ── */
 .payment-body {
-    padding: 32px 0 64px;
+    padding: 32px 0 80px;
 }
 
 /* ── Grid ── */
@@ -61,50 +78,149 @@
 }
 
 .payment-section {
-    background: var(--white);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    padding: 28px;
-    box-shadow: var(--shadow-sm);
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
 .payment-section h2 {
-    font-size: 1.0625rem;
-    font-weight: 700;
-    color: var(--text-primary);
-    margin-bottom: 24px;
-    padding-bottom: 14px;
-    border-bottom: 1px solid var(--border);
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: #1E293B;
+    margin: 0 0 20px 0;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #F1F5F9;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
 }
 
 .payment-section h2 i {
-    color: var(--cta);
+    color: #D97706;
+    font-size: 1.15rem;
 }
 
-/* Form Row */
-.form-row {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 16px;
+/* ── Recognized Customer Banner ── */
+.recognized-customer-banner {
+    background: #FEF3C7;
+    border: 1.5px solid #FCD34D;
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
 }
 
-/* Form Fields — global (defined in index.css, adding icon-aware supplements) */
+.recognized-customer-banner__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.saved-badge {
+    background: #B45309;
+    color: #FFFFFF;
+    font-size: 0.725rem;
+    font-weight: 800;
+    padding: 3px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.btn-change-address {
+    background: #FFFFFF;
+    border: 1.5px solid #D97706;
+    color: #B45309;
+    font-weight: 700;
+    font-size: 0.8125rem;
+    padding: 5px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 150ms ease;
+}
+
+.btn-change-address:hover {
+    background: #FDFBF7;
+    border-color: #B45309;
+}
+
+.recognized-customer-name {
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: #92400E;
+    margin: 4px 0 6px 0;
+}
+
+.recognized-customer-details p {
+    margin: 4px 0 0 0;
+    color: #78350F;
+    font-size: 0.875rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    word-break: break-word;
+}
+
+.recognized-customer-details p i {
+    margin-top: 2px;
+    color: #B45309;
+}
+
+.done-editing-wrap {
+    margin-top: 14px;
+    text-align: right;
+}
+
+/* ── Form Fields ── */
+.form-field {
+    display: flex;
+    flex-direction: column;
+}
+
 .form-field label {
     display: flex;
     align-items: center;
-    gap: 5px;
-    font-size: 0.8125rem;
-    font-weight: 600;
-    color: var(--text-secondary);
-    margin-bottom: 7px;
+    gap: 6px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #334155;
+    margin-bottom: 6px;
+    flex-wrap: wrap;
 }
 
-.form-field label i {
-    font-size: 0.8rem;
-    color: var(--accent);
+.label-helper-text {
+    font-size: 0.75rem;
+    color: #64748B;
+    font-weight: normal;
+}
+
+.form-field input,
+.form-field textarea {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1.5px solid #CBD5E1;
+    border-radius: 8px;
+    background: #FFFFFF;
+    font-size: 0.95rem;
+    color: #0F172A;
+    outline: none;
+    transition: border-color 150ms ease, box-shadow 150ms ease;
+    box-sizing: border-box;
+}
+
+.form-field input:focus,
+.form-field textarea:focus {
+    border-color: #D97706;
+    box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.12);
+}
+
+.form-field input.error,
+.form-field textarea.error {
+    border-color: #EF4444;
+    background: #FEF2F2;
 }
 
 .field-error {
@@ -113,681 +229,674 @@
     gap: 4px;
     font-size: 0.75rem;
     color: #DC2626;
+    font-weight: 600;
     margin-top: 4px;
 }
 
-.field-error i {
-    font-size: 0.75rem;
-}
-
-/* ── Payment Methods ── */
-.payment-methods {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-.payment-method-card {
+.phone-input-wrap {
+    position: relative;
     display: flex;
     align-items: center;
-    gap: 14px;
-    padding: 14px 18px;
-    border: 1.5px solid var(--border);
-    border-radius: var(--radius-md);
-    cursor: pointer;
-    transition: all 200ms ease;
-    position: relative;
 }
 
-.payment-method-card input[type="radio"] {
+.phone-prefix {
     position: absolute;
-    opacity: 0;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-weight: 800;
+    color: #64748B;
+    font-size: 0.95rem;
+    user-select: none;
     pointer-events: none;
 }
 
-.payment-method-card:hover {
-    border-color: var(--accent);
-    background: var(--primary-bg);
-}
-
-.payment-method-card.active {
-    border-color: var(--cta);
-    background: rgba(184, 132, 36, 0.05);
-    box-shadow: 0 0 0 3px rgba(184, 132, 36, 0.12);
-}
-
-.payment-method-icon {
-    width: 44px;
-    height: 44px;
-    border-radius: 12px;
-    background: var(--primary-bg);
-    border: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.25rem;
-    color: var(--cta);
-    flex-shrink: 0;
-}
-
-.payment-method-info {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-}
-
-.payment-method-label {
+.phone-field input {
+    padding-left: 48px;
     font-weight: 700;
-    font-size: 0.9375rem;
-    color: var(--text-primary);
+    font-size: 1rem;
+    letter-spacing: 0.03em;
 }
 
-.payment-method-desc {
-    font-size: 0.8125rem;
-    color: var(--text-muted);
+.phone-lookup-status {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #B45309;
+    background: #FEF3C7;
+    padding: 2px 8px;
+    border-radius: 4px;
 }
 
-.payment-method-check {
-    margin-left: auto;
-    font-size: 1.25rem;
-    color: var(--cta);
-    flex-shrink: 0;
-}
-
-.card-fields {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    animation: slideDown 200ms ease;
-}
-
-@keyframes slideDown {
-    from {
-        opacity: 0;
-        transform: translateY(-8px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-/* ── Pay Button ── */
-.pay-btn {
-    font-size: 1.0625rem;
-    padding: 18px;
-    background: linear-gradient(135deg, var(--cta), var(--cta-dark));
-    box-shadow: 0 6px 20px rgba(184, 132, 36, 0.35);
-    border-radius: var(--radius-md);
-    border: none;
-    color: white;
-    cursor: pointer;
-    transition: all 200ms ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-}
-
-.pay-btn:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 28px rgba(184, 132, 36, 0.45);
-}
-
-.pay-btn.loading {
-    opacity: 0.8;
-    cursor: wait;
-    animation: payPulse 1.5s ease-in-out infinite;
-}
-
-.pay-btn:disabled {
-    opacity: 0.7;
-    cursor: not-allowed;
-    transform: none !important;
-}
-
-@keyframes payPulse {
-
-    0%,
-    100% {
-        opacity: 0.8;
-    }
-
-    50% {
-        opacity: 1;
-    }
-}
-
-.spinner {
-    width: 18px;
-    height: 18px;
-    border: 2px solid rgba(255, 255, 255, 0.35);
-    border-top-color: white;
-    border-radius: 50%;
-    animation: spin 0.75s linear infinite;
-    display: inline-block;
-}
-
-@keyframes spin {
-    to {
-        transform: rotate(360deg);
-    }
-}
-
-.payment-disclaimer {
-    font-size: 0.8125rem;
-    color: var(--text-muted);
-    text-align: center;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    margin-top: -8px;
-}
-
-.payment-disclaimer i {
-    color: #059669;
-}
-
-/* ── Summary Column ── */
-.payment-summary-col {
-    position: sticky;
-    top: 88px;
-    display: flex;
-    flex-direction: column;
+.form-row {
+    display: grid;
     gap: 16px;
 }
 
-.payment-summary-card {
-    background: var(--white);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    padding: 24px;
-    box-shadow: var(--shadow-sm);
-}
-
-.payment-summary-card h3 {
-    font-size: 1.0625rem;
-    font-weight: 700;
-    margin-bottom: 20px;
-    padding-bottom: 14px;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    color: var(--text-primary);
-}
-
-/* Summary Items */
-.summary-items {
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
+.form-row--names {
+    grid-template-columns: 1fr 1fr;
     margin-bottom: 16px;
 }
 
-.summary-item {
+.form-row--location {
+    grid-template-columns: 1fr 1fr 1fr;
+}
+
+.address-field {
+    margin-bottom: 16px;
+}
+
+.address-field textarea {
+    resize: vertical;
+    min-height: 64px;
+}
+
+/* ── WhatsApp Payment Info Box ── */
+.whatsapp-info-box {
+    background: #F0FDF4;
+    border: 1.5px solid #86EFAC;
+    border-radius: 12px;
+    padding: 18px;
+}
+
+.whatsapp-info-box__header {
     display: flex;
     align-items: center;
     gap: 12px;
+    margin-bottom: 12px;
 }
 
-.summary-item img {
-    width: 60px;
-    height: 60px;
-    border-radius: 10px;
-    object-fit: contain;
-    background: #FFFFFF;
-    border: 1px solid var(--border);
-    flex-shrink: 0;
-    padding: 4px;
-}
-
-.summary-item__name {
-    font-size: 0.8125rem;
-    font-weight: 600;
-    color: var(--text-primary);
-    margin-bottom: 3px;
-}
-
-.summary-item__qty {
-    font-size: 0.75rem;
-    color: var(--text-muted);
+.whatsapp-info-box__icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: #25D366;
+    color: #FFFFFF;
     display: flex;
     align-items: center;
-    gap: 3px;
+    justify-content: center;
+    font-size: 1.4rem;
+    flex-shrink: 0;
+    box-shadow: 0 4px 10px rgba(37, 211, 102, 0.35);
 }
 
-.summary-item__qty i {
-    font-size: 0.7rem;
+.wa-title {
+    font-size: 1rem;
+    color: #166534;
+    display: block;
+    line-height: 1.3;
 }
 
-.summary-item__price {
-    font-size: 0.9375rem;
-    font-weight: 700;
-    color: #111827;
-    margin-left: auto;
-    white-space: nowrap;
+.wa-subtitle {
+    font-size: 0.8125rem;
+    color: #15803D;
 }
 
-/* Calc Rows */
-.summary-calc-rows {
+.whatsapp-info-box__desc {
+    margin: 0 0 10px 0;
+    font-size: 0.85rem;
+    color: #166534;
+    line-height: 1.4;
+}
+
+.whatsapp-steps-card {
+    background: #FFFFFF;
+    border: 1px solid #BBF7D0;
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-size: 0.8125rem;
+    color: #334155;
+}
+
+.whatsapp-steps-card ol {
+    margin: 0;
+    padding-left: 18px;
     display: flex;
     flex-direction: column;
+    gap: 6px;
+}
+
+/* ── Main Submit Button ── */
+.btn-whatsapp-submit {
+    width: 100%;
+    padding: 16px 20px;
+    font-size: 1.1rem;
+    font-weight: 800;
+    border-radius: 12px;
+    background: #25D366;
+    color: #FFFFFF;
+    border: none;
+    display: flex;
+    justify-content: center;
+    align-items: center;
     gap: 10px;
-    margin-bottom: 4px;
+    box-shadow: 0 4px 14px rgba(37, 211, 102, 0.35);
+    cursor: pointer;
+    transition: all 180ms ease;
+    min-height: 54px;
+}
+
+.btn-whatsapp-submit:hover:not(:disabled) {
+    background: #20BA5A;
+    box-shadow: 0 6px 20px rgba(37, 211, 102, 0.45);
+    transform: translateY(-1px);
+}
+
+.btn-whatsapp-submit:active:not(:disabled) {
+    transform: scale(0.98);
+}
+
+.btn-whatsapp-submit:disabled {
+    opacity: 0.75;
+    cursor: wait;
+}
+
+/* ── Summary Sidebar (Sticky on Desktop) ── */
+.payment-summary {
+    position: sticky;
+    top: 88px;
+}
+
+.summary-items-list {
+    max-height: 360px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 16px;
+    padding-right: 4px;
+}
+
+.desktop-summary-item {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    border-bottom: 1px solid #F1F5F9;
+    padding-bottom: 12px;
+}
+
+.desktop-summary-item:last-child {
+    border-bottom: none;
+    padding-bottom: 4px;
+}
+
+.desktop-summary-item__img {
+    width: 52px;
+    height: 52px;
+    object-fit: contain;
+    background: #FFFFFF;
+    border-radius: 8px;
+    border: 1px solid #E2E8F0;
+    padding: 3px;
+    flex-shrink: 0;
+}
+
+.desktop-summary-item__details {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.desktop-summary-item__name {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: #1E293B;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.payment-qty-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.payment-qty-stepper {
+    display: inline-flex;
+    align-items: center;
+    border: 1.5px solid #CBD5E1;
+    border-radius: 8px;
+    background: #FFFFFF;
+    overflow: hidden;
+    height: 28px;
+}
+
+.payment-qty-btn {
+    width: 28px;
+    height: 100%;
+    background: #F8FAFC;
+    border: none;
+    color: #475569;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 120ms ease;
+    padding: 0;
+}
+
+.payment-qty-btn:hover {
+    background: #E2E8F0;
+    color: #0F172A;
+}
+
+.payment-qty-val {
+    min-width: 28px;
+    text-align: center;
+    font-size: 0.825rem;
+    font-weight: 800;
+    color: #0F172A;
+    padding: 0 4px;
+}
+
+.payment-item-unit {
+    font-size: 0.75rem;
+    color: #64748B;
+    font-weight: 600;
+}
+
+.payment-item-delete-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    color: #94A3B8;
+    cursor: pointer;
+    font-size: 0.95rem;
+    padding: 2px 6px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 150ms ease;
+    margin-left: 2px;
+}
+
+.payment-item-delete-btn:hover {
+    color: #EF4444;
+    background: #FEE2E2;
+    border-color: #FECACA;
+}
+
+.desktop-summary-item__price {
+    font-weight: 800;
+    color: #0F172A;
+    font-size: 0.95rem;
+    white-space: nowrap;
+    text-align: right;
+    align-self: center;
+}
+
+.desktop-summary-calc {
+    border-top: 2px solid #E2E8F0;
+    padding-top: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
 }
 
 .summary-calc-row {
     display: flex;
     justify-content: space-between;
-    align-items: center;
     font-size: 0.875rem;
-    color: var(--text-secondary);
+    color: #475569;
 }
 
-.summary-calc-row span {
-    display: flex;
-    align-items: center;
-    gap: 5px;
+.summary-calc-row.text-green {
+    color: #16A34A;
+    font-weight: 700;
 }
 
-.summary-calc-row span:last-child {
-    font-weight: 600;
-    color: #111827;
-}
-
-.summary-calc-row i {
-    font-size: 0.8rem;
-    color: var(--text-muted);
-}
-
-.text-green {
-    color: #059669;
-    font-weight: 600;
-}
-
-.summary-total-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 1rem;
-}
-
-.summary-total-row strong:first-child {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    color: var(--text-primary);
-}
-
-.total-amount {
+.summary-calc-row--total {
+    border-top: 1px solid #E2E8F0;
+    padding-top: 10px;
+    margin-top: 2px;
     font-size: 1.25rem;
     font-weight: 800;
-    color: #111827;
+    color: #0F172A;
 }
 
-.free-shipping-badge {
-    margin-top: 10px;
-    background: #D1FAE5;
-    color: #059669;
-    font-size: 0.75rem;
-    font-weight: 700;
-    border-radius: 8px;
-    padding: 6px 12px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
+
+
+.btn-sticky-place-order:disabled {
+    opacity: 0.75;
+    cursor: wait;
 }
 
-/* ── Trust Badges ── */
-.trust-badges {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-}
-
-.trust-badge {
-    flex: 1;
-    min-width: 80px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 5px;
-    background: var(--white);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 12px 8px;
-    font-size: 0.7rem;
-    font-weight: 600;
-    color: var(--text-muted);
-    text-align: center;
-}
-
-.trust-badge i {
-    font-size: 1.25rem;
-    color: var(--cta);
-}
-
-/* ── Success ── */
+/* ── Success View ── */
 .payment-success {
-    min-height: 100vh;
-    background: #FFFFFF;
+    min-height: calc(100vh - 120px);
+    background: #F8FAFC;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 48px 24px;
+    padding: 40px 16px;
 }
 
 .payment-success__card {
-    background: white;
-    border-radius: 24px;
-    padding: 56px 48px;
+    background: #FFFFFF;
+    border-radius: 20px;
+    padding: 36px 32px;
     text-align: center;
     max-width: 520px;
     width: 100%;
-    box-shadow: 0 24px 64px rgba(184, 132, 36, 0.15);
-    border: 1px solid var(--border);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
+    border: 1px solid #E2E8F0;
+    box-sizing: border-box;
 }
 
-.success-animation {
-    position: relative;
-    width: 100px;
-    height: 100px;
-    margin: 0 auto 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.success-ring {
-    position: absolute;
-    inset: 0;
-    border-radius: 50%;
-    border: 3px solid var(--cta);
-    animation: ringPop 0.8s ease-out forwards;
-}
-
-@keyframes ringPop {
-    0% {
-        transform: scale(0);
-        opacity: 1;
-    }
-
-    100% {
-        transform: scale(1.3);
-        opacity: 0;
-    }
-}
-
-.success-checkmark {
-    width: 80px;
-    height: 80px;
-    background: linear-gradient(135deg, var(--cta), var(--accent));
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 2.25rem;
-    color: white;
-    box-shadow: 0 8px 24px rgba(184, 132, 36, 0.35);
-    animation: checkBounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.3s both;
-}
-
-@keyframes checkBounce {
-    from {
-        transform: scale(0);
-    }
-
-    to {
-        transform: scale(1);
-    }
-}
-
-.payment-success__card h2 {
-    font-size: 1.75rem;
-    margin-bottom: 10px;
-}
-
-.payment-success__card>p {
-    color: var(--text-muted);
-    font-size: 0.9375rem;
-    margin-bottom: 24px;
-    line-height: 1.7;
-}
-
-.payment-success__card>p code {
-    color: var(--cta);
-    font-weight: 700;
-    background: var(--primary-bg);
-    padding: 2px 8px;
-    border-radius: 5px;
-}
-
-.success-details {
-    background: var(--neutral-bg);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 16px;
-    margin-bottom: 24px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-.success-detail-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 0.875rem;
-}
-
-.success-detail-row span:first-child {
-    color: var(--text-muted);
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.success-detail-row span:first-child i {
-    font-size: 0.8rem;
-}
-
-.success-detail-row span:last-child,
-.success-detail-row strong {
-    color: var(--text-primary);
-    font-weight: 600;
-}
-
-.success-actions {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-/* Responsive */
-@media (max-width: 900px) {
-    .payment-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .payment-summary-col {
-        position: static;
-    }
-}
-
-@media (max-width: 560px) {
-    .payment-success__card {
-        padding: 40px 24px;
-    }
-}
-
-/* ============================================
-   WhatsApp Payment Styles
-   ============================================ */
-.payment-method-card.whatsapp-card.active {
-    border-color: #25D366;
-    background: rgba(37, 211, 102, 0.06);
-    box-shadow: 0 0 0 3px rgba(37, 211, 102, 0.18);
-}
-
-.whatsapp-icon {
-    background: rgba(37, 211, 102, 0.12) !important;
-    border-color: rgba(37, 211, 102, 0.3) !important;
-    color: #25D366 !important;
-    font-size: 1.5rem !important;
-}
-
-.payment-method-card.whatsapp-card .payment-method-check i {
-    color: #25D366;
-}
-
-.whatsapp-badge {
-    display: inline-block;
-    padding: 2px 8px;
+.payment-success__icon-wrap {
     background: #DCFCE7;
-    color: #15803D;
-    font-size: 0.6875rem;
-    font-weight: 700;
-    border-radius: 999px;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-}
-
-.whatsapp-notice-card {
-    background: #F0FDF4;
-    border: 1px solid #BBF7D0;
-    border-radius: var(--radius-md);
-    padding: 16px 20px;
-    margin-top: 16px;
-}
-
-.whatsapp-notice-title {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 0.875rem;
-    font-weight: 700;
-    color: #166534;
-    margin-bottom: 8px;
-}
-
-.whatsapp-notice-title i {
-    color: #22C55E;
-    font-size: 1rem;
-}
-
-.whatsapp-steps-list {
-    margin: 0;
-    padding-left: 20px;
-    font-size: 0.8125rem;
-    color: #374151;
-    line-height: 1.6;
-}
-
-.whatsapp-steps-list li {
-    margin-bottom: 4px;
-}
-
-.pay-btn-whatsapp {
-    background: linear-gradient(135deg, #25D366 0%, #128C7E 100%) !important;
-    box-shadow: 0 6px 20px rgba(37, 211, 102, 0.4) !important;
-}
-
-.pay-btn-whatsapp:hover:not(:disabled) {
-    box-shadow: 0 10px 28px rgba(37, 211, 102, 0.55) !important;
-}
-
-/* WhatsApp Success Screen Additions */
-.whatsapp-success-badge {
-    width: 80px;
-    height: 80px;
-    background: linear-gradient(135deg, #25D366, #128C7E);
+    color: #16A34A;
+    width: 64px;
+    height: 64px;
     border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 16px;
+    font-size: 1.85rem;
+}
+
+.payment-success__title {
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: #1E293B;
+    margin: 0 0 8px 0;
+}
+
+.payment-success__subtitle {
+    color: #475569;
+    font-size: 0.95rem;
+    max-width: 440px;
     margin: 0 auto 20px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 2.5rem;
-    color: white;
-    box-shadow: 0 10px 25px rgba(37, 211, 102, 0.4);
-    animation: checkBounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
-}
-
-.whatsapp-action-box {
-    background: #F0FDF4;
-    border: 1.5px solid #86EFAC;
-    border-radius: 16px;
-    padding: 20px;
-    margin-bottom: 24px;
-    text-align: center;
-}
-
-.whatsapp-action-header {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    font-size: 1.05rem;
-    font-weight: 700;
-    color: #166534;
-    margin-bottom: 8px;
-}
-
-.whatsapp-action-desc {
-    font-size: 0.875rem;
-    color: #374151;
-    margin-bottom: 16px;
     line-height: 1.5;
 }
 
-.btn-whatsapp-cta {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    width: 100%;
-    padding: 14px 20px;
-    background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
-    color: white !important;
-    font-weight: 700;
-    font-size: 1rem;
-    border-radius: 12px;
-    text-decoration: none;
-    box-shadow: 0 4px 14px rgba(37, 211, 102, 0.45);
-    transition: all 200ms ease;
-}
-
-.btn-whatsapp-cta:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(37, 211, 102, 0.6);
-}
-
-.success-items-preview {
+.payment-receipt-card {
     background: #F8FAFC;
     border: 1px solid #E2E8F0;
     border-radius: 12px;
-    padding: 14px 16px;
-    margin-bottom: 20px;
-}
-
-.success-items-list {
+    padding: 16px;
+    text-align: left;
+    margin: 20px 0;
     display: flex;
     flex-direction: column;
     gap: 10px;
 }
 
-.success-item-mini {
+.payment-receipt-row {
     display: flex;
+    justify-content: space-between;
     align-items: center;
-    gap: 12px;
+    font-size: 0.85rem;
+    border-bottom: 1px solid #F1F5F9;
     padding-bottom: 8px;
-    border-bottom: 1px dashed #E2E8F0;
 }
 
-.success-item-mini:last-child {
+.payment-receipt-row:last-child {
     border-bottom: none;
     padding-bottom: 0;
+}
+
+.payment-receipt-row--address {
+    align-items: flex-start;
+    gap: 10px;
+}
+
+.receipt-label {
+    color: #64748B;
+    font-size: 0.8125rem;
+    flex-shrink: 0;
+}
+
+.receipt-val {
+    color: #0F172A;
+}
+
+.receipt-mono {
+    font-family: monospace;
+    font-size: 0.9rem;
+}
+
+.receipt-total {
+    color: #B45309;
+    font-size: 1.05rem;
+}
+
+.receipt-badge {
+    background: #FEF3C7;
+    color: #92400E;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 0.775rem;
+    font-weight: 700;
+}
+
+.receipt-address {
+    text-align: right;
+    max-width: 65%;
+    font-size: 0.8125rem;
+    line-height: 1.35;
+    word-break: break-word;
+}
+
+.payment-success-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 24px;
+}
+
+.btn-success-wa {
+    background: #25D366;
+    color: #FFFFFF !important;
+    padding: 14px 20px;
+    font-weight: 800;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-size: 0.95rem;
+    text-decoration: none;
+    box-shadow: 0 4px 12px rgba(37, 211, 102, 0.35);
+    transition: all 150ms ease;
+}
+
+.btn-success-wa:hover {
+    background: #20BA5A;
+}
+
+.btn-success-track {
+    padding: 12px 20px;
+    font-weight: 700;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.btn-success-home {
+    padding: 12px 20px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ── Empty Cart ── */
+.empty-cart-container {
+    padding: 60px 16px;
+    text-align: center;
+}
+
+.empty-cart-icon {
+    font-size: 3.5rem;
+    color: #CBD5E1;
+    margin-bottom: 12px;
+}
+
+.empty-cart-container h2 {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: #1E293B;
+}
+
+.empty-cart-container p {
+    color: #64748B;
+    margin: 8px 0 20px;
+}
+
+/* ============================================
+   RESPONSIVE MEDIA QUERIES (Mobile-Friendly)
+   ============================================ */
+
+/* Tablet & Mobile (<900px) */
+@media (max-width: 900px) {
+    .payment-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    .payment-summary {
+        order: -1;
+        position: static !important;
+        top: auto !important;
+        width: 100%;
+    }
+
+    .payment-body {
+        padding: 20px 0 60px;
+    }
+
+    .payment-header {
+        padding: 20px 0 16px;
+    }
+
+    .payment-header h1 {
+        font-size: 1.35rem;
+        gap: 8px;
+    }
+
+    .payment-section {
+        padding: 20px 16px;
+        border-radius: 14px;
+    }
+}
+
+/* Phones (<576px) */
+@media (max-width: 576px) {
+    .payment-header h1 {
+        font-size: 1.25rem;
+    }
+
+    .payment-header__trust {
+        gap: 6px;
+    }
+
+    .payment-header__trust span {
+        font-size: 0.725rem;
+        padding: 3px 8px;
+    }
+
+    .payment-section {
+        padding: 16px 14px;
+        border-radius: 12px;
+    }
+
+    .payment-section h2 {
+        font-size: 1.05rem;
+        margin-bottom: 16px;
+        padding-bottom: 10px;
+    }
+
+    /* Prevent mobile browser zoom on input focus */
+    .form-field input,
+    .form-field textarea {
+        font-size: 16px !important;
+    }
+
+    .phone-field input {
+        height: 48px;
+    }
+
+    /* Stack names on small phones */
+    .form-row--names {
+        grid-template-columns: 1fr;
+        gap: 12px;
+        margin-bottom: 12px;
+    }
+
+    /* Pincode & City in 2 columns, State full width */
+    .form-row--location {
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+    }
+
+    .form-row--location .state-field {
+        grid-column: 1 / -1;
+    }
+
+    .recognized-customer-banner {
+        padding: 12px 14px;
+    }
+
+    .recognized-customer-name {
+        font-size: 1.05rem;
+    }
+
+    .whatsapp-info-box {
+        padding: 14px;
+    }
+
+    .whatsapp-info-box__header {
+        gap: 10px;
+    }
+
+    .whatsapp-info-box__icon {
+        width: 38px;
+        height: 38px;
+        font-size: 1.25rem;
+    }
+
+    .wa-title {
+        font-size: 0.9rem;
+    }
+
+    .wa-subtitle {
+        font-size: 0.75rem;
+    }
+
+    .whatsapp-steps-card {
+        padding: 10px 12px;
+        font-size: 0.775rem;
+    }
+
+    .btn-whatsapp-submit {
+        font-size: 1rem;
+        padding: 14px 16px;
+        min-height: 50px;
+    }
+
+    .payment-success__card {
+        padding: 28px 16px;
+    }
+
+    .payment-success__title {
+        font-size: 1.35rem;
+    }
+
+    .receipt-address {
+        max-width: 58%;
+    }
 }

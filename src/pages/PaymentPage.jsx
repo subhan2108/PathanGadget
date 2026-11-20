@@ -10,7 +10,7 @@ const WHATSAPP_PHONE = '918178768308'
 const WHATSAPP_DISPLAY = '+91 81787 68308'
 
 export default function PaymentPage() {
-    const { cartItems, cartTotal, clearCart } = useCart()
+    const { cartItems, cartTotal, clearCart, updateQty, removeFromCart } = useCart()
     const { user } = useAuth()
     const navigate = useNavigate()
     
@@ -294,63 +294,60 @@ ${trackingLink}
         return (
             <div className="payment-success page-enter" id="payment-success-section">
                 <div className="payment-success__card">
-                    <div className="payment-success__icon" style={{ background: '#DCFCE7', color: '#16A34A', width: '70px', height: '70px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', fontSize: '2rem' }}>
+                    <div className="payment-success__icon-wrap">
                         <i className="bi bi-whatsapp" />
                     </div>
 
-                    <h2 style={{ fontSize: '1.75rem', fontWeight: 800, color: '#1F2937', marginBottom: '8px' }}>
+                    <h2 className="payment-success__title">
                         Order Placed & Registered!
                     </h2>
-                    <p style={{ color: '#4B5563', fontSize: '1rem', maxWidth: '500px', margin: '0 auto 20px' }}>
+                    <p className="payment-success__subtitle">
                         Thank you, <strong>{successOrder.customer.shopName || successOrder.customer.name}</strong>. Your order is registered in our system and ready for payment on WhatsApp.
                     </p>
 
-                    <div className="payment-receipt" style={{ background: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: '12px', padding: '20px', textAlign: 'left', margin: '20px 0' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #E5E7EB', paddingBottom: '10px', marginBottom: '10px' }}>
-                            <span style={{ color: '#6B7280', fontSize: '0.875rem' }}>Order Number:</span>
-                            <strong style={{ color: '#111827', fontFamily: 'monospace', fontSize: '0.95rem' }}>{successOrder.order_number}</strong>
+                    <div className="payment-receipt-card">
+                        <div className="payment-receipt-row">
+                            <span className="receipt-label">Order Number:</span>
+                            <strong className="receipt-val receipt-mono">{successOrder.order_number}</strong>
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #E5E7EB', paddingBottom: '10px', marginBottom: '10px' }}>
-                            <span style={{ color: '#6B7280', fontSize: '0.875rem' }}>Total Amount:</span>
-                            <strong style={{ color: '#B45309', fontSize: '1.1rem' }}>{formatPrice(successOrder.total)}</strong>
+                        <div className="payment-receipt-row">
+                            <span className="receipt-label">Total Amount:</span>
+                            <strong className="receipt-val receipt-total">{formatPrice(successOrder.total)}</strong>
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #E5E7EB', paddingBottom: '10px', marginBottom: '10px' }}>
-                            <span style={{ color: '#6B7280', fontSize: '0.875rem' }}>Payment Status:</span>
-                            <span style={{ background: '#FEF3C7', color: '#92400E', padding: '2px 10px', borderRadius: '999px', fontSize: '0.8125rem', fontWeight: 700 }}>
-                                ⏳ Pending Payment on WhatsApp
+                        <div className="payment-receipt-row">
+                            <span className="receipt-label">Payment Status:</span>
+                            <span className="receipt-badge">
+                                ⏳ Pending on WhatsApp
                             </span>
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <span style={{ color: '#6B7280', fontSize: '0.875rem' }}>Delivery Address:</span>
-                            <span style={{ color: '#374151', fontSize: '0.875rem', textAlign: 'right', maxWidth: '60%' }}>
+                        <div className="payment-receipt-row payment-receipt-row--address">
+                            <span className="receipt-label">Delivery Address:</span>
+                            <span className="receipt-val receipt-address">
                                 {successOrder.customer.address}, {successOrder.customer.city} ({successOrder.customer.pincode})
                             </span>
                         </div>
                     </div>
 
-                    <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap', marginTop: '24px' }}>
+                    <div className="payment-success-buttons">
                         <a 
                             href={successOrder.waUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="btn"
-                            style={{ background: '#25D366', color: '#FFFFFF', padding: '12px 24px', fontWeight: 800, borderRadius: '8px', display: 'inline-flex', alignItems: 'center', gap: '8px', fontSize: '1rem' }}
+                            className="btn-success-wa"
                         >
-                            <i className="bi bi-whatsapp" style={{ fontSize: '1.2rem' }} /> Open WhatsApp Chat ({WHATSAPP_DISPLAY})
+                            <i className="bi bi-whatsapp" /> Open WhatsApp Chat ({WHATSAPP_DISPLAY})
                         </a>
 
                         <Link 
                             to={`/track/${successOrder.order_number}`}
-                            className="btn btn-primary"
-                            style={{ padding: '12px 24px', fontWeight: 700, borderRadius: '8px', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+                            className="btn btn-primary btn-success-track"
                         >
                             <i className="bi bi-geo-alt-fill" /> Track Order Status
                         </Link>
 
                         <Link 
                             to="/products"
-                            className="btn btn-secondary"
-                            style={{ padding: '12px 20px', borderRadius: '8px' }}
+                            className="btn btn-secondary btn-success-home"
                         >
                             Continue Shopping
                         </Link>
@@ -363,12 +360,12 @@ ${trackingLink}
     if (cartItems.length === 0) {
         return (
             <div className="payment-page page-enter">
-                <div className="container" style={{ padding: '80px 0', textAlign: 'center' }}>
-                    <div style={{ fontSize: '3.5rem', color: '#D1D5DB', marginBottom: '16px' }}>
+                <div className="container empty-cart-container">
+                    <div className="empty-cart-icon">
                         <i className="bi bi-cart-x" />
                     </div>
                     <h2>Your Cart is Empty</h2>
-                    <p style={{ color: '#6B7280', margin: '12px 0 24px' }}>Please add products to your cart before proceeding to checkout.</p>
+                    <p>Please add products to your cart before proceeding to checkout.</p>
                     <Link to="/products" className="btn btn-primary">Browse Key Blanks & Shells</Link>
                 </div>
             </div>
@@ -391,7 +388,7 @@ ${trackingLink}
                     <div className="payment-header__trust">
                         <span><i className="bi bi-lightning-charge-fill" /> No Password / No Gmail Required</span>
                         <span><i className="bi bi-whatsapp" /> Instant Order on WhatsApp</span>
-                        <span><i className="bi bi-truck" /> DTDC / Shree Maruti Courier</span>
+                        <span><i className="bi bi-truck" /> DTDC / Maruti Courier</span>
                     </div>
                 </div>
             </div>
@@ -410,32 +407,23 @@ ${trackingLink}
 
                             {/* Recognized Customer Memory Card */}
                             {isRecognizedCustomer && !isEditingDetails ? (
-                                <div className="recognized-customer-banner" style={{ background: '#FEF3C7', border: '1px solid #FCD34D', borderRadius: '10px', padding: '16px', marginBottom: '20px' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px' }}>
-                                        <div>
-                                            <span style={{ background: '#B45309', color: '#FFFFFF', fontSize: '0.75rem', fontWeight: 800, padding: '2px 8px', borderRadius: '4px', textTransform: 'uppercase' }}>
-                                                ⚡ 1-Tap Saved Address
-                                            </span>
-                                            <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#92400E', margin: '8px 0 4px' }}>
-                                                {customer.shopName || customer.name}
-                                            </h3>
-                                            <p style={{ margin: 0, color: '#78350F', fontSize: '0.875rem' }}>
-                                                <i className="bi bi-telephone-fill" style={{ marginRight: '6px' }} />
-                                                <strong>+91 {customer.phone}</strong>
-                                            </p>
-                                            <p style={{ margin: '4px 0 0', color: '#78350F', fontSize: '0.875rem' }}>
-                                                <i className="bi bi-geo-alt-fill" style={{ marginRight: '6px' }} />
-                                                {customer.address}, {customer.city}, {customer.state} - {customer.pincode}
-                                            </p>
-                                        </div>
+                                <div className="recognized-customer-banner">
+                                    <div className="recognized-customer-banner__header">
+                                        <span className="saved-badge">⚡ 1-Tap Saved Address</span>
                                         <button 
                                             type="button" 
-                                            className="btn btn-secondary btn-sm"
+                                            className="btn-change-address"
                                             onClick={() => setIsEditingDetails(true)}
-                                            style={{ background: '#FFFFFF', borderColor: '#D97706', color: '#B45309', fontWeight: 700 }}
                                         >
                                             <i className="bi bi-pencil-square" /> Change Address
                                         </button>
+                                    </div>
+                                    <h3 className="recognized-customer-name">
+                                        {customer.shopName || customer.name}
+                                    </h3>
+                                    <div className="recognized-customer-details">
+                                        <p><i className="bi bi-telephone-fill" /> <strong>+91 {customer.phone}</strong></p>
+                                        <p><i className="bi bi-geo-alt-fill" /> {customer.address}, {customer.city}, {customer.state} - {customer.pincode}</p>
                                     </div>
                                 </div>
                             ) : null}
@@ -443,29 +431,30 @@ ${trackingLink}
                             {/* Editable Form Inputs */}
                             {(!isRecognizedCustomer || isEditingDetails) && (
                                 <div className="customer-fields-container">
-                                    <div className="form-field" style={{ marginBottom: '16px' }}>
+                                    <div className="form-field phone-field">
                                         <label htmlFor="phone">
                                             <i className="bi bi-phone-fill" style={{ color: '#D97706' }} /> 
-                                            Mobile / WhatsApp Number * 
-                                            <span style={{ fontSize: '0.75rem', color: '#6B7280', fontWeight: 'normal', marginLeft: '6px' }}>
-                                                (Used for WhatsApp order confirmation & tracking)
+                                            <span>Mobile / WhatsApp Number *</span>
+                                            <span className="label-helper-text">
+                                                (For WhatsApp order & courier updates)
                                             </span>
                                         </label>
-                                        <div style={{ position: 'relative' }}>
-                                            <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', fontWeight: 700, color: '#6B7280' }}>+91</span>
+                                        <div className="phone-input-wrap">
+                                            <span className="phone-prefix">+91</span>
                                             <input 
                                                 type="tel" 
                                                 id="phone" 
                                                 name="phone" 
                                                 maxLength="10"
+                                                inputMode="numeric"
+                                                autoComplete="tel-national"
                                                 value={customer.phone}
                                                 onChange={handlePhoneChange}
                                                 className={errors.phone ? 'error' : ''}
                                                 placeholder="9876543210"
-                                                style={{ paddingLeft: '48px', fontSize: '1rem', fontWeight: 600 }}
                                             />
                                             {lookupLoading && (
-                                                <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '0.8125rem', color: '#B45309' }}>
+                                                <span className="phone-lookup-status">
                                                     Checking profile...
                                                 </span>
                                             )}
@@ -473,7 +462,7 @@ ${trackingLink}
                                         {errors.phone && <span className="field-error"><i className="bi bi-exclamation-circle" /> {errors.phone}</span>}
                                     </div>
 
-                                    <div className="form-row" style={{ marginBottom: '16px' }}>
+                                    <div className="form-row form-row--names">
                                         <div className="form-field">
                                             <label htmlFor="shopName"><i className="bi bi-shop" /> Shop / Business Name *</label>
                                             <input 
@@ -498,9 +487,9 @@ ${trackingLink}
                                             />
                                         </div>
                                     </div>
-                                    {errors.name && <span className="field-error" style={{ display: 'block', marginTop: '-10px', marginBottom: '12px' }}><i className="bi bi-exclamation-circle" /> {errors.name}</span>}
+                                    {errors.name && <span className="field-error name-field-error"><i className="bi bi-exclamation-circle" /> {errors.name}</span>}
 
-                                    <div className="form-field" style={{ marginBottom: '16px' }}>
+                                    <div className="form-field address-field">
                                         <label htmlFor="address"><i className="bi bi-geo-alt" /> Delivery Address / Landmark *</label>
                                         <textarea 
                                             id="address" 
@@ -510,19 +499,19 @@ ${trackingLink}
                                             onChange={handleInputChange}
                                             className={errors.address ? 'error' : ''}
                                             placeholder="Shop No. 4, Station Road, Near Main Market"
-                                            style={{ width: '100%', borderRadius: '8px', border: '1px solid #D1D5DB', padding: '10px' }}
                                         />
                                         {errors.address && <span className="field-error"><i className="bi bi-exclamation-circle" /> {errors.address}</span>}
                                     </div>
 
-                                    <div className="form-row">
-                                        <div className="form-field">
+                                    <div className="form-row form-row--location">
+                                        <div className="form-field pincode-field">
                                             <label htmlFor="pincode"><i className="bi bi-pin-map" /> Pincode *</label>
                                             <input 
                                                 type="text" 
                                                 id="pincode" 
                                                 name="pincode" 
                                                 maxLength="6"
+                                                inputMode="numeric"
                                                 value={customer.pincode}
                                                 onChange={handleInputChange}
                                                 className={errors.pincode ? 'error' : ''}
@@ -530,7 +519,7 @@ ${trackingLink}
                                             />
                                             {errors.pincode && <span className="field-error"><i className="bi bi-exclamation-circle" /> {errors.pincode}</span>}
                                         </div>
-                                        <div className="form-field">
+                                        <div className="form-field city-field">
                                             <label htmlFor="city"><i className="bi bi-building" /> City *</label>
                                             <input 
                                                 type="text" 
@@ -543,7 +532,7 @@ ${trackingLink}
                                             />
                                             {errors.city && <span className="field-error"><i className="bi bi-exclamation-circle" /> {errors.city}</span>}
                                         </div>
-                                        <div className="form-field">
+                                        <div className="form-field state-field">
                                             <label htmlFor="state"><i className="bi bi-map" /> State *</label>
                                             <input 
                                                 type="text" 
@@ -559,7 +548,7 @@ ${trackingLink}
                                     </div>
 
                                     {isRecognizedCustomer && (
-                                        <div style={{ marginTop: '12px', textAlign: 'right' }}>
+                                        <div className="done-editing-wrap">
                                             <button 
                                                 type="button" 
                                                 className="btn btn-secondary btn-sm"
@@ -580,30 +569,30 @@ ${trackingLink}
                                 2. Payment & Confirmation via WhatsApp
                             </h2>
 
-                            <div style={{ background: '#F0FDF4', border: '2px solid #86EFAC', borderRadius: '12px', padding: '20px' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-                                    <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: '#25D366', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem', flexShrink: 0 }}>
+                            <div className="whatsapp-info-box">
+                                <div className="whatsapp-info-box__header">
+                                    <div className="whatsapp-info-box__icon">
                                         <i className="bi bi-whatsapp" />
                                     </div>
-                                    <div>
-                                        <strong style={{ fontSize: '1.05rem', color: '#166534', display: 'block' }}>
+                                    <div className="whatsapp-info-box__titles">
+                                        <strong className="wa-title">
                                             Pay via WhatsApp (UPI / QR / Bank Transfer)
                                         </strong>
-                                        <span style={{ fontSize: '0.85rem', color: '#15803D' }}>
+                                        <span className="wa-subtitle">
                                             Smiley N Traders Official: <strong>{WHATSAPP_DISPLAY}</strong>
                                         </span>
                                     </div>
                                 </div>
 
-                                <p style={{ margin: '0 0 14px 0', fontSize: '0.875rem', color: '#166534', lineHeight: 1.5 }}>
+                                <p className="whatsapp-info-box__desc">
                                     When you click <strong>"Place Order on WhatsApp"</strong> below:
                                 </p>
 
-                                <div style={{ background: '#FFFFFF', border: '1px solid #BBF7D0', borderRadius: '8px', padding: '14px 16px', fontSize: '0.8125rem', color: '#374151' }}>
-                                    <ol style={{ margin: 0, paddingLeft: '18px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                        <li>Your order will be <strong>instantly saved in our database</strong> with stock reserved.</li>
-                                        <li>WhatsApp will automatically open with your ordered items, quantities, and order number.</li>
-                                        <li>Our team will share the <strong>UPI QR code / payment info</strong> directly on WhatsApp. Once paid, we approve your order and dispatch!</li>
+                                <div className="whatsapp-steps-card">
+                                    <ol>
+                                        <li>Your order is <strong>instantly saved in our database</strong> with stock reserved.</li>
+                                        <li>WhatsApp opens with your ordered items, quantities & order number.</li>
+                                        <li>Our team shares the <strong>UPI QR code / bank info</strong> on WhatsApp. Once paid, we dispatch!</li>
                                     </ol>
                                 </div>
                             </div>
@@ -612,83 +601,98 @@ ${trackingLink}
                         {/* Submit Order Button */}
                         <button 
                             type="submit" 
-                            className="btn"
+                            className="btn-whatsapp-submit"
                             disabled={loading}
                             id="submit-order-btn"
-                            style={{ 
-                                padding: '16px 24px', 
-                                fontSize: '1.15rem', 
-                                fontWeight: 800, 
-                                borderRadius: '10px', 
-                                background: '#25D366', 
-                                color: '#FFFFFF', 
-                                border: 'none', 
-                                display: 'flex', 
-                                justifyContent: 'center', 
-                                alignItems: 'center', 
-                                gap: '10px',
-                                boxShadow: '0 4px 14px rgba(37, 211, 102, 0.35)',
-                                cursor: 'pointer'
-                            }}
                         >
                             {loading ? (
                                 <>
                                     <span className="spinner-border spinner-border-sm" />
-                                    Saving Order & Opening WhatsApp...
+                                    <span>Saving Order & Opening WhatsApp...</span>
                                 </>
                             ) : (
                                 <>
-                                    <i className="bi bi-whatsapp" style={{ fontSize: '1.4rem' }} />
-                                    Place Order on WhatsApp ({formatPrice(total)})
+                                    <i className="bi bi-whatsapp" />
+                                    <span>Place Order on WhatsApp ({formatPrice(total)})</span>
                                 </>
                             )}
                         </button>
                     </form>
 
-                    {/* Right Column: Order Summary */}
-                    <div className="payment-summary">
-                        <div className="payment-section" id="order-cart-summary">
+                    {/* Order Summary */}
+                    <div className="payment-summary" id="order-cart-summary">
+                        <div className="payment-section">
                             <h2>
                                 <i className="bi bi-bag-check-fill" />
                                 Order Items ({cartItems.length})
                             </h2>
 
-                            <div className="summary-items-list" style={{ maxHeight: '360px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '16px', paddingRight: '4px' }}>
+                            <div className="summary-items-list">
                                 {cartItems.map((item) => (
-                                    <div key={item.id} style={{ display: 'flex', gap: '12px', alignItems: 'center', borderBottom: '1px solid #F3F4F6', paddingBottom: '10px' }}>
+                                    <div key={item.id} className="desktop-summary-item">
                                         <img 
                                             src={item.image || item.image_url || '/logo.png'} 
                                             alt={item.name} 
                                             referrerPolicy="no-referrer"
-                                            style={{ width: '48px', height: '48px', objectFit: 'contain', background: '#F9FAFB', borderRadius: '6px', border: '1px solid #E5E7EB' }}
+                                            className="desktop-summary-item__img"
                                         />
-                                        <div style={{ flex: 1, minWidth: 0 }}>
-                                            <div style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1F2937', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                        <div className="desktop-summary-item__details">
+                                            <div className="desktop-summary-item__name" title={item.name}>
                                                 {item.name}
                                             </div>
-                                            <div style={{ fontSize: '0.75rem', color: '#6B7280' }}>
-                                                Qty: {item.quantity} × {formatPrice(item.price)}
+                                            <div className="payment-qty-controls">
+                                                <div className="payment-qty-stepper">
+                                                    <button
+                                                        type="button"
+                                                        className="payment-qty-btn"
+                                                        onClick={() => updateQty(item.id, Number(item.quantity) - 1)}
+                                                        title="Decrease quantity"
+                                                        aria-label="Decrease quantity"
+                                                    >
+                                                        <i className="bi bi-dash" />
+                                                    </button>
+                                                    <span className="payment-qty-val">{item.quantity}</span>
+                                                    <button
+                                                        type="button"
+                                                        className="payment-qty-btn"
+                                                        onClick={() => updateQty(item.id, Number(item.quantity) + 1)}
+                                                        title="Increase quantity"
+                                                        aria-label="Increase quantity"
+                                                    >
+                                                        <i className="bi bi-plus" />
+                                                    </button>
+                                                </div>
+                                                <span className="payment-item-unit">× {formatPrice(item.price)}</span>
+                                                <button
+                                                    type="button"
+                                                    className="payment-item-delete-btn"
+                                                    onClick={() => removeFromCart(item.id)}
+                                                    title="Remove item from order"
+                                                    aria-label="Remove item"
+                                                >
+                                                    <i className="bi bi-trash3" />
+                                                </button>
                                             </div>
                                         </div>
-                                        <div style={{ fontWeight: 700, color: '#111827', fontSize: '0.875rem' }}>
+                                        <div className="desktop-summary-item__price">
                                             {formatPrice(Number(item.price) * Number(item.quantity))}
                                         </div>
                                     </div>
                                 ))}
                             </div>
 
-                            <div style={{ borderTop: '2px solid #E5E7EB', paddingTop: '14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#4B5563', fontSize: '0.875rem' }}>
+                            <div className="desktop-summary-calc">
+                                <div className="summary-calc-row">
                                     <span>Subtotal:</span>
                                     <span>{formatPrice(subtotal)}</span>
                                 </div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#10B981', fontSize: '0.875rem', fontWeight: 600 }}>
+                                <div className="summary-calc-row text-green">
                                     <span>Courier Shipping:</span>
                                     <span>FREE</span>
                                 </div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#111827', fontSize: '1.25rem', fontWeight: 800, borderTop: '1px solid #E5E7EB', paddingTop: '8px' }}>
+                                <div className="summary-calc-row summary-calc-row--total">
                                     <span>Total Payable:</span>
-                                    <span style={{ color: '#D97706' }}>{formatPrice(total)}</span>
+                                    <span className="total-gold">{formatPrice(total)}</span>
                                 </div>
                             </div>
                         </div>

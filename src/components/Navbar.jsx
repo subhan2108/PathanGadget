@@ -237,14 +237,7 @@ export default function Navbar() {
                             <span>Total</span>
                             <strong style={{ color: '#111827', fontWeight: 800 }}>{formatPrice(cartTotal)}</strong>
                         </div>
-                        <SignedOut>
-                            <p className="cart-auth-notice">
-                                <i className="bi bi-info-circle" />
-                                <SignInButton mode="modal">
-                                    <button className="auth-link">Sign in</button>
-                                </SignInButton> to save your cart & checkout
-                            </p>
-                        </SignedOut>
+
                         <button
                             className="btn btn-primary btn-lg btn-full"
                             onClick={() => {

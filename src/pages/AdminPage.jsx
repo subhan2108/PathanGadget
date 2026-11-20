@@ -524,8 +524,7 @@ export default function AdminPage() {
             ...prod,
             sku: existingSku,
             subcategory: prod.subcategory || detailsObj.subcategory || defaultSubcategory || '',
-            stock_quantity: prod.stock_quantity !== undefined && prod.stock_quantity !== null ? prod.stock_quantity : (prod.in_stock !== false ? 5 : 0),
-            in_stock: prod.in_stock !== false && (prod.stock_quantity === undefined || prod.stock_quantity > 0),
+            in_stock: prod.in_stock !== false,
             colors: prod.colors?.join(', ') || '',
             image_url: prod.image_url || prod.image || '',
             image2: existingExtraImages[0] || '',
@@ -544,7 +543,6 @@ export default function AdminPage() {
             category: defaultCategory || 'Key Cover', 
             subcategory: defaultSubcategory || '', 
             brand: '',
-            stock_quantity: 5,
             description: '', image_url: '', badge: '', in_stock: true,
             rating: 0, review_count: 0, colors: '', 
             image2: '', image3: '', image4: '', image5: '', image6: '',
@@ -599,15 +597,12 @@ export default function AdminPage() {
                 }
             };
 
-            const stockQty = restForm.stock_quantity !== undefined && restForm.stock_quantity !== null && restForm.stock_quantity !== ''
-                ? parseInt(restForm.stock_quantity)
-                : (restForm.in_stock !== false ? 5 : 0);
-            const inStockVal = stockQty > 0;
+            const inStockVal = restForm.in_stock !== false;
 
             const formattedForm = {
                 ...restForm,
                 sku: finalSku,
-                stock_quantity: stockQty,
+                stock_quantity: inStockVal ? 9999 : 0,
                 in_stock: inStockVal,
                 colors: restForm.colors ? restForm.colors.split(',').map(c => c.trim()).filter(Boolean) : [],
                 details: parsedDetails,
@@ -1240,14 +1235,14 @@ export default function AdminPage() {
                                                     <td><span className="badge badge-secondary">{p.category}</span></td>
                                                     <td>{p.subcategory ? <span className="badge badge-light" style={{ border: '1px solid #D1D5DB', fontSize: '0.75rem', fontWeight: 600 }}>{p.subcategory}</span> : <span style={{ color: '#9CA3AF' }}>-</span>}</td>
                                                     <td>
-                                                        {Number(p.stock_quantity) > 3 ? (
-                                                            <span className="text-success" style={{ fontWeight: 600 }}>{p.stock_quantity} in stock</span>
-                                                        ) : Number(p.stock_quantity) > 0 ? (
-                                                            <span className="badge" style={{ backgroundColor: '#FEF3C7', color: '#B45309', border: '1px solid #FCD34D', fontSize: '0.75rem', fontWeight: 700, padding: '3px 8px' }}>
-                                                                Only {p.stock_quantity} left!
+                                                        {p.in_stock !== false ? (
+                                                            <span className="badge" style={{ backgroundColor: '#D1FAE5', color: '#065F46', border: '1px solid #A7F3D0', fontSize: '0.75rem', fontWeight: 700, padding: '4px 8px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                                                <i className="bi bi-check-circle-fill" /> In Stock
                                                             </span>
                                                         ) : (
-                                                            <span className="text-danger" style={{ fontWeight: 600 }}>Out of Stock (0)</span>
+                                                            <span className="badge" style={{ backgroundColor: '#FEE2E2', color: '#991B1B', border: '1px solid #FECACA', fontSize: '0.75rem', fontWeight: 700, padding: '4px 8px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                                                <i className="bi bi-x-circle-fill" /> Out of Stock
+                                                            </span>
                                                         )}
                                                     </td>
                                                     <td>
@@ -1802,14 +1797,14 @@ export default function AdminPage() {
                                                                     </span>
                                                                 </td>
                                                                 <td>
-                                                                    {Number(p.stock_quantity) > 3 ? (
-                                                                        <span className="text-success" style={{ fontWeight: 600 }}>{p.stock_quantity} in stock</span>
-                                                                    ) : Number(p.stock_quantity) > 0 ? (
-                                                                        <span className="badge" style={{ backgroundColor: '#FEF3C7', color: '#B45309', border: '1px solid #FCD34D', fontSize: '0.75rem', fontWeight: 700, padding: '3px 8px' }}>
-                                                                            Only {p.stock_quantity} left!
+                                                                    {p.in_stock !== false ? (
+                                                                        <span className="badge" style={{ backgroundColor: '#D1FAE5', color: '#065F46', border: '1px solid #A7F3D0', fontSize: '0.75rem', fontWeight: 700, padding: '4px 8px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                                                            <i className="bi bi-check-circle-fill" /> In Stock
                                                                         </span>
                                                                     ) : (
-                                                                        <span className="text-danger" style={{ fontWeight: 600 }}>Out of Stock (0)</span>
+                                                                        <span className="badge" style={{ backgroundColor: '#FEE2E2', color: '#991B1B', border: '1px solid #FECACA', fontSize: '0.75rem', fontWeight: 700, padding: '4px 8px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                                                            <i className="bi bi-x-circle-fill" /> Out of Stock
+                                                                        </span>
                                                                     )}
                                                                 </td>
                                                                 <td>
@@ -2091,14 +2086,14 @@ export default function AdminPage() {
                                                         <td>₹{p.price}</td>
                                                         <td>{p.brand || '-'}</td>
                                                         <td>
-                                                            {Number(p.stock_quantity) > 3 ? (
-                                                                <span className="text-success" style={{ fontWeight: 600 }}>{p.stock_quantity} in stock</span>
-                                                            ) : Number(p.stock_quantity) > 0 ? (
-                                                                <span className="badge" style={{ backgroundColor: '#FEF3C7', color: '#B45309', border: '1px solid #FCD34D', fontSize: '0.75rem', fontWeight: 700, padding: '3px 8px' }}>
-                                                                    Only {p.stock_quantity} left!
+                                                            {p.in_stock !== false ? (
+                                                                <span className="badge" style={{ backgroundColor: '#D1FAE5', color: '#065F46', border: '1px solid #A7F3D0', fontSize: '0.75rem', fontWeight: 700, padding: '4px 8px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                                                    <i className="bi bi-check-circle-fill" /> In Stock
                                                                 </span>
                                                             ) : (
-                                                                <span className="text-danger" style={{ fontWeight: 600 }}>Out of Stock (0)</span>
+                                                                <span className="badge" style={{ backgroundColor: '#FEE2E2', color: '#991B1B', border: '1px solid #FECACA', fontSize: '0.75rem', fontWeight: 700, padding: '4px 8px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                                                    <i className="bi bi-x-circle-fill" /> Out of Stock
+                                                                </span>
                                                             )}
                                                         </td>
                                                         <td>
@@ -2837,47 +2832,33 @@ export default function AdminPage() {
                                     <input type="number" className="form-control" placeholder="e.g. 15" value={productForm.buy3Discount || ''} onChange={e => setProductForm({ ...productForm, buy3Discount: Number(e.target.value) })} />
                                 </div>
                             </div>
-                            <div style={{ display: 'flex', gap: '20px', alignItems: 'center', backgroundColor: '#F8FAFC', padding: '16px', borderRadius: '10px', border: '1px solid #E2E8F0', marginBottom: 20 }}>
-                                <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
-                                    <label htmlFor="stockQtyInput" style={{ fontWeight: 700, marginBottom: '6px', color: '#1E293B', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                        <i className="bi bi-boxes" style={{ color: 'var(--cta)' }} /> Stock Quantity
-                                    </label>
-                                    <input 
-                                        type="number" 
-                                        id="stockQtyInput"
-                                        min="0"
-                                        className="form-control" 
-                                        placeholder="e.g. 5" 
-                                        value={productForm.stock_quantity !== undefined && productForm.stock_quantity !== null ? productForm.stock_quantity : ''} 
-                                        onChange={e => {
-                                            const val = e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0);
-                                            setProductForm({ 
-                                                ...productForm, 
-                                                stock_quantity: val,
-                                                in_stock: val === '' ? true : val > 0 
-                                            });
-                                        }} 
-                                    />
-                                    <span style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '4px', display: 'block' }}>
-                                        Set to 0 to mark as Out of Stock.
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#F8FAFC', padding: '16px 20px', borderRadius: '10px', border: '1px solid #E2E8F0', marginBottom: 20 }}>
+                                <div>
+                                    <span style={{ fontWeight: 700, fontSize: '0.95rem', color: '#1E293B', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <i className="bi bi-box-seam" style={{ color: 'var(--cta)', fontSize: '1.1rem' }} /> Availability Status
+                                    </span>
+                                    <span style={{ fontSize: '0.8rem', color: '#64748B', marginTop: '2px', display: 'block' }}>
+                                        Toggle whether this item is currently available for purchase
                                     </span>
                                 </div>
-                                <div className="form-check" style={{ paddingTop: '10px', marginBottom: 0 }}>
+                                <div className="form-check form-switch" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
                                     <input 
                                         type="checkbox" 
                                         id="stockCheck" 
                                         className="form-check-input" 
+                                        role="switch"
                                         checked={Boolean(productForm.in_stock)} 
                                         onChange={e => {
                                             const checked = e.target.checked;
                                             setProductForm({ 
                                                 ...productForm, 
                                                 in_stock: checked,
-                                                stock_quantity: checked ? (productForm.stock_quantity > 0 ? productForm.stock_quantity : 5) : 0
+                                                stock_quantity: checked ? 9999 : 0
                                             });
                                         }} 
+                                        style={{ width: '40px', height: '22px', cursor: 'pointer' }}
                                     />
-                                    <label htmlFor="stockCheck" className="form-check-label" style={{ fontWeight: 700, color: productForm.in_stock ? '#059669' : '#DC2626' }}>
+                                    <label htmlFor="stockCheck" className="form-check-label" style={{ fontWeight: 800, fontSize: '0.95rem', cursor: 'pointer', color: productForm.in_stock ? '#059669' : '#DC2626' }}>
                                         {productForm.in_stock ? 'In Stock' : 'Out of Stock'}
                                     </label>
                                 </div>

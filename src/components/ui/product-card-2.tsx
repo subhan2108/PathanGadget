@@ -81,9 +81,7 @@ const ProductCard = React.forwardRef<HTMLDivElement, ProductCardProps>(
     const hasRating = rating > 0 || reviewCount > 0;
     const badge = raw.badge || (offerText && !offerText.includes("%") ? offerText : null);
     const inStock = raw.in_stock ?? raw.inStock ?? true;
-    const stockQty = Number(raw.stock_quantity ?? (inStock ? 5 : 0));
-    const isOutOfStock = !inStock || stockQty <= 0;
-    const isLowStock = !isOutOfStock && stockQty <= 3;
+    const isOutOfStock = !inStock;
 
     const discount = originalPrice > price
       ? Math.round(((originalPrice - price) / originalPrice) * 100)
@@ -118,7 +116,6 @@ const ProductCard = React.forwardRef<HTMLDivElement, ProductCardProps>(
           image_url: image,
           inStock: !isOutOfStock,
           in_stock: !isOutOfStock,
-          stock_quantity: stockQty,
           ...raw,
         });
       }
@@ -180,12 +177,7 @@ const ProductCard = React.forwardRef<HTMLDivElement, ProductCardProps>(
             </div>
           )}
 
-          {/* Low Stock Urgency Badge */}
-          {isLowStock && (
-            <span className="absolute bottom-1.5 left-1.5 rounded-md bg-[#EF4444] px-1.5 sm:px-2 py-0.5 text-[9px] sm:text-[10px] font-bold text-white shadow-md z-10 flex items-center gap-1">
-              <i className="bi bi-fire" /> Only {stockQty} left!
-            </span>
-          )}
+
         </div>
 
         {/* Card Body Content */}

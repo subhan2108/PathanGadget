@@ -47,14 +47,8 @@ function mapProduct(row) {
     image: formattedImageUrl,
     image_url: formattedImageUrl,
     badge: row.badge,
-    inStock: row.in_stock && (row.stock_quantity === undefined || row.stock_quantity === null || parseInt(row.stock_quantity) > 0),
-    in_stock: row.in_stock && (row.stock_quantity === undefined || row.stock_quantity === null || parseInt(row.stock_quantity) > 0),
-    stock_quantity: row.stock_quantity !== undefined && row.stock_quantity !== null
-      ? parseInt(row.stock_quantity)
-      : (row.in_stock ? 5 : 0),
-    quantity: row.stock_quantity !== undefined && row.stock_quantity !== null
-      ? parseInt(row.stock_quantity)
-      : (row.in_stock ? 5 : 0),
+    inStock: row.in_stock !== false,
+    in_stock: row.in_stock !== false,
     rating: parseFloat(row.rating || 0),
     review_count: parseInt(row.review_count || 0),
     reviews: parseInt(row.review_count || 0),
@@ -803,7 +797,7 @@ export async function fetchSimilarProducts(category, excludeId, brand = '') {
     if (rows.length < 4) {
       const existingIds = rows.map(r => r.id);
       if (!isNaN(intExcludeId)) existingIds.push(intExcludeId);
-      
+
       const needed = 4 - rows.length;
       const fallbackRows = await sql`
         SELECT * FROM products 

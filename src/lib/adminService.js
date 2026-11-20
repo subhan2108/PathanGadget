@@ -24,17 +24,12 @@ export async function adminGetProducts() {
         const rows = await sql`SELECT * FROM products ORDER BY created_at DESC`;
         return rows.map(r => {
             const detailsObj = typeof r.details === 'string' ? JSON.parse(r.details) : (r.details || {});
-            const stockQty = r.stock_quantity !== undefined && r.stock_quantity !== null 
-                ? parseInt(r.stock_quantity) 
-                : (r.in_stock ? 5 : 0);
             return {
                 ...r,
                 image_url: formatImageUrl(r.image_url),
                 sku: r.sku || detailsObj.sku || `SMN-${(r.category || 'GEN').substring(0, 3).toUpperCase()}-${String(r.id).padStart(4, '0')}`,
                 subcategory: r.subcategory || detailsObj.subcategory || '',
-                stock_quantity: stockQty,
-                quantity: stockQty,
-                in_stock: stockQty > 0,
+                in_stock: r.in_stock !== false,
                 details: detailsObj
             };
         });
@@ -49,10 +44,8 @@ export async function adminCreateProduct(p) {
         await ensureSchema();
         const skuVal = (p.sku && p.sku.trim()) || `SMN-${(p.category || 'GEN').substring(0, 3).toUpperCase()}-${Date.now().toString().slice(-4)}`;
         const subcatVal = (p.subcategory && p.subcategory.trim()) || '';
-        const stockQty = p.stock_quantity !== undefined && p.stock_quantity !== null && p.stock_quantity !== ''
-            ? parseInt(p.stock_quantity)
-            : (p.in_stock !== false ? 5 : 0);
-        const inStockVal = stockQty > 0;
+        const inStockVal = p.in_stock !== false;
+        const stockQty = inStockVal ? 9999 : 0;
         const detailsWithSku = {
             ...(p.details || {}),
             sku: skuVal,
@@ -82,10 +75,8 @@ export async function adminUpdateProduct(id, p) {
         await ensureSchema();
         const skuVal = (p.sku && p.sku.trim()) || `SMN-${(p.category || 'GEN').substring(0, 3).toUpperCase()}-${String(id).padStart(4, '0')}`;
         const subcatVal = (p.subcategory && p.subcategory.trim()) || '';
-        const stockQty = p.stock_quantity !== undefined && p.stock_quantity !== null && p.stock_quantity !== ''
-            ? parseInt(p.stock_quantity)
-            : (p.in_stock !== false ? 5 : 0);
-        const inStockVal = stockQty > 0;
+        const inStockVal = p.in_stock !== false;
+        const stockQty = inStockVal ? 9999 : 0;
         const detailsWithSku = {
             ...(p.details || {}),
             sku: skuVal,

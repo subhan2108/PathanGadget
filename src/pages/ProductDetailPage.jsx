@@ -190,14 +190,11 @@ export default function ProductDetailPage() {
     ] : null
 
     const activeVariant = dynamicVariants ? (dynamicVariants.find(v => v.id === selectedVariant) || dynamicVariants[0]) : null
-    const finalQty = activeVariant ? activeVariant.qty : quantity
-    const finalPrice = activeVariant ? activeVariant.price : basePrice * quantity
+    const finalQty = activeVariant ? activeVariant.qty : 1
+    const finalPrice = activeVariant ? activeVariant.price : basePrice
     const finalUnitCost = activeVariant ? (activeVariant.price / activeVariant.qty) : basePrice
 
-    const stockQuantity = Number(product?.stock_quantity ?? (product?.in_stock !== false ? 5 : 0))
-    const hasStockInfo = product ? (product.in_stock !== undefined || product.inStock !== undefined || product.stock_quantity !== undefined) : false
-    const isInStock = product ? (product.in_stock !== false && product.inStock !== false && stockQuantity > 0) : true
-    const isLowStock = isInStock && stockQuantity > 0 && stockQuantity <= 3
+    const isInStock = product ? (product.in_stock !== false && product.inStock !== false) : true
 
     // Set initial color based on what actually exists
     useEffect(() => {
@@ -207,18 +204,14 @@ export default function ProductDetailPage() {
     }, [product, colors.length])
 
     const handleAddToCart = async () => {
-        if (!isInStock || stockQuantity <= 0) {
+        if (!isInStock) {
             alert('Sorry, this product is currently out of stock.');
-            return;
-        }
-        if (finalQty > stockQuantity) {
-            alert(`Cannot order ${finalQty} items. Only ${stockQuantity} items available in stock.`);
             return;
         }
         const res = await addToCart({
             ...product,
-            stock_quantity: stockQuantity,
-            quantity: stockQuantity,
+            in_stock: true,
+            inStock: true,
             sku: product.sku || `SMN-${(product.category || 'GEN').substring(0, 3).toUpperCase()}-${String(product.id).padStart(4, '0')}`,
             name: product.name,
             price: finalUnitCost,
@@ -237,12 +230,8 @@ export default function ProductDetailPage() {
     }
 
     const handleBuyNow = async () => {
-        if (!isInStock || stockQuantity <= 0) {
+        if (!isInStock) {
             alert('Sorry, this product is currently out of stock.');
-            return;
-        }
-        if (finalQty > stockQuantity) {
-            alert(`Cannot order ${finalQty} items. Only ${stockQuantity} items available in stock.`);
             return;
         }
         await handleAddToCart()
@@ -501,23 +490,21 @@ export default function ProductDetailPage() {
                                 </>
                             )}
 
-                            {hasStockInfo && (
-                                <div style={{
-                                    marginLeft: hasRatingOrReviews ? 'auto' : '0',
-                                    backgroundColor: !isInStock ? '#FEE2E2' : (isLowStock ? '#FEF3C7' : '#D1FAE5'),
-                                    color: !isInStock ? '#DC2626' : (isLowStock ? '#B45309' : '#065F46'),
-                                    padding: '4px 12px',
-                                    borderRadius: '20px',
-                                    fontSize: '0.825rem',
-                                    fontWeight: '700',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '6px'
-                                }}>
-                                    <i className={`bi ${!isInStock ? 'bi-x-circle-fill' : (isLowStock ? 'bi-fire' : 'bi-check-circle-fill')}`} />
-                                    {!isInStock ? 'Out of Stock' : (isLowStock ? `Only ${stockQuantity} remaining!` : 'In Stock')}
-                                </div>
-                            )}
+                            <div style={{
+                                marginLeft: hasRatingOrReviews ? 'auto' : '0',
+                                backgroundColor: !isInStock ? '#FEE2E2' : '#D1FAE5',
+                                color: !isInStock ? '#DC2626' : '#065F46',
+                                padding: '5px 14px',
+                                borderRadius: '20px',
+                                fontSize: '0.85rem',
+                                fontWeight: '700',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px'
+                            }}>
+                                <i className={`bi ${!isInStock ? 'bi-x-circle-fill' : 'bi-check-circle-fill'}`} />
+                                {!isInStock ? 'Out of Stock' : 'In Stock'}
+                            </div>
                         </div>
 
                         {/* Price Block */}
@@ -605,50 +592,7 @@ export default function ProductDetailPage() {
                             </div>
                         )}
 
-                        {/* Quantity Stepper (When no bundle variants configured) */}
-                        {!hasRealBundleOffer && isInStock && (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                                    <span style={{ fontSize: '0.875rem', fontWeight: '700', color: '#374151' }}>Quantity:</span>
-                                    <div style={{ display: 'inline-flex', alignItems: 'center', border: '1.5px solid #E5E7EB', borderRadius: '10px', overflow: 'hidden', height: '38px', background: '#FFFFFF' }}>
-                                        <button
-                                            type="button"
-                                            onClick={() => setQuantity(q => Math.max(1, q - 1))}
-                                            style={{ width: '36px', height: '100%', border: 'none', background: '#F9FAFB', cursor: 'pointer', fontSize: '1rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4B5563', transition: 'background 0.2s' }}
-                                            onMouseOver={e => e.currentTarget.style.background = '#F3F4F6'}
-                                            onMouseOut={e => e.currentTarget.style.background = '#F9FAFB'}
-                                            aria-label="Decrease quantity"
-                                        >
-                                            <i className="bi bi-dash" />
-                                        </button>
-                                        <span style={{ minWidth: '40px', textAlign: 'center', fontWeight: '700', fontSize: '0.95rem', color: '#111827' }}>{quantity}</span>
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                if (quantity >= stockQuantity) {
-                                                    alert(`Cannot add more. Only ${stockQuantity} items in stock.`);
-                                                    return;
-                                                }
-                                                setQuantity(q => q + 1);
-                                            }}
-                                            disabled={quantity >= stockQuantity}
-                                            style={{ width: '36px', height: '100%', border: 'none', background: quantity >= stockQuantity ? '#F3F4F6' : '#F9FAFB', cursor: quantity >= stockQuantity ? 'not-allowed' : 'pointer', fontSize: '1rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', color: quantity >= stockQuantity ? '#9CA3AF' : '#4B5563', transition: 'background 0.2s' }}
-                                            aria-label="Increase quantity"
-                                        >
-                                            <i className="bi bi-plus" />
-                                        </button>
-                                    </div>
-                                    <span style={{ fontSize: '0.8rem', color: '#6B7280' }}>
-                                        ({stockQuantity} available)
-                                    </span>
-                                </div>
-                                {isLowStock && (
-                                    <div style={{ fontSize: '0.825rem', fontWeight: '700', color: '#DC2626', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                        <i className="bi bi-fire" /> Only {stockQuantity} remaining in stock - order soon!
-                                    </div>
-                                )}
-                            </div>
-                        )}
+
 
                         {/* Action Buttons */}
                         <div className="pdp-action-buttons">
