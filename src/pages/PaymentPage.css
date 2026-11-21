@@ -234,41 +234,74 @@
 }
 
 .phone-input-wrap {
-    position: relative;
     display: flex;
     align-items: center;
+    width: 100%;
+    background: #FFFFFF;
+    border: 1.5px solid #CBD5E1;
+    border-radius: 8px;
+    padding: 0 12px;
+    height: 44px;
+    transition: border-color 150ms ease, box-shadow 150ms ease;
+    box-sizing: border-box;
+}
+
+.phone-input-wrap:focus-within {
+    border-color: #D97706;
+    box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.12);
+}
+
+.phone-input-wrap.error {
+    border-color: #EF4444;
+    background: #FEF2F2;
 }
 
 .phone-prefix {
-    position: absolute;
-    left: 12px;
-    top: 50%;
-    transform: translateY(-50%);
+    display: inline-flex;
+    align-items: center;
     font-weight: 800;
     color: #64748B;
     font-size: 0.95rem;
+    padding-right: 10px;
+    margin-right: 10px;
+    border-right: 1.5px solid #CBD5E1;
     user-select: none;
-    pointer-events: none;
+    white-space: nowrap;
+    height: 22px;
+    line-height: 1;
 }
 
-.phone-field input {
-    padding-left: 48px;
+.phone-field .phone-input-wrap input {
+    flex: 1;
+    min-width: 0;
+    border: none !important;
+    outline: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    padding: 0 !important;
     font-weight: 700;
     font-size: 1rem;
     letter-spacing: 0.03em;
+    color: #0F172A;
+    height: 100%;
+}
+
+.phone-field .phone-input-wrap input::placeholder {
+    color: #94A3B8;
+    font-weight: 500;
+    letter-spacing: normal;
 }
 
 .phone-lookup-status {
-    position: absolute;
-    right: 12px;
-    top: 50%;
-    transform: translateY(-50%);
+    flex-shrink: 0;
+    margin-left: 8px;
     font-size: 0.75rem;
     font-weight: 600;
     color: #B45309;
     background: #FEF3C7;
     padding: 2px 8px;
     border-radius: 4px;
+    white-space: nowrap;
 }
 
 .form-row {
@@ -826,8 +859,12 @@
         font-size: 16px !important;
     }
 
-    .phone-field input {
+    .phone-input-wrap {
         height: 48px;
+    }
+
+    .phone-field .phone-input-wrap input {
+        font-size: 16px !important;
     }
 
     /* Stack names on small phones */

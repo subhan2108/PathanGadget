@@ -439,7 +439,7 @@ ${trackingLink}
                                                 (For WhatsApp order & courier updates)
                                             </span>
                                         </label>
-                                        <div className="phone-input-wrap">
+                                        <div className={`phone-input-wrap ${errors.phone ? 'error' : ''}`}>
                                             <span className="phone-prefix">+91</span>
                                             <input 
                                                 type="tel" 
