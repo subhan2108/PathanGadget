@@ -523,8 +523,33 @@ export default function ProductsPage() {
         }
     }
 
+    const [isMobileScreen, setIsMobileScreen] = useState(() => typeof window !== 'undefined' ? window.innerWidth < 768 : false)
+
+    useEffect(() => {
+        const handleResize = () => {
+            setIsMobileScreen(window.innerWidth < 768)
+        }
+        window.addEventListener('resize', handleResize)
+        return () => window.removeEventListener('resize', handleResize)
+    }, [])
+
     const getPageNumbers = () => {
         const pages = []
+        if (isMobileScreen) {
+            if (totalPages <= 5) {
+                for (let i = 1; i <= totalPages; i++) pages.push(i)
+            } else {
+                if (safeCurrentPage <= 2) {
+                    pages.push(1, 2, 3, '...', totalPages)
+                } else if (safeCurrentPage >= totalPages - 1) {
+                    pages.push(1, '...', totalPages - 2, totalPages - 1, totalPages)
+                } else {
+                    pages.push(1, '...', safeCurrentPage, '...', totalPages)
+                }
+            }
+            return pages
+        }
+
         if (totalPages <= 7) {
             for (let i = 1; i <= totalPages; i++) pages.push(i)
         } else {

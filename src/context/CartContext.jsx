@@ -67,10 +67,10 @@ export function CartProvider({ children }) {
         }
 
         setCartItems(prev => {
-            const itemExists = prev.find(i => i.id === product.id)
+            const itemExists = prev.find(i => String(i.id) === String(product.id))
             let newCart;
             if (itemExists) {
-                newCart = prev.map(i => i.id === product.id ? { ...i, quantity: i.quantity + qty } : i)
+                newCart = prev.map(i => String(i.id) === String(product.id) ? { ...i, quantity: i.quantity + qty } : i)
             } else {
                 newCart = [...prev, { ...product, quantity: qty }]
             }
@@ -81,7 +81,7 @@ export function CartProvider({ children }) {
         if (user) {
             try {
                 const currentItems = JSON.parse(localStorage.getItem('local_cart') || '[]')
-                const exists = currentItems.find(i => i.id === product.id)
+                const exists = currentItems.find(i => String(i.id) === String(product.id))
                 if (exists) {
                     updateCartQtyDB(user.id, product.id, exists.quantity + qty).catch(() => {})
                 } else {
@@ -94,7 +94,7 @@ export function CartProvider({ children }) {
 
     const removeFromCart = useCallback(async (productId) => {
         setCartItems(prev => {
-            const newCart = prev.filter(i => i.id !== productId)
+            const newCart = prev.filter(i => String(i.id) !== String(productId))
             if (!user) localStorage.setItem('local_cart', JSON.stringify(newCart))
             return newCart
         })
@@ -105,7 +105,7 @@ export function CartProvider({ children }) {
         if (qty < 1) return removeFromCart(productId)
 
         setCartItems(prev => {
-            const newCart = prev.map(i => i.id === productId ? { ...i, quantity: qty } : i)
+            const newCart = prev.map(i => String(i.id) === String(productId) ? { ...i, quantity: qty } : i)
             if (!user) localStorage.setItem('local_cart', JSON.stringify(newCart))
             return newCart
         })

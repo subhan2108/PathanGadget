@@ -108,28 +108,14 @@
 .footer__bottom {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: center;
     padding: 24px 0;
+    text-align: center;
 }
 
 .footer__bottom p {
     font-size: 0.8125rem;
     color: rgba(255, 255, 255, 0.35);
-}
-
-.footer__payments {
-    display: flex;
-    gap: 8px;
-}
-
-.payment-pill {
-    padding: 4px 10px;
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 6px;
-    font-size: 0.6875rem;
-    font-weight: 600;
-    color: rgba(255, 255, 255, 0.5);
-    letter-spacing: 0.3px;
 }
 
 @media (max-width: 900px) {
@@ -146,13 +132,6 @@
     }
 
     .footer__bottom {
-        flex-direction: column;
-        gap: 16px;
         text-align: center;
-    }
-
-    .footer__payments {
-        flex-wrap: wrap;
-        justify-content: center;
     }
 }

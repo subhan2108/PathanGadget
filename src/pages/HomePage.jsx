@@ -240,7 +240,7 @@ export default function HomePage() {
         <div className="home-page page-enter" id="home-page">
 
             {/* ── Editorial Hero Carousel ── */}
-            <section className="relative w-full h-[100dvh] min-h-[480px] md:min-h-[580px] overflow-hidden bg-black" id="hero-section">
+            <section className="relative w-full h-[50dvh] min-h-[320px] max-h-[460px] md:h-[100dvh] md:min-h-[580px] md:max-h-none overflow-hidden bg-black" id="hero-section">
                 <HeroCarousel
                     items={heroSlides}
                     defaultIndex={0}
@@ -248,7 +248,7 @@ export default function HomePage() {
                     onShopNow={() => navigate('/products')}
                     autoplay={true}
                     autoplayDelay={4500}
-                    className="h-[100dvh] min-h-[480px] md:min-h-[580px] w-full"
+                    className="h-[50dvh] min-h-[320px] max-h-[460px] md:h-[100dvh] md:min-h-[580px] md:max-h-none w-full"
                 />
             </section>
 

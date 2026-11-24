@@ -1136,13 +1136,18 @@
         box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05) !important;
     }
 
+    .product-stepper-btn {
+        border-radius: 0 !important;
+        padding: 0 !important;
+    }
+
     .glass-card .h-36,
     .glass-card .h-48,
     .glass-card .sm\:h-48 {
-        height: 112px !important;
+        height: 124px !important;
         margin-bottom: 6px !important;
         padding: 4px !important;
-        border-radius: 10px !important;
+        border-radius: 12px !important;
     }
 
     .glass-card .absolute.top-1\.5 {
@@ -1609,41 +1614,82 @@
 
 @media (max-width: 768px) {
     .plp-pagination {
-        flex-direction: column;
-        align-items: center;
-        text-align: center;
-        gap: 14px;
-        padding: 14px 12px;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        text-align: center !important;
+        gap: 12px !important;
+        padding: 16px 12px !important;
+        margin-top: 24px !important;
+        border-radius: 14px !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+        overflow: hidden !important;
     }
 
     .plp-pagination__controls {
-        order: 1;
-        width: 100%;
-        justify-content: center;
-        overflow-x: auto;
-        padding: 2px 0;
+        order: 1 !important;
+        width: 100% !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 4px !important;
+        overflow: hidden !important;
+        padding: 2px 0 !important;
+        scrollbar-width: none !important;
+        -ms-overflow-style: none !important;
+    }
+
+    .plp-pagination__controls::-webkit-scrollbar {
+        display: none !important;
+    }
+
+    .plp-pagination__pages {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 4px !important;
     }
 
     .plp-pagination__info {
-        order: 2;
-        font-size: 0.8125rem;
+        order: 2 !important;
+        font-size: 0.8125rem !important;
+        color: #4B5563 !important;
+        margin: 0 !important;
     }
 
     .plp-pagination__per-page {
-        order: 3;
-        font-size: 0.8125rem;
+        order: 3 !important;
+        font-size: 0.8125rem !important;
+        gap: 6px !important;
+        margin: 0 !important;
+        justify-content: center !important;
     }
 
     .plp-pagination__btn {
-        height: 36px;
-        min-width: 36px;
-        padding: 0 8px;
-        font-size: 0.8125rem;
+        height: 36px !important;
+        min-width: 36px !important;
+        padding: 0 !important;
+        font-size: 0.8125rem !important;
+        border-radius: 8px !important;
     }
 
     .plp-pagination__btn--page {
-        min-width: 34px;
-        height: 34px;
+        min-width: 34px !important;
+        height: 34px !important;
+        font-size: 0.8125rem !important;
+        border-radius: 8px !important;
+    }
+
+    .plp-pagination__ellipsis {
+        width: 18px !important;
+        font-size: 0.85rem !important;
+    }
+
+    .plp-pagination__select {
+        padding: 4px 8px !important;
+        font-size: 0.8125rem !important;
+        border-radius: 6px !important;
     }
 }
 

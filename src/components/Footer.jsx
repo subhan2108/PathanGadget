@@ -62,13 +62,6 @@ export default function Footer() {
 
                 <div className="footer__bottom">
                     <p>© {year} Smiley N Traders. All rights reserved.</p>
-                    <div className="footer__payments">
-                        <span className="payment-pill"><i className="bi bi-phone" /> UPI</span>
-                        <span className="payment-pill"><i className="bi bi-credit-card" /> Visa</span>
-                        <span className="payment-pill"><i className="bi bi-credit-card-2-back" /> Mastercard</span>
-                        <span className="payment-pill"><i className="bi bi-bank" /> NetBanking</span>
-                        <span className="payment-pill"><i className="bi bi-cash-coin" /> COD</span>
-                    </div>
                 </div>
             </div>
         </footer>

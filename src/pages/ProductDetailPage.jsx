@@ -193,8 +193,10 @@ export default function ProductDetailPage() {
     ] : null
 
     const activeVariant = dynamicVariants ? (dynamicVariants.find(v => v.id === selectedVariant) || dynamicVariants[0]) : null
-    const finalQty = activeVariant ? activeVariant.qty : 1
+    const activeQty = cartQty > 0 ? cartQty : (activeVariant ? activeVariant.qty : 1)
     const finalPrice = activeVariant ? activeVariant.price : basePrice
+    const finalOriginalPrice = activeVariant ? (activeVariant.originalPrice || activeVariant.price) : (baseOriginalPrice || basePrice)
+    const finalSavings = (finalOriginalPrice > finalPrice) ? (finalOriginalPrice - finalPrice) : 0
     const finalUnitCost = activeVariant ? (activeVariant.price / activeVariant.qty) : basePrice
 
     const isInStock = product ? (product.in_stock !== false && product.inStock !== false) : true
@@ -211,11 +213,13 @@ export default function ProductDetailPage() {
             alert('Sorry, this product is currently out of stock.');
             return;
         }
+        const qtyToAdd = activeVariant ? activeVariant.qty : (quantity || 1)
         const res = await addToCart({
             ...product,
+            id: product?.id || id,
             in_stock: true,
             inStock: true,
-            sku: product.sku || `SMN-${(product.category || 'GEN').substring(0, 3).toUpperCase()}-${String(product.id).padStart(4, '0')}`,
+            sku: product.sku || `SMN-${(product.category || 'GEN').substring(0, 3).toUpperCase()}-${String(product.id || id).padStart(4, '0')}`,
             name: product.name,
             price: finalUnitCost,
             image: gallery[0] || product.image_url || null,
@@ -224,7 +228,7 @@ export default function ProductDetailPage() {
             selectedColor: selectedColor && selectedColor.toLowerCase() !== 'standard' ? selectedColor : null,
             variantId: activeVariant?.discountApplied > 0 ? `Buy ${activeVariant.qty} (${activeVariant.discountApplied}% Off)` : (selectedColor && selectedColor.toLowerCase() !== 'standard' ? `Color: ${selectedColor}` : undefined),
             appliedOffer: activeVariant?.discountApplied > 0 ? `Buy ${activeVariant.qty} (${activeVariant.discountApplied}% Off)` : null
-        }, finalQty)
+        }, qtyToAdd)
         if (res && res.success === false) {
             return;
         }
@@ -237,7 +241,9 @@ export default function ProductDetailPage() {
             alert('Sorry, this product is currently out of stock.');
             return;
         }
-        await handleAddToCart()
+        if (cartQty <= 0) {
+            await handleAddToCart()
+        }
         checkout()
     }
 
@@ -261,13 +267,13 @@ export default function ProductDetailPage() {
             {/* Breadcrumb Bar (Aligned with Navbar Logo) */}
             <div className="pdp-breadcrumb-bar">
                 <div className="container">
-                    <nav className="breadcrumb">
+                    <nav className="breadcrumb" aria-label="Breadcrumb">
                         <Link to="/"><i className="bi bi-house" /> Home</Link>
-                        <span>›</span>
+                        <span className="breadcrumb-separator">›</span>
                         <Link to="/products">Products</Link>
                         {product?.category && (
                             <>
-                                <span>›</span>
+                                <span className="breadcrumb-separator">›</span>
                                 <Link to={`/products?category=${encodeURIComponent(product.category)}`} style={{ textTransform: 'capitalize' }}>
                                     {product.category}
                                 </Link>
@@ -275,12 +281,12 @@ export default function ProductDetailPage() {
                         )}
                         {product?.subcategory && (
                             <>
-                                <span>›</span>
+                                <span className="breadcrumb-separator">›</span>
                                 <span style={{ color: 'var(--text-secondary)' }}>{product.subcategory}</span>
                             </>
                         )}
-                        <span>›</span>
-                        <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{product.name}</span>
+                        <span className="breadcrumb-separator">›</span>
+                        <span className="breadcrumb-current" title={product?.name}>{product?.name}</span>
                     </nav>
                 </div>
             </div>
@@ -511,13 +517,13 @@ export default function ProductDetailPage() {
                         </div>
 
                         {/* Price Block */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '8px', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '8px', flexWrap: 'wrap' }}>
                             <span style={{ fontSize: '2.75rem', fontWeight: '900', color: '#111827', lineHeight: '1', letterSpacing: '-1px' }}>
                                 ₹{finalPrice.toLocaleString()}
                             </span>
                             {hasDiscount && (
                                 <span style={{ fontSize: '1.4rem', color: '#9CA3AF', textDecoration: 'line-through', fontWeight: '600' }}>
-                                    ₹{(baseOriginalPrice * finalQty).toLocaleString()}
+                                    ₹{finalOriginalPrice.toLocaleString()}
                                 </span>
                             )}
                             {hasDiscount && (
@@ -528,10 +534,10 @@ export default function ProductDetailPage() {
                         </div>
 
                         {/* You Save (Only if discounted in backend) */}
-                        {hasDiscount && (
+                        {hasDiscount && finalSavings > 0 && (
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#059669', fontSize: '0.95rem', fontWeight: '600', marginBottom: '24px' }}>
                                 <i className="bi bi-piggy-bank" style={{ fontSize: '1.15rem' }} />
-                                <span>You save <strong style={{ fontWeight: '800' }}>₹{(savingsAmount * finalQty).toLocaleString()}</strong> on this order</span>
+                                <span>You save <strong style={{ fontWeight: '800' }}>₹{finalSavings.toLocaleString()}</strong> on this order</span>
                             </div>
                         )}
 
@@ -600,15 +606,24 @@ export default function ProductDetailPage() {
                         {/* Action Buttons */}
                         <div className="pdp-action-buttons">
                             {cartQty > 0 ? (
-                                <div className="pdp-qty-stepper-pill" id="pdp-qty-stepper">
+                                <div
+                                    className="pdp-qty-stepper-pill"
+                                    id="pdp-qty-stepper"
+                                    style={{
+                                        border: '2px solid #E58A1F',
+                                        boxShadow: '0 0 0 1px #E58A1F, 0 2px 10px rgba(229, 138, 31, 0.20)',
+                                    }}
+                                >
                                     <button
                                         type="button"
                                         className="pdp-qty-stepper-btn"
+                                        style={{ borderRight: '1.5px solid #FED7AA' }}
                                         onClick={() => {
+                                            const targetId = product?.id || id
                                             if (cartQty <= 1) {
-                                                removeFromCart(id)
+                                                removeFromCart(targetId)
                                             } else {
-                                                updateQty(id, cartQty - 1)
+                                                updateQty(targetId, cartQty - 1)
                                             }
                                         }}
                                         aria-label="Decrease quantity"
@@ -619,7 +634,11 @@ export default function ProductDetailPage() {
                                     <button
                                         type="button"
                                         className="pdp-qty-stepper-btn"
-                                        onClick={() => updateQty(id, cartQty + 1)}
+                                        style={{ borderLeft: '1.5px solid #FED7AA' }}
+                                        onClick={() => {
+                                            const targetId = product?.id || id
+                                            updateQty(targetId, cartQty + 1)
+                                        }}
                                         aria-label="Increase quantity"
                                     >
                                         +
@@ -630,6 +649,16 @@ export default function ProductDetailPage() {
                                     type="button"
                                     id="pdp-add-to-cart"
                                     className="pdp-btn-cart"
+                                    style={
+                                        !isInStock
+                                            ? { border: '2px solid #D1D5DB' }
+                                            : {
+                                                border: '2px solid #E58A1F',
+                                                boxShadow: '0 0 0 1px #E58A1F, 0 2px 10px rgba(229, 138, 31, 0.18)',
+                                                color: '#D97706',
+                                                background: '#FFFDF9',
+                                            }
+                                    }
                                     onClick={handleAddToCart}
                                     disabled={!isInStock}
                                 >
@@ -767,7 +796,7 @@ export default function ProductDetailPage() {
                                 View All in {product?.category || 'Catalog'} <i className="bi bi-arrow-right" />
                             </Link>
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '20px' }}>
+                        <div className="recommended-products-grid">
                             {similarProducts.slice(0, 4).map((prod) => (
                                 <ProductCard key={prod.id} id={`recommended-card-${prod.id}`} product={prod} />
                             ))}

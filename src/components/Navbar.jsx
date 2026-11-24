@@ -37,6 +37,18 @@ export default function Navbar() {
         setScrolled(window.scrollY > 20)
     }, [location])
 
+    /* Lock body scroll when cart or mobile menu is open */
+    useEffect(() => {
+        if (cartOpen || menuOpen) {
+            document.body.style.overflow = 'hidden'
+        } else {
+            document.body.style.overflow = ''
+        }
+        return () => {
+            document.body.style.overflow = ''
+        }
+    }, [cartOpen, menuOpen])
+
     const formatPrice = (p) =>
         new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0 }).format(p)
 

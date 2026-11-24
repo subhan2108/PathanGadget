@@ -15,6 +15,7 @@ export interface ProductCardProps extends React.HTMLAttributes<HTMLDivElement> {
   product?: any;
   imageUrl?: string;
   name?: string;
+  brand?: string;
   tagline?: string;
   price?: number;
   currency?: string;
@@ -31,6 +32,7 @@ const ProductCardComponent = React.forwardRef<HTMLDivElement, ProductCardProps>(
       product: rawProduct,
       imageUrl,
       name: propName,
+      brand: propBrand,
       tagline,
       price: propPrice,
       currency = "₹",
@@ -55,7 +57,7 @@ const ProductCardComponent = React.forwardRef<HTMLDivElement, ProductCardProps>(
     const cartItem = id ? cartItems.find((i: any) => String(i.id) === String(id)) : null;
     const cartQty = cartItem ? cartItem.quantity : 0;
     const name = propName || raw.name || "Product";
-    const brand = raw.brand || null;
+    const brand = propBrand || raw.brand || raw.make || null;
     const category = raw.category || null;
     const description = raw.description || tagline || (category ? `${category} Collection` : "Genuine Key & Remote");
 
@@ -177,7 +179,7 @@ const ProductCardComponent = React.forwardRef<HTMLDivElement, ProductCardProps>(
         {...props}
       >
         {/* Product Image Box with Pure White Background */}
-        <div 
+        <div
           className="relative mb-2 flex h-36 sm:h-48 w-full items-center justify-center overflow-hidden rounded-xl bg-white border border-neutral-200/60 p-2 sm:p-3 shrink-0"
           style={{ backgroundColor: '#FFFFFF' }}
         >
@@ -212,54 +214,56 @@ const ProductCardComponent = React.forwardRef<HTMLDivElement, ProductCardProps>(
               </span>
             </div>
           )}
-
-
         </div>
 
         {/* Card Body Content */}
         <div className="flex flex-col flex-1 w-full justify-between items-start text-left">
           {/* Brand & Category Row */}
           {(brand || category) && (
-            <div className="flex items-center justify-between w-full mb-1 gap-1 min-w-0 h-4 shrink-0">
+            <div
+              className={cn(
+                "items-center justify-between w-full mb-1 gap-1 min-w-0 shrink-0",
+                brand ? "flex" : "hidden sm:flex"
+              )}
+            >
               {brand ? (
                 <span
-                  className="flex items-center gap-1 text-[11px] sm:text-xs font-semibold text-[#2471E5] truncate max-w-[55%]"
+                  className="flex items-center gap-1 text-[11px] sm:text-xs font-semibold text-[#2471E5] truncate max-w-full sm:max-w-[55%]"
                   style={{ color: 'rgb(36, 113, 229)' }}
                 >
-                  <i className="bi bi-building shrink-0" /> <span className="truncate">{brand}</span>
+                  <i className="bi bi-building shrink-0 text-[10px] sm:text-xs" /> <span className="truncate">{brand}</span>
                 </span>
               ) : <span />}
               {category && (
-                <span className="flex items-center gap-1 rounded-full bg-neutral-100/90 border border-neutral-200/80 px-1.5 sm:px-2.5 py-0.5 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-[#5E5549] shrink-0">
+                <span className="hidden sm:flex items-center gap-1 rounded-full bg-neutral-100/90 border border-neutral-200/80 px-1.5 sm:px-2.5 py-0.5 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-[#5E5549] shrink-0">
                   <i className={`bi ${CATEGORY_ICONS[category.toLowerCase()] || "bi-box"}`} /> {category}
                 </span>
               )}
             </div>
           )}
 
-          {/* Product Title (Limit: 55 chars, line-clamp-2, font-bold) */}
+          {/* Product Title (Visibly shows 2 full lines on mobile) */}
           <h3
             title={name}
-            className="font-bold text-xs sm:text-base text-[#1C1814] tracking-wide text-left w-full line-clamp-2 transition-colors duration-200 group-hover:text-[#B88424] mb-1 shrink-0 min-h-[32px] sm:min-h-[40px] overflow-hidden text-ellipsis leading-tight"
+            className="font-bold text-xs sm:text-base text-[#111827] tracking-tight text-left w-full line-clamp-2 transition-colors duration-200 group-hover:text-[#B88424] mb-1 leading-snug shrink-0 min-h-[32px] sm:min-h-[40px] overflow-hidden text-ellipsis"
           >
             {cleanName}
           </h3>
 
-          {/* Rating Stars & Count */}
-          <div className="flex items-center justify-start gap-1 w-full text-left mb-1 shrink-0 h-4 min-h-[16px]">
+          {/* Rating Stars & Count (Desktop Only) */}
+          <div className="hidden sm:flex items-center justify-start gap-1 w-full text-left mb-1 shrink-0 h-4 min-h-[16px]">
             {hasRating ? (
               <>
                 <span className="flex items-center gap-0.5 text-[#F9D949] text-[11px] sm:text-xs">
                   {[1, 2, 3, 4, 5].map((i) => (
                     <i
                       key={i}
-                      className={`bi ${
-                        i <= Math.floor(rating)
-                          ? "bi-star-fill"
-                          : i - rating < 1
+                      className={`bi ${i <= Math.floor(rating)
+                        ? "bi-star-fill"
+                        : i - rating < 1
                           ? "bi-star-half"
                           : "bi-star text-neutral-300"
-                      }`}
+                        }`}
                     />
                   ))}
                 </span>
@@ -273,18 +277,18 @@ const ProductCardComponent = React.forwardRef<HTMLDivElement, ProductCardProps>(
             )}
           </div>
 
-          {/* Product Description (Limit: 65 chars, line-clamp-1) */}
+          {/* Product Description (Desktop Only) */}
           <p
             title={description}
-            className="text-[10px] sm:text-xs text-[#5E5549] line-clamp-1 text-left w-full font-normal leading-tight mb-2 shrink-0 h-4 overflow-hidden text-ellipsis"
+            className="hidden sm:block text-[10px] sm:text-xs text-[#5E5549] line-clamp-1 text-left w-full font-normal leading-tight mb-2 shrink-0 h-4 overflow-hidden text-ellipsis"
           >
             {cleanDescription}
           </p>
 
-          {/* Pricing Row: Left-aligned price, Save value on big screens only */}
-          <div className="flex items-center justify-between w-full pt-0.5 mb-2 shrink-0 min-h-[22px]">
+          {/* Pricing Row: Directly below Title on Mobile */}
+          <div className="flex items-center justify-between w-full pt-0.5 sm:mb-2 shrink-0 min-h-[20px] sm:min-h-[22px]">
             <div className="flex items-baseline justify-start gap-1 shrink-0">
-              <span className="text-sm sm:text-xl lg:text-2xl font-bold tracking-tight text-[#1C1814]">
+              <span className="text-sm sm:text-xl lg:text-2xl font-bold tracking-tight text-[#111827]">
                 {formatPrice(price)}
               </span>
               {originalPrice > price && (
@@ -300,55 +304,75 @@ const ProductCardComponent = React.forwardRef<HTMLDivElement, ProductCardProps>(
             )}
           </div>
 
-          {/* Action Button: Add or Quantity Stepper */}
-          {cartQty > 0 ? (
-            <div
-              className="w-full h-8 sm:h-9 rounded-full border-2 border-[#E58A1F] overflow-hidden flex items-stretch select-none bg-white shadow-sm"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <button
-                type="button"
-                aria-label="Decrease quantity"
-                className="w-10 sm:w-12 bg-[#FFF3E6] hover:bg-[#FFE5CC] active:bg-[#FDD8B3] text-[#E58A1F] font-black text-base sm:text-lg flex items-center justify-center transition-colors shrink-0 cursor-pointer border-none outline-none"
-                onClick={handleDecrement}
-              >
-                —
-              </button>
+          {/* Action Button: Add or Quantity Stepper (Positioned at bottom of card) */}
+          <div className="w-full mt-auto pt-1">
+            {cartQty > 0 ? (
               <div
-                className="flex-1 bg-white text-[#1C1814] font-extrabold text-xs sm:text-sm flex items-center justify-center px-1 min-w-0"
+                className="product-stepper w-full h-8 sm:h-9 rounded-full overflow-hidden flex items-stretch select-none bg-white"
+                style={{
+                  border: '2px solid #E58A1F',
+                  boxShadow: '0 0 0 1px #E58A1F, 0 2px 8px rgba(229, 138, 31, 0.18)',
+                  borderRadius: '9999px',
+                }}
                 onClick={(e) => e.stopPropagation()}
               >
-                {cartQty}
+                <button
+                  type="button"
+                  aria-label="Decrease quantity"
+                  className="product-stepper-btn w-10 sm:w-12 bg-[#FFF3E6] hover:bg-[#FFE5CC] active:bg-[#FDD8B3] text-[#E58A1F] font-black text-base sm:text-lg flex items-center justify-center transition-colors shrink-0 cursor-pointer outline-none border-none p-0"
+                  style={{ border: 'none', borderRight: '1.5px solid #FED7AA', borderRadius: '0' }}
+                  onClick={handleDecrement}
+                >
+                  —
+                </button>
+                <div
+                  className="flex-1 bg-white text-[#1C1814] font-extrabold text-xs sm:text-sm flex items-center justify-center px-1 min-w-0"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {cartQty}
+                </div>
+                <button
+                  type="button"
+                  aria-label="Increase quantity"
+                  className="product-stepper-btn w-10 sm:w-12 bg-[#FFF3E6] hover:bg-[#FFE5CC] active:bg-[#FDD8B3] text-[#E58A1F] font-black text-base sm:text-lg flex items-center justify-center transition-colors shrink-0 cursor-pointer outline-none border-none p-0"
+                  style={{ border: 'none', borderLeft: '1.5px solid #FED7AA', borderRadius: '0' }}
+                  onClick={handleIncrement}
+                >
+                  +
+                </button>
               </div>
+            ) : (
               <button
                 type="button"
-                aria-label="Increase quantity"
-                className="w-10 sm:w-12 bg-[#FFF3E6] hover:bg-[#FFE5CC] active:bg-[#FDD8B3] text-[#E58A1F] font-black text-base sm:text-lg flex items-center justify-center transition-colors shrink-0 cursor-pointer border-none outline-none"
-                onClick={handleIncrement}
+                id={id ? `cart-btn-${id}` : undefined}
+                className={cn(
+                  "w-full h-8 sm:h-9 rounded-full font-bold text-xs sm:text-sm tracking-wide transition-all duration-150 active:scale-95 select-none flex items-center justify-center gap-1 cursor-pointer",
+                  isOutOfStock
+                    ? "opacity-50 cursor-not-allowed bg-neutral-100 text-neutral-400"
+                    : "bg-[#FFFBF5] hover:bg-[#FFF3E6] text-[#D97706]"
+                )}
+                style={
+                  isOutOfStock
+                    ? { border: '2px solid #D1D5DB', borderRadius: '9999px' }
+                    : {
+                        border: '2px solid #E58A1F',
+                        boxShadow: '0 0 0 1px #E58A1F, 0 2px 8px rgba(229, 138, 31, 0.18)',
+                        borderRadius: '9999px',
+                      }
+                }
+                onClick={handleAddToCart}
+                disabled={isOutOfStock}
               >
-                +
+                {isOutOfStock ? (
+                  <>
+                    <i className="bi bi-x-circle" /> Out of Stock
+                  </>
+                ) : (
+                  <>Add</>
+                )}
               </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              id={id ? `cart-btn-${id}` : undefined}
-              className={cn(
-                "w-full h-8 sm:h-9 rounded-full border-2 border-[#E58A1F] bg-white hover:bg-[#FFF3E6] text-[#E58A1F] font-bold text-xs sm:text-sm tracking-wide transition-all duration-150 active:scale-95 shadow-sm select-none flex items-center justify-center gap-1 cursor-pointer",
-                isOutOfStock && "opacity-50 cursor-not-allowed border-neutral-300 text-neutral-400 hover:bg-white"
-              )}
-              onClick={handleAddToCart}
-              disabled={isOutOfStock}
-            >
-              {isOutOfStock ? (
-                <>
-                  <i className="bi bi-x-circle" /> Out of Stock
-                </>
-              ) : (
-                <>Add</>
-              )}
-            </button>
-          )}
+            )}
+          </div>
         </div>
       </div>
     );

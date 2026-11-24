@@ -83,9 +83,9 @@ export function HeroCarousel({
 
   const isMobile = box.w > 0 ? box.w < 768 : (typeof window !== "undefined" ? window.innerWidth < 768 : false)
 
-  const stripTop = isMobile ? 0.52 : STRIP_TOP
+  const stripTop = isMobile ? 0.50 : STRIP_TOP
   const fullH = isMobile
-    ? clamp(box.h * 0.165, 110, 140)
+    ? clamp(Math.round(box.h * 0.23), 76, 100)
     : clamp(box.h * CARD_H, 96, 360)
   const halfH = isMobile ? Math.round(fullH * 0.58) : fullH / 2
   const cardW = Math.round(fullH * CARD_AR)
@@ -94,7 +94,7 @@ export function HeroCarousel({
   const pad = Math.max(16, Math.round(box.w * PAD))
   const label = isMobile ? 10 : Math.max(9, Math.round(box.h * LABEL))
   const titleFontSize = isMobile
-    ? clamp(Math.round(box.w * 0.068), 20, 26)
+    ? clamp(Math.round(box.w * 0.052), 17, 22)
     : Math.max(26, Math.round(box.h * TITLE))
   const railWidth = isMobile
     ? clamp(box.w * 0.28, 90, 130)
@@ -162,7 +162,7 @@ export function HeroCarousel({
         go(keys[e.key])
       }}
       className={cn(
-        "relative h-[100dvh] min-h-[480px] md:min-h-[580px] w-full overflow-hidden bg-black text-white select-none",
+        "relative h-[50dvh] min-h-[320px] max-h-[460px] md:h-[100dvh] md:min-h-[580px] md:max-h-none w-full overflow-hidden bg-black text-white select-none",
         "outline-none focus-visible:ring-1 focus-visible:ring-white/40 focus-visible:ring-inset",
         className
       )}
@@ -212,8 +212,8 @@ export function HeroCarousel({
         className="absolute inset-x-0 top-0 flex flex-col justify-end z-20 pointer-events-none"
         style={{
           height: `${stripTop * 100}%`,
-          paddingTop: isMobile ? Math.max(68, Math.round(box.h * 0.085)) : undefined,
-          paddingBottom: isMobile ? 12 : Math.round(box.h * 0.028),
+          paddingTop: isMobile ? 54 : undefined,
+          paddingBottom: isMobile ? 8 : Math.round(box.h * 0.028),
         }}
       >
         <div className="container w-full pointer-events-auto px-4 sm:px-6">
