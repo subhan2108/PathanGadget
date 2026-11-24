@@ -67,6 +67,9 @@
 
 html {
   scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 body {
@@ -76,6 +79,23 @@ body {
   color: var(--text-primary);
   background: var(--white);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* ── Typography & Screen Rendering Optimization ──
+   Cap extreme weights (800/900) to crisp 700 to prevent text blurriness
+   and rasterization slowdown on mobile screens */
+b, strong, .font-black, .font-extrabold {
+  font-weight: 700;
+}
+
+/* ── High-Performance Card Rendering Isolation ──
+   Isolates card layout so grid scrolls at rock-solid 60/120 FPS */
+.glass-card {
+  contain: layout style paint;
+  content-visibility: auto;
+  contain-intrinsic-size: 340px;
 }
 
 img {

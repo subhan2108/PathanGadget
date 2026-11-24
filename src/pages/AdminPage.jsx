@@ -19,7 +19,12 @@ import {
     adminApprovePayment,
     adminDispatchOrder,
     adminMarkDelivered,
-    adminExportToVyapar
+    adminExportToVyapar,
+    adminGetHomepageSettings,
+    adminSaveHeroSlides,
+    adminSaveCategoryOrder,
+    adminSaveFeaturedProducts,
+    adminToggleProductFeatured
 } from '../lib/adminService'
 const ADMIN_PASSWORD = (import.meta.env.VITE_ADMIN_PASSWORD || 'admin123').trim()
 import { useCategories } from '../hooks/useProducts'
@@ -98,6 +103,36 @@ export default function AdminPage() {
     const [uploadingSlot, setUploadingSlot] = useState(null)
     const [bulkProgress, setBulkProgress] = useState(null)
     const [showUrlInputs, setShowUrlInputs] = useState({})
+
+    // Homepage Showcase Customization State
+    const [homepageSubTab, setHomepageSubTab] = useState('hero')
+    const [heroSlides, setHeroSlides] = useState([])
+    const [categoryOrder, setCategoryOrder] = useState([])
+    const [featuredProductIds, setFeaturedProductIds] = useState([])
+    const [savingHomepage, setSavingHomepage] = useState(false)
+    const [homepageNotice, setHomepageNotice] = useState('')
+
+    // Hero Slide Add/Edit Modal
+    const [showSlideModal, setShowSlideModal] = useState(false)
+    const [slideForm, setSlideForm] = useState({
+        id: '',
+        productId: '',
+        title: '',
+        image: '',
+        accent: '#C99738',
+        link: '/products',
+        price: '',
+        originalPrice: '',
+        discount: '',
+        rating: '4.9',
+        reviews: '1,000+'
+    })
+    const [slideSearchQuery, setSlideSearchQuery] = useState('')
+    const [editingSlideIndex, setEditingSlideIndex] = useState(null)
+
+    // Featured Product Search
+    const [featuredSearchQuery, setFeaturedSearchQuery] = useState('')
+    const [showFeaturedDropdown, setShowFeaturedDropdown] = useState(false)
 
     const availableSubcategories = React.useMemo(() => {
         const catKey = (productForm?.category || '').toLowerCase().trim();
@@ -445,9 +480,227 @@ export default function AdminPage() {
 
     useEffect(() => {
         if (!isAuthenticated) return
-        if (tab === 'products' || tab === 'collections' || tab === 'bulk') loadProducts()
+        if (tab === 'products' || tab === 'collections' || tab === 'bulk' || tab === 'homepage') loadProducts()
         if (tab === 'orders') loadOrders()
+        if (tab === 'homepage') loadHomepageSettings()
     }, [tab, isAuthenticated])
+
+    const loadHomepageSettings = async () => {
+        try {
+            const data = await adminGetHomepageSettings()
+            if (data) {
+                setHeroSlides(data.hero_slides || [])
+                setFeaturedProductIds(data.featured_product_ids || [])
+                if (Array.isArray(data.category_order) && data.category_order.length > 0) {
+                    setCategoryOrder(data.category_order)
+                } else if (categories && categories.length > 0) {
+                    setCategoryOrder(categories.map(c => c.id || c.name))
+                }
+            }
+        } catch (err) {
+            console.error('Failed to load homepage settings:', err)
+        }
+    }
+
+    useEffect(() => {
+        if (categories && categories.length > 0 && categoryOrder.length === 0) {
+            setCategoryOrder(categories.map(c => c.id || c.name))
+        }
+    }, [categories, categoryOrder.length])
+
+    // --- Homepage Showcase Handlers ---
+    const handleMoveHeroSlide = (index, direction) => {
+        const next = [...heroSlides]
+        const targetIndex = direction === 'up' ? index - 1 : index + 1
+        if (targetIndex < 0 || targetIndex >= next.length) return
+        const temp = next[index]
+        next[index] = next[targetIndex]
+        next[targetIndex] = temp
+        setHeroSlides(next)
+    }
+
+    const handleRemoveHeroSlide = (index) => {
+        if (!window.confirm('Are you sure you want to remove this slide from the hero carousel?')) return
+        setHeroSlides(prev => prev.filter((_, i) => i !== index))
+    }
+
+    const openAddSlideModal = () => {
+        setEditingSlideIndex(null)
+        setSlideForm({
+            id: `slide-${Date.now()}`,
+            productId: '',
+            title: '',
+            image: '',
+            accent: '#C99738',
+            link: '/products',
+            price: '',
+            originalPrice: '',
+            discount: '',
+            rating: '4.9',
+            reviews: '1,000+'
+        })
+        setSlideSearchQuery('')
+        setShowSlideModal(true)
+    }
+
+    const openEditSlideModal = (slide, index) => {
+        setEditingSlideIndex(index)
+        setSlideForm({ ...slide })
+        setSlideSearchQuery('')
+        setShowSlideModal(true)
+    }
+
+    const handleSelectProductForSlide = (product) => {
+        const disc = product.original_price && product.original_price > product.price
+            ? `${Math.round(((product.original_price - product.price) / product.original_price) * 100)}% OFF`
+            : ''
+        setSlideForm(prev => ({
+            ...prev,
+            productId: product.id,
+            title: prev.title || product.name,
+            image: product.image_url,
+            price: `₹${product.price}`,
+            originalPrice: product.original_price ? `₹${product.original_price}` : '',
+            discount: disc,
+            link: `/products?category=${encodeURIComponent(product.category || '')}`
+        }))
+        setSlideSearchQuery('')
+    }
+
+    const handleSaveSlideForm = (e) => {
+        if (e) e.preventDefault()
+        if (!slideForm.title.trim()) {
+            alert('Please provide a slide title/headline.')
+            return
+        }
+        if (!slideForm.image.trim()) {
+            alert('Please provide a slide image URL or select a product.')
+            return
+        }
+        const updated = [...heroSlides]
+        if (editingSlideIndex !== null) {
+            updated[editingSlideIndex] = { ...slideForm }
+        } else {
+            updated.push({ ...slideForm, id: slideForm.id || `slide-${Date.now()}` })
+        }
+        setHeroSlides(updated)
+        setShowSlideModal(false)
+    }
+
+    const handleSaveAllHeroSlides = async () => {
+        setSavingHomepage(true)
+        try {
+            await adminSaveHeroSlides(heroSlides)
+            try {
+                localStorage.setItem('smn_hero_slides', JSON.stringify(heroSlides))
+            } catch (e) {}
+            setHomepageNotice('Hero Carousel slides saved successfully!')
+            setTimeout(() => setHomepageNotice(''), 4000)
+        } catch (err) {
+            alert('Failed to save hero slides: ' + err.message)
+        } finally {
+            setSavingHomepage(false)
+        }
+    }
+
+    // --- Collections Order Handlers ---
+    const handleMoveCategory = (index, direction) => {
+        const next = [...categoryOrder]
+        const targetIndex = direction === 'up' ? index - 1 : index + 1
+        if (targetIndex < 0 || targetIndex >= next.length) return
+        const temp = next[index]
+        next[index] = next[targetIndex]
+        next[targetIndex] = temp
+        setCategoryOrder(next)
+    }
+
+    const handleMoveCategoryToTop = (index) => {
+        if (index === 0) return
+        const next = [...categoryOrder]
+        const [item] = next.splice(index, 1)
+        next.unshift(item)
+        setCategoryOrder(next)
+    }
+
+    const handleResetCategoryOrder = () => {
+        if (!window.confirm('Reset categories back to alphabetical order?')) return
+        const alpha = [...categoryOrder].sort((a, b) => a.localeCompare(b))
+        setCategoryOrder(alpha)
+    }
+
+    const handleSaveCategoryOrder = async () => {
+        setSavingHomepage(true)
+        try {
+            await adminSaveCategoryOrder(categoryOrder)
+            setHomepageNotice('Category & Collection display order saved successfully!')
+            setTimeout(() => setHomepageNotice(''), 4000)
+        } catch (err) {
+            alert('Failed to save category order: ' + err.message)
+        } finally {
+            setSavingHomepage(false)
+        }
+    }
+
+    // --- Featured Products Handlers ---
+    const handleAddFeaturedProduct = (product) => {
+        if (featuredProductIds.includes(product.id)) {
+            alert('This product is already in the Featured Showcase!')
+            return
+        }
+        setFeaturedProductIds(prev => [product.id, ...prev])
+        setFeaturedSearchQuery('')
+        setShowFeaturedDropdown(false)
+    }
+
+    const handleRemoveFeaturedProduct = (productId) => {
+        setFeaturedProductIds(prev => prev.filter(id => id !== productId))
+    }
+
+    const handleMoveFeaturedProduct = (index, direction) => {
+        const next = [...featuredProductIds]
+        const targetIndex = direction === 'up' ? index - 1 : index + 1
+        if (targetIndex < 0 || targetIndex >= next.length) return
+        const temp = next[index]
+        next[index] = next[targetIndex]
+        next[targetIndex] = temp
+        setFeaturedProductIds(next)
+    }
+
+    const handleSaveFeaturedProducts = async () => {
+        setSavingHomepage(true)
+        try {
+            await adminSaveFeaturedProducts(featuredProductIds)
+            try {
+                localStorage.setItem('smn_featured_product_ids', JSON.stringify(featuredProductIds))
+            } catch (e) {}
+            setProducts(prev => prev.map(p => ({
+                ...p,
+                is_featured: featuredProductIds.includes(p.id)
+            })))
+            setHomepageNotice('Featured Products showcase saved successfully!')
+            setTimeout(() => setHomepageNotice(''), 4000)
+        } catch (err) {
+            alert('Failed to save featured products: ' + err.message)
+        } finally {
+            setSavingHomepage(false)
+        }
+    }
+
+    const handleToggleProductFeatured = async (productId, isFeatured) => {
+        try {
+            await adminToggleProductFeatured(productId, isFeatured)
+            setProducts(prev => prev.map(p => p.id === productId ? { ...p, is_featured: isFeatured } : p))
+            const nextList = isFeatured
+                ? (featuredProductIds.includes(productId) ? featuredProductIds : [productId, ...featuredProductIds])
+                : featuredProductIds.filter(id => id !== productId)
+            setFeaturedProductIds(nextList)
+            try {
+                localStorage.setItem('smn_featured_product_ids', JSON.stringify(nextList))
+            } catch (e) {}
+        } catch (err) {
+            alert('Failed to toggle featured status: ' + err.message)
+        }
+    }
 
     const loadProducts = async () => {
         setLoading(true)
@@ -1042,6 +1295,9 @@ export default function AdminPage() {
                 <button className={`admin-tab ${tab === 'collections' ? 'active' : ''}`} onClick={() => setTab('collections')}>
                     <i className="bi bi-grid-3x3-gap-fill" /> Collections
                 </button>
+                <button className={`admin-tab ${tab === 'homepage' ? 'active' : ''}`} onClick={() => setTab('homepage')}>
+                    <i className="bi bi-house-gear-fill" /> Homepage Showcase
+                </button>
                 <button className={`admin-tab ${tab === 'bulk' ? 'active' : ''}`} onClick={() => setTab('bulk')}>
                     <i className="bi bi-check2-square" /> Bulk Category & Subcategory Editor
                 </button>
@@ -1193,6 +1449,7 @@ export default function AdminPage() {
                                                 <th>Category</th>
                                                 <th>Subcategory</th>
                                                 <th>Stock</th>
+                                                <th>Featured</th>
                                                 <th>Actions</th>
                                             </tr>
                                         </thead>
@@ -1243,6 +1500,48 @@ export default function AdminPage() {
                                                             <span className="badge" style={{ backgroundColor: '#FEE2E2', color: '#991B1B', border: '1px solid #FECACA', fontSize: '0.75rem', fontWeight: 700, padding: '4px 8px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                                                                 <i className="bi bi-x-circle-fill" /> Out of Stock
                                                             </span>
+                                                        )}
+                                                    </td>
+                                                    <td>
+                                                        {p.is_featured ? (
+                                                            <button
+                                                                type="button"
+                                                                className="btn btn-sm"
+                                                                onClick={() => handleToggleProductFeatured(p.id, false)}
+                                                                title="Featured on Homepage - Click to Unfeature"
+                                                                style={{
+                                                                    backgroundColor: '#FEF3C7',
+                                                                    color: '#92400E',
+                                                                    border: '1px solid #FCD34D',
+                                                                    fontWeight: 700,
+                                                                    fontSize: '0.75rem',
+                                                                    padding: '4px 8px',
+                                                                    display: 'inline-flex',
+                                                                    alignItems: 'center',
+                                                                    gap: '4px',
+                                                                    cursor: 'pointer'
+                                                                }}
+                                                            >
+                                                                <i className="bi bi-star-fill text-warning" /> Featured
+                                                            </button>
+                                                        ) : (
+                                                            <button
+                                                                type="button"
+                                                                className="btn btn-sm btn-outline-secondary"
+                                                                onClick={() => handleToggleProductFeatured(p.id, true)}
+                                                                title="Click to Feature on Homepage"
+                                                                style={{
+                                                                    fontSize: '0.75rem',
+                                                                    fontWeight: 600,
+                                                                    padding: '4px 8px',
+                                                                    display: 'inline-flex',
+                                                                    alignItems: 'center',
+                                                                    gap: '4px',
+                                                                    cursor: 'pointer'
+                                                                }}
+                                                            >
+                                                                <i className="bi bi-star" /> Feature
+                                                            </button>
                                                         )}
                                                     </td>
                                                     <td>
@@ -1823,6 +2122,465 @@ export default function AdminPage() {
                                         </div>
                                     </div>
                                 )}
+                            </div>
+                        )}
+
+                        {/* ── HOMEPAGE SHOWCASE MANAGER TAB ── */}
+                        {tab === 'homepage' && (
+                            <div className="admin-panel">
+                                <div className="admin-panel__header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                                    <div>
+                                        <h2 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
+                                            <i className="bi bi-house-gear-fill" style={{ color: 'var(--primary-color)' }} />
+                                            Homepage Showcase Customizer
+                                        </h2>
+                                        <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#6B7280' }}>
+                                            Customize your Hero carousel slides, rearrange Collection order, and curate Featured products.
+                                        </p>
+                                    </div>
+                                    {homepageNotice && (
+                                        <div className="alert alert-success py-1 px-3 mb-0" style={{ fontSize: '0.88rem', fontWeight: 600 }}>
+                                            <i className="bi bi-check-circle-fill me-1" /> {homepageNotice}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Sub Tabs Navigation */}
+                                <div className="homepage-subtabs">
+                                    <button
+                                        type="button"
+                                        className={`btn btn-sm ${homepageSubTab === 'hero' ? 'btn-primary' : 'btn-outline-secondary'}`}
+                                        onClick={() => setHomepageSubTab('hero')}
+                                        style={{ fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                                    >
+                                        <i className="bi bi-images" /> 1. Hero Carousel Slides ({heroSlides.length})
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className={`btn btn-sm ${homepageSubTab === 'collections' ? 'btn-primary' : 'btn-outline-secondary'}`}
+                                        onClick={() => setHomepageSubTab('collections')}
+                                        style={{ fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                                    >
+                                        <i className="bi bi-grid-3x3-gap-fill" /> 2. Collections Order ({categoryOrder.length || categories.length})
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className={`btn btn-sm ${homepageSubTab === 'featured' ? 'btn-primary' : 'btn-outline-secondary'}`}
+                                        onClick={() => setHomepageSubTab('featured')}
+                                        style={{ fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                                    >
+                                        <i className="bi bi-stars" /> 3. Featured Products ({featuredProductIds.length})
+                                    </button>
+                                </div>
+
+                                {/* ── SUB-TAB 1: HERO CAROUSEL SLIDES ── */}
+                                {homepageSubTab === 'hero' && (
+                                    <div>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '16px' }}>
+                                            <p style={{ margin: 0, fontSize: '0.9rem', color: '#4B5563' }}>
+                                                Select and reorder which products/banners are displayed in the main top Hero Carousel. Customers can click small preview boxes to view that product.
+                                            </p>
+                                            <div style={{ display: 'flex', gap: '10px' }}>
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-sm btn-outline-primary"
+                                                    onClick={openAddSlideModal}
+                                                    style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}
+                                                >
+                                                    <i className="bi bi-plus-circle" /> Add Slide from Product
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-sm btn-primary"
+                                                    onClick={handleSaveAllHeroSlides}
+                                                    disabled={savingHomepage}
+                                                    style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 700 }}
+                                                >
+                                                    <i className={`bi ${savingHomepage ? 'bi-arrow-repeat bi-spin' : 'bi-check2-circle'}`} />
+                                                    {savingHomepage ? 'Saving...' : 'Save Hero Slides'}
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {heroSlides.length === 0 ? (
+                                            <div style={{ textAlign: 'center', padding: '40px 20px', background: '#F9FAFB', borderRadius: '12px', border: '1px dashed #D1D5DB' }}>
+                                                <i className="bi bi-images" style={{ fontSize: '2rem', color: '#9CA3AF' }} />
+                                                <p style={{ margin: '8px 0 16px 0', color: '#6B7280' }}>No hero slides configured. Click below to add a slide.</p>
+                                                <button type="button" className="btn btn-sm btn-primary" onClick={openAddSlideModal}>
+                                                    <i className="bi bi-plus-circle" /> Add First Slide
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <div className="hero-slides-list">
+                                                {heroSlides.map((slide, idx) => (
+                                                    <div key={slide.id || idx} className="homepage-slide-card">
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1, minWidth: 0 }}>
+                                                            <span className="category-rank-badge" style={{ backgroundColor: '#1E293B', color: '#FFFFFF' }}>
+                                                                {idx + 1}
+                                                            </span>
+                                                            <img
+                                                                src={formatImageUrl(slide.image)}
+                                                                alt={slide.title}
+                                                                className="homepage-slide-img"
+                                                                onError={(e) => { e.currentTarget.src = '/placeholder-key.svg' }}
+                                                            />
+                                                            <div style={{ minWidth: 0 }}>
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
+                                                                    <strong style={{ fontSize: '0.95rem', color: '#111827', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                                        {slide.title ? slide.title.replace(/\n/g, ' ') : 'Hero Slide'}
+                                                                    </strong>
+                                                                    {slide.productId && (
+                                                                        <span className="badge badge-light" style={{ border: '1px solid #D1D5DB', fontSize: '0.75rem', fontWeight: 600 }}>
+                                                                            Product #{slide.productId}
+                                                                        </span>
+                                                                    )}
+                                                                    <span style={{ display: 'inline-block', width: '12px', height: '12px', borderRadius: '50%', backgroundColor: slide.accent || '#C99738' }} title={`Accent: ${slide.accent}`} />
+                                                                </div>
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.85rem', color: '#4B5563' }}>
+                                                                    <span style={{ fontWeight: 700, color: '#111827' }}>{slide.price}</span>
+                                                                    {slide.originalPrice && (
+                                                                        <span style={{ textDecoration: 'line-through', color: '#9CA3AF' }}>{slide.originalPrice}</span>
+                                                                    )}
+                                                                    {slide.discount && (
+                                                                        <span className="badge badge-success" style={{ fontSize: '0.7rem' }}>{slide.discount}</span>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Reorder and Edit Actions */}
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                            <button
+                                                                type="button"
+                                                                className="btn btn-sm btn-outline-secondary"
+                                                                onClick={() => handleMoveHeroSlide(idx, 'up')}
+                                                                disabled={idx === 0}
+                                                                title="Move Up"
+                                                                style={{ padding: '4px 8px' }}
+                                                            >
+                                                                <i className="bi bi-arrow-up" />
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                className="btn btn-sm btn-outline-secondary"
+                                                                onClick={() => handleMoveHeroSlide(idx, 'down')}
+                                                                disabled={idx === heroSlides.length - 1}
+                                                                title="Move Down"
+                                                                style={{ padding: '4px 8px' }}
+                                                            >
+                                                                <i className="bi bi-arrow-down" />
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                className="btn btn-sm btn-outline-primary"
+                                                                onClick={() => openEditSlideModal(slide, idx)}
+                                                                title="Edit Slide"
+                                                                style={{ padding: '4px 10px', fontWeight: 600 }}
+                                                            >
+                                                                <i className="bi bi-pencil" /> Edit
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                className="btn btn-sm btn-outline-danger"
+                                                                onClick={() => handleRemoveHeroSlide(idx)}
+                                                                title="Remove Slide"
+                                                                style={{ padding: '4px 8px' }}
+                                                            >
+                                                                <i className="bi bi-trash" />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* ── SUB-TAB 2: COLLECTIONS ORDER ── */}
+                                {homepageSubTab === 'collections' && (() => {
+                                    const allUniqueCategories = Array.from(new Set([
+                                        ...categoryOrder,
+                                        ...categories.map(c => c.id || c.name),
+                                        ...products.map(p => p.category).filter(Boolean)
+                                    ]))
+                                    const catCountsMap = new Map()
+                                    categories.forEach(c => { if (c.id) catCountsMap.set(c.id.toLowerCase().trim(), c.count || 0) })
+
+                                    return (
+                                        <div>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '16px' }}>
+                                                <p style={{ margin: 0, fontSize: '0.9rem', color: '#4B5563' }}>
+                                                    Choose which category is shown at the top of the homepage in the <strong>"Shop by Collection"</strong> grid and category tabs. Use the <strong>Top</strong> button to move any collection to #1.
+                                                </p>
+                                                <div style={{ display: 'flex', gap: '10px' }}>
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-sm btn-outline-secondary"
+                                                        onClick={handleResetCategoryOrder}
+                                                    >
+                                                        <i className="bi bi-arrow-clockwise" /> Reset A-Z
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-sm btn-primary"
+                                                        onClick={handleSaveCategoryOrder}
+                                                        disabled={savingHomepage}
+                                                        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 700 }}
+                                                    >
+                                                        <i className={`bi ${savingHomepage ? 'bi-arrow-repeat bi-spin' : 'bi-check2-circle'}`} />
+                                                        {savingHomepage ? 'Saving...' : 'Save Category Order'}
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <div className="category-order-list">
+                                                {allUniqueCategories.map((catName, idx) => {
+                                                    const count = catCountsMap.get(catName.toLowerCase().trim()) || 0
+                                                    return (
+                                                        <div key={catName} className="category-order-row">
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                                <span className={`category-rank-badge ${idx === 0 ? 'rank-1' : ''}`}>
+                                                                    {idx === 0 ? <i className="bi bi-trophy-fill" title="#1 Top Category" /> : `#${idx + 1}`}
+                                                                </span>
+                                                                <div>
+                                                                    <strong style={{ fontSize: '0.95rem', color: '#111827' }}>
+                                                                        {catName}
+                                                                    </strong>
+                                                                    {idx === 0 && (
+                                                                        <span className="badge badge-warning ms-2" style={{ fontSize: '0.75rem', fontWeight: 700 }}>
+                                                                            Top of Homepage
+                                                                        </span>
+                                                                    )}
+                                                                    <div style={{ fontSize: '0.8rem', color: '#6B7280' }}>
+                                                                        {count} products available
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                                <button
+                                                                    type="button"
+                                                                    className="btn btn-sm btn-outline-warning text-dark"
+                                                                    onClick={() => handleMoveCategoryToTop(idx)}
+                                                                    disabled={idx === 0}
+                                                                    title="Make this the #1 Top Category"
+                                                                    style={{ fontWeight: 700, fontSize: '0.78rem', padding: '4px 10px' }}
+                                                                >
+                                                                    <i className="bi bi-arrow-up-circle-fill" /> Top
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    className="btn btn-sm btn-outline-secondary"
+                                                                    onClick={() => handleMoveCategory(idx, 'up')}
+                                                                    disabled={idx === 0}
+                                                                    title="Move Up"
+                                                                    style={{ padding: '4px 8px' }}
+                                                                >
+                                                                    <i className="bi bi-chevron-up" />
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    className="btn btn-sm btn-outline-secondary"
+                                                                    onClick={() => handleMoveCategory(idx, 'down')}
+                                                                    disabled={idx === allUniqueCategories.length - 1}
+                                                                    title="Move Down"
+                                                                    style={{ padding: '4px 8px' }}
+                                                                >
+                                                                    <i className="bi bi-chevron-down" />
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    )
+                                                })}
+                                            </div>
+                                        </div>
+                                    )
+                                })()}
+
+                                {/* ── SUB-TAB 3: FEATURED PRODUCTS ── */}
+                                {homepageSubTab === 'featured' && (() => {
+                                    const featuredProductsList = featuredProductIds
+                                        .map(id => products.find(p => p.id === id))
+                                        .filter(Boolean)
+
+                                    const availableToFeature = featuredSearchQuery.trim()
+                                        ? products.filter(p => 
+                                            !featuredProductIds.includes(p.id) &&
+                                            (p.name?.toLowerCase().includes(featuredSearchQuery.toLowerCase()) ||
+                                             p.sku?.toLowerCase().includes(featuredSearchQuery.toLowerCase()) ||
+                                             p.category?.toLowerCase().includes(featuredSearchQuery.toLowerCase()))
+                                          ).slice(0, 8)
+                                        : []
+
+                                    return (
+                                        <div>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '16px' }}>
+                                                <p style={{ margin: 0, fontSize: '0.9rem', color: '#4B5563' }}>
+                                                    Choose your best products to showcase in the homepage <strong>"Featured Products"</strong> section. Pinned products always appear first in the customer catalog.
+                                                </p>
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-sm btn-primary"
+                                                    onClick={handleSaveFeaturedProducts}
+                                                    disabled={savingHomepage}
+                                                    style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 700 }}
+                                                >
+                                                    <i className={`bi ${savingHomepage ? 'bi-arrow-repeat bi-spin' : 'bi-check2-circle'}`} />
+                                                    {savingHomepage ? 'Saving...' : 'Save Featured Showcase'}
+                                                </button>
+                                            </div>
+
+                                            {/* Search to add products */}
+                                            <div style={{ position: 'relative', marginBottom: '20px', maxWidth: '520px' }}>
+                                                <label style={{ display: 'block', fontWeight: 600, fontSize: '0.85rem', marginBottom: '6px', color: '#374151' }}>
+                                                    <i className="bi bi-plus-circle me-1" /> Add Product to Featured Showcase:
+                                                </label>
+                                                <div style={{ position: 'relative' }}>
+                                                    <input
+                                                        type="text"
+                                                        className="form-control"
+                                                        placeholder="Search product name, SKU or category to feature..."
+                                                        value={featuredSearchQuery}
+                                                        onChange={e => {
+                                                            setFeaturedSearchQuery(e.target.value)
+                                                            setShowFeaturedDropdown(true)
+                                                        }}
+                                                        onFocus={() => setShowFeaturedDropdown(true)}
+                                                    />
+                                                    <i className="bi bi-search" style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: '#9CA3AF' }} />
+                                                </div>
+
+                                                {/* Search Dropdown */}
+                                                {showFeaturedDropdown && featuredSearchQuery.trim() && (
+                                                    <div className="featured-picker-dropdown">
+                                                        {availableToFeature.length === 0 ? (
+                                                            <div style={{ padding: '12px 16px', color: '#6B7280', fontSize: '0.85rem' }}>
+                                                                No matching products found.
+                                                            </div>
+                                                        ) : (
+                                                            availableToFeature.map(prod => (
+                                                                <div
+                                                                    key={prod.id}
+                                                                    className="featured-picker-item"
+                                                                    onClick={() => handleAddFeaturedProduct(prod)}
+                                                                >
+                                                                    <img
+                                                                        src={formatImageUrl(prod.image_url)}
+                                                                        alt=""
+                                                                        width="36"
+                                                                        height="36"
+                                                                        style={{ objectFit: 'contain', borderRadius: '4px', border: '1px solid #E5E7EB' }}
+                                                                        onError={handleAdminImgError}
+                                                                    />
+                                                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                                                        <div style={{ fontWeight: 600, fontSize: '0.88rem', color: '#111827', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                                            {prod.name}
+                                                                        </div>
+                                                                        <div style={{ fontSize: '0.78rem', color: '#6B7280' }}>
+                                                                            ₹{prod.price} • {prod.category} {prod.sku && `• SKU: ${prod.sku}`}
+                                                                        </div>
+                                                                    </div>
+                                                                    <span className="badge badge-primary" style={{ fontSize: '0.75rem' }}>
+                                                                        + Add
+                                                                    </span>
+                                                                </div>
+                                                            ))
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Featured Products Table */}
+                                            {featuredProductsList.length === 0 ? (
+                                                <div style={{ textAlign: 'center', padding: '30px 20px', background: '#F9FAFB', borderRadius: '12px', border: '1px dashed #D1D5DB' }}>
+                                                    <i className="bi bi-stars" style={{ fontSize: '2rem', color: '#9CA3AF' }} />
+                                                    <p style={{ margin: '8px 0 0 0', color: '#6B7280' }}>No products featured yet. Search above or use the star buttons in the Products tab!</p>
+                                                </div>
+                                            ) : (
+                                                <div className="table-responsive">
+                                                    <table className="admin-table">
+                                                        <thead>
+                                                            <tr>
+                                                                <th style={{ width: '60px' }}>Rank</th>
+                                                                <th>Image</th>
+                                                                <th>Name & SKU</th>
+                                                                <th>Price</th>
+                                                                <th>Category</th>
+                                                                <th>Reorder</th>
+                                                                <th>Action</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {featuredProductsList.map((prod, idx) => (
+                                                                <tr key={prod.id}>
+                                                                    <td>
+                                                                        <span className={`category-rank-badge ${idx === 0 ? 'rank-1' : ''}`}>
+                                                                            {idx + 1}
+                                                                        </span>
+                                                                    </td>
+                                                                    <td>
+                                                                        <img
+                                                                            src={formatImageUrl(prod.image_url)}
+                                                                            alt=""
+                                                                            width="40"
+                                                                            height="40"
+                                                                            style={{ objectFit: 'contain', borderRadius: '4px', border: '1px solid #E5E7EB' }}
+                                                                            onError={handleAdminImgError}
+                                                                        />
+                                                                    </td>
+                                                                    <td>
+                                                                        <strong>{prod.name}</strong>
+                                                                        {prod.sku && (
+                                                                            <div style={{ fontSize: '0.75rem', color: '#6B7280', fontFamily: 'monospace' }}>
+                                                                                SKU: {prod.sku}
+                                                                            </div>
+                                                                        )}
+                                                                    </td>
+                                                                    <td>₹{prod.price}</td>
+                                                                    <td><span className="badge badge-secondary">{prod.category}</span></td>
+                                                                    <td>
+                                                                        <div style={{ display: 'flex', gap: '4px' }}>
+                                                                            <button
+                                                                                type="button"
+                                                                                className="btn btn-sm btn-outline-secondary"
+                                                                                onClick={() => handleMoveFeaturedProduct(idx, 'up')}
+                                                                                disabled={idx === 0}
+                                                                                title="Move Up"
+                                                                                style={{ padding: '2px 6px' }}
+                                                                            >
+                                                                                <i className="bi bi-chevron-up" />
+                                                                            </button>
+                                                                            <button
+                                                                                type="button"
+                                                                                className="btn btn-sm btn-outline-secondary"
+                                                                                onClick={() => handleMoveFeaturedProduct(idx, 'down')}
+                                                                                disabled={idx === featuredProductsList.length - 1}
+                                                                                title="Move Down"
+                                                                                style={{ padding: '2px 6px' }}
+                                                                            >
+                                                                                <i className="bi bi-chevron-down" />
+                                                                            </button>
+                                                                        </div>
+                                                                    </td>
+                                                                    <td>
+                                                                        <button
+                                                                            type="button"
+                                                                            className="btn btn-sm btn-outline-danger"
+                                                                            onClick={() => handleRemoveFeaturedProduct(prod.id)}
+                                                                            style={{ padding: '4px 8px', fontSize: '0.78rem' }}
+                                                                        >
+                                                                            <i className="bi bi-x-circle" /> Remove
+                                                                        </button>
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )
+                                })()}
                             </div>
                         )}
 
@@ -3408,6 +4166,162 @@ export default function AdminPage() {
                                     disabled={loading || !renameModal.newName.trim()}
                                 >
                                     {loading ? 'Updating Products...' : 'Save & Update All Products'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>,
+                document.body
+            )}
+
+            {/* ── HERO SLIDE ADD / EDIT MODAL ── */}
+            {showSlideModal && createPortal(
+                <div 
+                    className="admin-modal-overlay" 
+                    onClick={(e) => { if (e.target === e.currentTarget) setShowSlideModal(false) }}
+                >
+                    <div className="admin-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '620px' }}>
+                        <div className="admin-modal__head">
+                            <h3>{editingSlideIndex !== null ? 'Edit Hero Slide' : 'Add Hero Slide from Product'}</h3>
+                            <button className="close-btn" onClick={() => setShowSlideModal(false)}><i className="bi bi-x-lg" /></button>
+                        </div>
+                        <form className="admin-modal__body" onSubmit={handleSaveSlideForm}>
+                            {/* Auto-fill from Catalog Search */}
+                            <div className="form-group mb-3" style={{ background: '#F8FAFC', padding: '12px 16px', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+                                <label style={{ fontWeight: 700, fontSize: '0.85rem', color: '#1E293B', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                                    <i className="bi bi-magic" style={{ color: 'var(--primary-color)' }} /> Search & Select Product from Catalog (Auto-fills details):
+                                </label>
+                                <input
+                                    type="text"
+                                    className="form-control form-control-sm mb-2"
+                                    placeholder="Type product name, category, or SKU to auto-fill..."
+                                    value={slideSearchQuery}
+                                    onChange={e => setSlideSearchQuery(e.target.value)}
+                                />
+                                {slideSearchQuery.trim() && (
+                                    <div style={{ maxHeight: '180px', overflowY: 'auto', background: '#FFFFFF', border: '1px solid #CBD5E1', borderRadius: '6px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}>
+                                        {products.filter(p => 
+                                            p.name?.toLowerCase().includes(slideSearchQuery.toLowerCase()) || 
+                                            p.sku?.toLowerCase().includes(slideSearchQuery.toLowerCase()) ||
+                                            p.category?.toLowerCase().includes(slideSearchQuery.toLowerCase())
+                                        ).slice(0, 5).map(prod => (
+                                            <div
+                                                key={prod.id}
+                                                onClick={() => handleSelectProductForSlide(prod)}
+                                                style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', borderBottom: '1px solid #F1F5F9', cursor: 'pointer', transition: 'background 0.15s' }}
+                                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#EFF6FF'}
+                                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                                            >
+                                                <img src={formatImageUrl(prod.image_url)} alt="" width="32" height="32" style={{ objectFit: 'contain', borderRadius: '4px' }} onError={handleAdminImgError} />
+                                                <div style={{ flex: 1, minWidth: 0, fontSize: '0.82rem' }}>
+                                                    <strong>{prod.name}</strong> • ₹{prod.price} {prod.sku && `• SKU: ${prod.sku}`}
+                                                </div>
+                                                <span className="badge badge-primary" style={{ fontSize: '0.7rem' }}>Select</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="form-group mb-3">
+                                <label style={{ fontWeight: 600, fontSize: '0.85rem' }}>Slide Headline / Title (Supports Enter for multiple lines)</label>
+                                <textarea
+                                    className="form-control"
+                                    rows="2"
+                                    value={slideForm.title}
+                                    onChange={e => setSlideForm({ ...slideForm, title: e.target.value })}
+                                    placeholder="e.g. Luxury Leather &\nMetal Key Covers"
+                                    required
+                                />
+                            </div>
+
+                            <div className="form-group mb-3">
+                                <label style={{ fontWeight: 600, fontSize: '0.85rem' }}>Image URL</label>
+                                <input
+                                    type="text"
+                                    className="form-control"
+                                    value={slideForm.image}
+                                    onChange={e => setSlideForm({ ...slideForm, image: e.target.value })}
+                                    placeholder="https://..."
+                                    required
+                                />
+                                {slideForm.image && (
+                                    <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <img src={formatImageUrl(slideForm.image)} alt="Preview" style={{ height: '60px', width: '60px', borderRadius: '6px', border: '1px solid #E5E7EB', objectFit: 'cover' }} onError={handleAdminImgError} />
+                                        <span style={{ fontSize: '0.78rem', color: '#6B7280' }}>Image preview</span>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="form-row mb-3" style={{ display: 'flex', gap: '12px' }}>
+                                <div className="form-group" style={{ flex: 1 }}>
+                                    <label style={{ fontWeight: 600, fontSize: '0.85rem' }}>Linked Product ID</label>
+                                    <input
+                                        type="number"
+                                        className="form-control"
+                                        value={slideForm.productId || ''}
+                                        onChange={e => setSlideForm({ ...slideForm, productId: e.target.value ? Number(e.target.value) : '' })}
+                                        placeholder="e.g. 1"
+                                    />
+                                    <span style={{ fontSize: '0.72rem', color: '#6B7280' }}>Clicking small thumbnail opens this product</span>
+                                </div>
+                                <div className="form-group" style={{ flex: 1 }}>
+                                    <label style={{ fontWeight: 600, fontSize: '0.85rem' }}>Display Price</label>
+                                    <input
+                                        type="text"
+                                        className="form-control"
+                                        value={slideForm.price || ''}
+                                        onChange={e => setSlideForm({ ...slideForm, price: e.target.value })}
+                                        placeholder="e.g. ₹330"
+                                    />
+                                </div>
+                                <div className="form-group" style={{ flex: 1 }}>
+                                    <label style={{ fontWeight: 600, fontSize: '0.85rem' }}>Original Price</label>
+                                    <input
+                                        type="text"
+                                        className="form-control"
+                                        value={slideForm.originalPrice || ''}
+                                        onChange={e => setSlideForm({ ...slideForm, originalPrice: e.target.value })}
+                                        placeholder="e.g. ₹350"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="form-row mb-3" style={{ display: 'flex', gap: '12px' }}>
+                                <div className="form-group" style={{ flex: 1 }}>
+                                    <label style={{ fontWeight: 600, fontSize: '0.85rem' }}>Discount Tag</label>
+                                    <input
+                                        type="text"
+                                        className="form-control"
+                                        value={slideForm.discount || ''}
+                                        onChange={e => setSlideForm({ ...slideForm, discount: e.target.value })}
+                                        placeholder="e.g. 10% OFF"
+                                    />
+                                </div>
+                                <div className="form-group" style={{ flex: 1 }}>
+                                    <label style={{ fontWeight: 600, fontSize: '0.85rem' }}>Accent Hue Color</label>
+                                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                        <input
+                                            type="color"
+                                            value={slideForm.accent || '#C99738'}
+                                            onChange={e => setSlideForm({ ...slideForm, accent: e.target.value })}
+                                            style={{ width: '38px', height: '36px', padding: 0, border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                                        />
+                                        <input
+                                            type="text"
+                                            className="form-control"
+                                            value={slideForm.accent || '#C99738'}
+                                            onChange={e => setSlideForm({ ...slideForm, accent: e.target.value })}
+                                            placeholder="#C99738"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="admin-modal__foot" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px', paddingTop: '12px', borderTop: '1px solid #E5E7EB' }}>
+                                <button type="button" className="btn btn-outline-secondary" onClick={() => setShowSlideModal(false)}>Cancel</button>
+                                <button type="submit" className="btn btn-primary">
+                                    <i className="bi bi-check-lg" /> {editingSlideIndex !== null ? 'Update Slide' : 'Add to Carousel'}
                                 </button>
                             </div>
                         </form>

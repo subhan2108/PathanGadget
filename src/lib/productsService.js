@@ -49,6 +49,7 @@ function mapProduct(row) {
     badge: row.badge,
     inStock: row.in_stock !== false,
     in_stock: row.in_stock !== false,
+    is_featured: row.is_featured === true,
     rating: parseFloat(row.rating || 0),
     review_count: parseInt(row.review_count || 0),
     reviews: parseInt(row.review_count || 0),
@@ -64,14 +65,21 @@ export async function fetchProducts(filters = {}, sortBy = 'featured') {
     let query = 'SELECT * FROM products WHERE 1=1';
     const params = [];
 
-    // Category Filter
+    // Category Filter (supports exact match, slug, unhyphenated, and normalized comparison)
     if (filters.category && filters.category !== 'all' && filters.category !== 'All') {
-      const catVal = filters.category.trim().toLowerCase();
+      const rawCat = filters.category.trim();
+      const catVal = rawCat.toLowerCase();
+      const normCat = catVal.replace(/&/g, 'and').replace(/[^a-z0-9]/g, '');
       params.push(catVal);
+      const catParamIdx = params.length;
+      params.push(normCat);
+      const normParamIdx = params.length;
       query += ` AND (
-        LOWER(category) = $${params.length} 
-        OR LOWER(REPLACE(category, ' ', '-')) = $${params.length}
-        OR LOWER(REPLACE(category, '-', ' ')) = $${params.length}
+        LOWER(category) = $${catParamIdx} 
+        OR LOWER(REPLACE(category, ' ', '-')) = $${catParamIdx}
+        OR LOWER(REPLACE(category, '-', ' ')) = $${catParamIdx}
+        OR LOWER(REPLACE(category, '+', ' ')) = $${catParamIdx}
+        OR REGEXP_REPLACE(LOWER(REPLACE(REPLACE(category, '&', 'and'), '+', ' ')), '[^a-z0-9]', '', 'g') = $${normParamIdx}
       )`;
     }
 
@@ -144,6 +152,11 @@ export async function fetchProducts(filters = {}, sortBy = 'featured') {
       )`;
     }
 
+    // Featured only filter
+    if (filters.featuredOnly === true) {
+      query += ' AND is_featured = TRUE';
+    }
+
     // Sort By
     if (sortBy === 'price-asc') {
       query += ' ORDER BY price ASC, id ASC';
@@ -155,12 +168,26 @@ export async function fetchProducts(filters = {}, sortBy = 'featured') {
       query += ' ORDER BY review_count DESC, rating DESC, id ASC';
     } else if (sortBy === 'discount') {
       query += ' ORDER BY (COALESCE(original_price, price) - price) DESC, id ASC';
+    } else if (sortBy === 'featured') {
+      query += ' ORDER BY is_featured DESC, id ASC';
     } else {
       query += ' ORDER BY id ASC';
     }
 
     const rows = await sql.query(query, params);
-    return rows.map(mapProduct);
+    let mapped = rows.map(mapProduct);
+
+    if (filters.featuredOnly && Array.isArray(filters.featuredProductIds) && filters.featuredProductIds.length > 0) {
+      const orderMap = new Map();
+      filters.featuredProductIds.forEach((id, idx) => orderMap.set(Number(id), idx));
+      mapped.sort((a, b) => {
+        const orderA = orderMap.has(Number(a.id)) ? orderMap.get(Number(a.id)) : 99999;
+        const orderB = orderMap.has(Number(b.id)) ? orderMap.get(Number(b.id)) : 99999;
+        return orderA - orderB;
+      });
+    }
+
+    return mapped;
   } catch (err) {
     console.error('Error fetching products from Neon:', err);
     return [];
@@ -181,6 +208,18 @@ export async function fetchFilterMeta() {
       WHERE subcategory IS NOT NULL AND subcategory != '' 
       ORDER BY subcategory ASC
     `;
+    const subcatImagesRow = await sql`
+      SELECT DISTINCT ON (subcategory) subcategory, image_url
+      FROM products
+      WHERE subcategory IS NOT NULL AND subcategory != '' AND image_url IS NOT NULL AND image_url != ''
+      ORDER BY subcategory, id ASC
+    `;
+    const subcategoryImages = {};
+    for (const row of subcatImagesRow) {
+      if (row.subcategory && row.image_url) {
+        subcategoryImages[row.subcategory.trim()] = row.image_url;
+      }
+    }
     const priceRow = await sql`SELECT MIN(price) as min_p, MAX(price) as max_p FROM products`;
 
     const allBrandsSet = new Set();
@@ -198,8 +237,9 @@ export async function fetchFilterMeta() {
       const unhyphen = lower.replace(/-/g, ' ');
       const singular = lower.endsWith('s') ? lower.slice(0, -1) : lower;
       const plural = `${lower}s`;
+      const norm = lower.replace(/&/g, 'and').replace(/[^a-z0-9]/g, '');
 
-      const keys = [cat, lower, slug, unhyphen, singular, plural];
+      const keys = [cat, lower, slug, unhyphen, singular, plural, norm];
       for (const k of keys) {
         if (!brandsByCategory[k]) brandsByCategory[k] = [];
         if (!brandsByCategory[k].includes(b)) {
@@ -219,8 +259,9 @@ export async function fetchFilterMeta() {
       const unhyphen = lower.replace(/-/g, ' ');
       const singular = lower.endsWith('s') ? lower.slice(0, -1) : lower;
       const plural = `${lower}s`;
+      const norm = lower.replace(/&/g, 'and').replace(/[^a-z0-9]/g, '');
 
-      const keys = [cat, lower, slug, unhyphen, singular, plural];
+      const keys = [cat, lower, slug, unhyphen, singular, plural, norm];
       for (const k of keys) {
         if (!subcategoriesByCategory[k]) subcategoriesByCategory[k] = [];
         if (!subcategoriesByCategory[k].includes(row.subcategory)) {
@@ -237,6 +278,7 @@ export async function fetchFilterMeta() {
       brandsByCategory,
       subcategories,
       subcategoriesByCategory,
+      subcategoryImages,
       colors: [],
       minPrice,
       maxPrice,
@@ -258,11 +300,13 @@ export async function fetchFilterMeta() {
 export async function fetchSubcategories(category) {
   try {
     if (category && category !== 'All' && category !== 'all') {
+      const normCat = category.toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]/g, '');
       const rows = await sql`
         SELECT DISTINCT subcategory FROM products 
         WHERE (
           LOWER(category) = LOWER(${category}) 
           OR LOWER(REPLACE(category, '-', ' ')) = LOWER(REPLACE(${category}, '-', ' '))
+          OR REGEXP_REPLACE(LOWER(REPLACE(REPLACE(category, '&', 'and'), '+', ' ')), '[^a-z0-9]', '', 'g') = ${normCat}
         )
         AND subcategory IS NOT NULL AND subcategory != ''
         ORDER BY subcategory ASC
@@ -693,7 +737,7 @@ export async function fetchCategories() {
       }
     };
 
-    return counts.map(row => {
+    const categoryResults = counts.map(row => {
       const cat = row.category;
       const lowerCat = cat.toLowerCase();
       const slugCat = lowerCat.replace(/\s+/g, '-');
@@ -719,9 +763,49 @@ export async function fetchCategories() {
         count: parseInt(row.c || 0)
       };
     });
+
+    // Custom order configured in Admin Homepage Showcase
+    try {
+      const orderRow = await sql`SELECT settings FROM homepage_settings WHERE id = 'category_order'`;
+      if (orderRow.length > 0) {
+        const catOrder = typeof orderRow[0].settings === 'string' ? JSON.parse(orderRow[0].settings) : (orderRow[0].settings || []);
+        if (Array.isArray(catOrder) && catOrder.length > 0) {
+          const orderMap = new Map();
+          catOrder.forEach((name, i) => {
+            if (name) orderMap.set(name.toLowerCase().trim(), i);
+          });
+          categoryResults.sort((a, b) => {
+            const idxA = orderMap.has(a.id.toLowerCase().trim()) ? orderMap.get(a.id.toLowerCase().trim()) : 9999;
+            const idxB = orderMap.has(b.id.toLowerCase().trim()) ? orderMap.get(b.id.toLowerCase().trim()) : 9999;
+            if (idxA !== idxB) return idxA - idxB;
+            return a.id.localeCompare(b.id);
+          });
+        }
+      }
+    } catch (_) {}
+
+    return categoryResults;
   } catch (err) {
     console.error('Error fetching categories from Neon:', err);
     return [];
+  }
+}
+
+export async function fetchHomepageSettings() {
+  try {
+    const rows = await sql`SELECT id, settings FROM homepage_settings`;
+    const res = {};
+    for (const r of rows) {
+      res[r.id] = typeof r.settings === 'string' ? JSON.parse(r.settings) : r.settings;
+    }
+    return {
+      heroSlides: Array.isArray(res.hero_slides) ? res.hero_slides : [],
+      categoryOrder: Array.isArray(res.category_order) ? res.category_order : [],
+      featuredProductIds: Array.isArray(res.featured_product_ids) ? res.featured_product_ids : []
+    };
+  } catch (err) {
+    console.error('Error fetching homepage settings:', err);
+    return { heroSlides: [], categoryOrder: [], featuredProductIds: [] };
   }
 }
 

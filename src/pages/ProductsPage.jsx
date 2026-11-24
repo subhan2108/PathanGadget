@@ -371,6 +371,17 @@ export default function ProductsPage() {
     const [inStockOnly, setInStockOnly] = useState(false)
     const searchInputRef = useRef(null)
 
+    // Sync state when URL searchParams change
+    useEffect(() => {
+        const cat = searchParams.get('category')
+        if (cat && cat !== activeCategory) {
+            setActiveCategory(cat)
+            setSelectedBrands([])
+            setSelectedSubcategories([])
+            setSelectedColors([])
+        }
+    }, [searchParams])
+
 
     // ── Live data from Supabase ──
     const { meta, loading: metaLoading } = useFilterMeta()
@@ -387,14 +398,16 @@ export default function ProductsPage() {
             const unhyphenCat = lowerCat.replace(/-/g, ' ')
             const singularCat = lowerCat.endsWith('s') ? lowerCat.slice(0, -1) : lowerCat
             const pluralCat = `${lowerCat}s`
+            const normCat = lowerCat.replace(/&/g, 'and').replace(/[^a-z0-9]/g, '')
 
-            const list = 
+            const list =
                 meta.brandsByCategory?.[rawCat] ||
                 meta.brandsByCategory?.[lowerCat] ||
                 meta.brandsByCategory?.[slugCat] ||
                 meta.brandsByCategory?.[unhyphenCat] ||
                 meta.brandsByCategory?.[singularCat] ||
                 meta.brandsByCategory?.[pluralCat] ||
+                meta.brandsByCategory?.[normCat] ||
                 []
 
             if (list.length > 0) {
@@ -417,14 +430,16 @@ export default function ProductsPage() {
             const unhyphenCat = lowerCat.replace(/-/g, ' ')
             const singularCat = lowerCat.endsWith('s') ? lowerCat.slice(0, -1) : lowerCat
             const pluralCat = `${lowerCat}s`
+            const normCat = lowerCat.replace(/&/g, 'and').replace(/[^a-z0-9]/g, '')
 
-            const list = 
+            const list =
                 meta.subcategoriesByCategory?.[rawCat] ||
                 meta.subcategoriesByCategory?.[lowerCat] ||
                 meta.subcategoriesByCategory?.[slugCat] ||
                 meta.subcategoriesByCategory?.[unhyphenCat] ||
                 meta.subcategoriesByCategory?.[singularCat] ||
                 meta.subcategoriesByCategory?.[pluralCat] ||
+                meta.subcategoriesByCategory?.[normCat] ||
                 []
 
             if (list.length > 0) return [...list].sort((a, b) => a.localeCompare(b))
@@ -442,6 +457,8 @@ export default function ProductsPage() {
                     const valid = prev.filter(b => ALL_BRANDS.includes(b))
                     return valid.length === prev.length ? prev : valid
                 })
+            } else if (!metaLoading && meta.brandsByCategory) {
+                setSelectedBrands([])
             }
             if (ALL_SUBCATEGORIES.length > 0) {
                 setSelectedSubcategories(prev => {
@@ -449,9 +466,11 @@ export default function ProductsPage() {
                     const valid = prev.filter(s => ALL_SUBCATEGORIES.includes(s))
                     return valid.length === prev.length ? prev : valid
                 })
+            } else if (!metaLoading && meta.subcategoriesByCategory) {
+                setSelectedSubcategories([])
             }
         }
-    }, [activeCategory, ALL_BRANDS, ALL_SUBCATEGORIES])
+    }, [activeCategory, ALL_BRANDS, ALL_SUBCATEGORIES, metaLoading])
 
     // Build filter object passed to the hook
     const filters = {
@@ -464,6 +483,61 @@ export default function ProductsPage() {
     }
 
     const { products: filtered, loading: productsLoading, error: productsError } = useProducts(filters, sortBy)
+
+    // Map subcategory names to their first product's image
+    const subcategoryImageMap = React.useMemo(() => {
+        const map = { ...(meta.subcategoryImages || {}) }
+        if (filtered && filtered.length > 0) {
+            for (const p of filtered) {
+                if (p.subcategory && (p.image_url || p.image) && !map[p.subcategory]) {
+                    map[p.subcategory] = p.image_url || p.image
+                }
+            }
+        }
+        return map
+    }, [meta.subcategoryImages, filtered])
+
+    // ── Pagination State ──
+    const [currentPage, setCurrentPage] = useState(1)
+    const [itemsPerPage, setItemsPerPage] = useState(24)
+
+    // Reset page to 1 whenever filters or sorting change
+    useEffect(() => {
+        setCurrentPage(1)
+    }, [search, activeCategory, selectedSubcategories, selectedColors, selectedBrands, inStockOnly, sortBy])
+
+    const totalProducts = filtered.length
+    const totalPages = Math.max(1, Math.ceil(totalProducts / itemsPerPage))
+    const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages)
+    const startIndex = (safeCurrentPage - 1) * itemsPerPage
+    const endIndex = Math.min(startIndex + itemsPerPage, totalProducts)
+    const paginatedProducts = filtered.slice(startIndex, endIndex)
+
+    const handlePageChange = (newPage) => {
+        if (newPage < 1 || newPage > totalPages || newPage === safeCurrentPage) return
+        setCurrentPage(newPage)
+        const gridEl = document.getElementById('plp-grid') || document.querySelector('.plp-main')
+        if (gridEl) {
+            const topOffset = gridEl.getBoundingClientRect().top + window.pageYOffset - 90
+            window.scrollTo({ top: Math.max(0, topOffset), behavior: 'smooth' })
+        }
+    }
+
+    const getPageNumbers = () => {
+        const pages = []
+        if (totalPages <= 7) {
+            for (let i = 1; i <= totalPages; i++) pages.push(i)
+        } else {
+            if (safeCurrentPage <= 4) {
+                pages.push(1, 2, 3, 4, 5, '...', totalPages)
+            } else if (safeCurrentPage >= totalPages - 3) {
+                pages.push(1, '...', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages)
+            } else {
+                pages.push(1, '...', safeCurrentPage - 1, safeCurrentPage, safeCurrentPage + 1, '...', totalPages)
+            }
+        }
+        return pages
+    }
 
     // Only show "Applying filters..." overlay when the user has actually interacted with a filter on mobile
     const [isUserFiltering, setIsUserFiltering] = useState(false)
@@ -653,8 +727,12 @@ export default function ProductsPage() {
                             <div className="plp-stat-pill"><i className="bi bi-tags" /><strong>{categories.length}</strong> Categories</div>
                         </div>
                     </div>
+                </div>
+            </div>
 
-                    {/* ── Category Tabs ── */}
+            {/* ── Category Tabs Bar ── */}
+            <div className="plp-category-nav" id="plp-category-nav">
+                <div className="container">
                     <div className={`plp-category-tabs-wrapper ${canScrollLeft ? 'can-scroll-left' : ''} ${canScrollRight ? 'can-scroll-right' : ''}`}>
                         {canScrollLeft && (
                             <button
@@ -689,13 +767,13 @@ export default function ProductsPage() {
                                     onClick={() => {
                                         if (hasDraggedRef.current) return
                                         setActiveCategory(cat.id)
+                                        setSelectedBrands([])
+                                        setSelectedSubcategories([])
+                                        setSelectedColors([])
                                     }}
                                 >
                                     <i className={`bi ${cat.icon}`} />
                                     <span>{cat.name || 'All'}</span>
-                                    <span className={`plp-cat-count ${activeCategory === cat.id ? 'active' : ''}`}>
-                                        {categoryCountMap[cat.id] ?? 0}
-                                    </span>
                                 </button>
                             ))}
                         </div>
@@ -883,29 +961,6 @@ export default function ProductsPage() {
 
                     {/* Main Content */}
                     <main className="plp-main" id="plp-main">
-                        {/* Results bar */}
-                        <div className="plp-results-bar" id="plp-results-bar">
-                            <div className="plp-results-count">
-                                {productsLoading
-                                    ? <span className="plp-loading-text"><span className="spinner-border spinner-border-sm me-2" role="status" /> Searching for excellence...</span>
-                                    : filtered.length === 0
-                                        ? <span>No products found</span>
-                                        : <span><strong>{filtered.length}</strong> {filtered.length === 1 ? 'product' : 'products'} found</span>
-                                }
-                                {search && <span className="plp-search-term"> for "<em>{search}</em>"</span>}
-                            </div>
-
-                            {/* Desktop filters button */}
-                            <button
-                                className={`plp-filter-toggle-btn desktop-filter-btn ${activeFilterCount > 0 ? 'has-filters' : ''}`}
-                                onClick={() => setSidebarOpen(o => !o)}
-                            >
-                                <i className={`bi bi-layout-sidebar-inset${sidebarOpen ? '-reverse' : ''}`} />
-                                {sidebarOpen ? 'Hide Filters' : 'Show Filters'}
-                                {activeFilterCount > 0 && <span className="filter-badge">{activeFilterCount}</span>}
-                            </button>
-                        </div>
-
                         {/* White overlay with spinner ONLY on mobile when user actively applies a filter (rendered in Portal to center on viewport regardless of transforms/scroll) */}
                         {isUserFiltering && productsLoading && typeof document !== 'undefined' && createPortal(
                             <div className="plp-loading-screen-overlay" aria-live="polite" role="status">
@@ -917,36 +972,220 @@ export default function ProductsPage() {
                             document.body
                         )}
 
-                        {/* Product Grid / List */}
-                        {(!hasLoadedOnceRef.current && productsLoading) ? (
-                            <div className="plp-loading" id="plp-loading">
-                                {[...Array(6)].map((_, i) => (
-                                    <div key={i} className="plp-skeleton" />
-                                ))}
-                            </div>
-                        ) : productsError ? (
-                            <div className="plp-empty" id="plp-error">
-                                <div className="plp-empty__icon"><i className="bi bi-wifi-off" /></div>
-                                <h3>Could not load products</h3>
-                                <p>{productsError}</p>
-                                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: 8 }}>Make sure you ran the SQL schema in Supabase.</p>
-                            </div>
-                        ) : filtered.length > 0 ? (
-                            <div className={`plp-grid ${viewMode === 'list' ? 'plp-grid--list' : ''}`} id="plp-grid">
-                                {filtered.map(p => <ProductCard key={p.id} id={`product-card-${p.id}`} product={p} />)}
-                            </div>
-                        ) : (
-                            <div className="plp-empty" id="plp-empty">
-                                <div className="plp-empty__icon">
-                                    <i className="bi bi-search" />
+                        <div className="plp-products-split">
+                            {/* Left Subcategory Rail with first product image */}
+                            {ALL_SUBCATEGORIES.length > 0 && (
+                                <aside className="plp-subcat-rail" id="plp-subcat-rail" aria-label="Subcategories">
+                                    <div className="plp-subcat-rail__inner">
+                                        <button
+                                            type="button"
+                                            className={`plp-subcat-rail__item ${selectedSubcategories.length === 0 ? 'active' : ''}`}
+                                            onClick={() => {
+                                                setIsUserFiltering(true)
+                                                setSelectedSubcategories([])
+                                            }}
+                                        >
+                                            <div className="plp-subcat-rail__img-box">
+                                                <i className="bi bi-grid-fill plp-subcat-rail__all-icon" />
+                                            </div>
+                                            <span className="plp-subcat-rail__label">All</span>
+                                        </button>
+
+                                        {ALL_SUBCATEGORIES.map(sub => {
+                                            const isSelected = selectedSubcategories.includes(sub)
+                                            const subImg = subcategoryImageMap[sub] || '/placeholder-key.svg'
+                                            return (
+                                                <button
+                                                    key={sub}
+                                                    type="button"
+                                                    className={`plp-subcat-rail__item ${isSelected ? 'active' : ''}`}
+                                                    onClick={() => {
+                                                        setIsUserFiltering(true)
+                                                        setSelectedSubcategories(isSelected ? [] : [sub])
+                                                    }}
+                                                    title={sub}
+                                                >
+                                                    <div className="plp-subcat-rail__img-box">
+                                                        <img
+                                                            src={subImg}
+                                                            alt={sub}
+                                                            loading="lazy"
+                                                            onError={(e) => {
+                                                                e.currentTarget.onerror = null
+                                                                e.currentTarget.src = '/placeholder-key.svg'
+                                                            }}
+                                                        />
+                                                    </div>
+                                                    <span className="plp-subcat-rail__label">{sub}</span>
+                                                </button>
+                                            )
+                                        })}
+                                    </div>
+                                </aside>
+                            )}
+
+                            {/* Right Products Column */}
+                            <div className="plp-products-col">
+                                {/* Top Brand Scroller of that specific category */}
+                                {ALL_BRANDS.length > 0 && (
+                                    <div className="plp-brands-bar" id="plp-brands-bar">
+                                        <div className="plp-brands-scroller" role="tablist">
+                                            <button
+                                                type="button"
+                                                className={`plp-brand-pill ${selectedBrands.length === 0 ? 'active' : ''}`}
+                                                onClick={() => {
+                                                    setIsUserFiltering(true)
+                                                    setSelectedBrands([])
+                                                }}
+                                            >
+                                                <span>All</span>
+                                            </button>
+                                            {ALL_BRANDS.map(b => {
+                                                const isSelected = selectedBrands.includes(b)
+                                                return (
+                                                    <button
+                                                        key={b}
+                                                        type="button"
+                                                        className={`plp-brand-pill ${isSelected ? 'active' : ''}`}
+                                                        onClick={() => {
+                                                            setIsUserFiltering(true)
+                                                            setSelectedBrands(isSelected ? [] : [b])
+                                                        }}
+                                                    >
+                                                        <i className="bi bi-building shrink-0" />
+                                                        <span>{b}</span>
+                                                    </button>
+                                                )
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Results bar */}
+                                <div className="plp-results-bar" id="plp-results-bar">
+                                    <div className="plp-results-count">
+                                        {productsLoading && (
+                                            <span className="plp-loading-text"><span className="spinner-border spinner-border-sm me-2" role="status" /> Loading products...</span>
+                                        )}
+                                        {search && <span className="plp-search-term">Search for "<em>{search}</em>"</span>}
+                                    </div>
+
+                                    {/* Desktop filters button */}
+                                    <button
+                                        className={`plp-filter-toggle-btn desktop-filter-btn ${activeFilterCount > 0 ? 'has-filters' : ''}`}
+                                        onClick={() => setSidebarOpen(o => !o)}
+                                    >
+                                        <i className={`bi bi-layout-sidebar-inset${sidebarOpen ? '-reverse' : ''}`} />
+                                        {sidebarOpen ? 'Hide Filters' : 'Show Filters'}
+                                        {activeFilterCount > 0 && <span className="filter-badge">{activeFilterCount}</span>}
+                                    </button>
                                 </div>
-                                <h3>No products match your filters</h3>
-                                <p>Try adjusting your search or clearing some filters to see more results.</p>
-                                <button className="btn btn-primary btn-lg" onClick={resetFilters}>
-                                    <i className="bi bi-arrow-counterclockwise" /> Reset All Filters
-                                </button>
+
+                                {/* Product Grid / List */}
+                                {(!hasLoadedOnceRef.current && productsLoading) ? (
+                                    <div className="plp-loading" id="plp-loading">
+                                        {[...Array(6)].map((_, i) => (
+                                            <div key={i} className="plp-skeleton" />
+                                        ))}
+                                    </div>
+                                ) : productsError ? (
+                                    <div className="plp-empty" id="plp-error">
+                                        <div className="plp-empty__icon"><i className="bi bi-wifi-off" /></div>
+                                        <h3>Could not load products</h3>
+                                        <p>{productsError}</p>
+                                        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: 8 }}>Make sure you ran the SQL schema in Supabase.</p>
+                                    </div>
+                                ) : filtered.length > 0 ? (
+                                    <>
+                                        <div className={`plp-grid ${viewMode === 'list' ? 'plp-grid--list' : ''}`} id="plp-grid">
+                                            {paginatedProducts.map(p => <ProductCard key={p.id} id={`product-card-${p.id}`} product={p} />)}
+                                        </div>
+
+                                        {/* Pagination Controls */}
+                                        {totalPages > 1 && (
+                                            <div className="plp-pagination" id="plp-pagination">
+                                                <div className="plp-pagination__info">
+                                                    Showing <strong>{startIndex + 1}</strong> - <strong>{endIndex}</strong> of <strong>{totalProducts.toLocaleString()}</strong> products
+                                                </div>
+
+                                                <div className="plp-pagination__controls">
+                                                    <button
+                                                        type="button"
+                                                        className="plp-pagination__btn plp-pagination__btn--nav"
+                                                        onClick={() => handlePageChange(safeCurrentPage - 1)}
+                                                        disabled={safeCurrentPage === 1}
+                                                        aria-label="Previous page"
+                                                        title="Previous page"
+                                                    >
+                                                        <i className="bi bi-chevron-left" />
+                                                        <span className="hidden sm:inline">Prev</span>
+                                                    </button>
+
+                                                    <div className="plp-pagination__pages">
+                                                        {getPageNumbers().map((page, idx) => (
+                                                            page === '...' ? (
+                                                                <span key={`dots-${idx}`} className="plp-pagination__ellipsis">…</span>
+                                                            ) : (
+                                                                <button
+                                                                    key={page}
+                                                                    type="button"
+                                                                    className={`plp-pagination__btn plp-pagination__btn--page ${safeCurrentPage === page ? 'active' : ''}`}
+                                                                    onClick={() => handlePageChange(page)}
+                                                                    aria-current={safeCurrentPage === page ? 'page' : undefined}
+                                                                >
+                                                                    {page}
+                                                                </button>
+                                                            )
+                                                        ))}
+                                                    </div>
+
+                                                    <button
+                                                        type="button"
+                                                        className="plp-pagination__btn plp-pagination__btn--nav"
+                                                        onClick={() => handlePageChange(safeCurrentPage + 1)}
+                                                        disabled={safeCurrentPage === totalPages}
+                                                        aria-label="Next page"
+                                                        title="Next page"
+                                                    >
+                                                        <span className="hidden sm:inline">Next</span>
+                                                        <i className="bi bi-chevron-right" />
+                                                    </button>
+                                                </div>
+
+                                                <div className="plp-pagination__per-page">
+                                                    <label htmlFor="per-page-select">Per page:</label>
+                                                    <select
+                                                        id="per-page-select"
+                                                        className="plp-pagination__select"
+                                                        value={itemsPerPage}
+                                                        onChange={(e) => {
+                                                            setItemsPerPage(Number(e.target.value))
+                                                            setCurrentPage(1)
+                                                        }}
+                                                    >
+                                                        <option value={12}>12</option>
+                                                        <option value={24}>24</option>
+                                                        <option value={48}>48</option>
+                                                        <option value={96}>96</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </>
+                                ) : (
+                                    <div className="plp-empty" id="plp-empty">
+                                        <div className="plp-empty__icon">
+                                            <i className="bi bi-search" />
+                                        </div>
+                                        <h3>No products match your filters</h3>
+                                        <p>Try adjusting your search or clearing some filters to see more results.</p>
+                                        <button className="btn btn-primary btn-lg" onClick={resetFilters}>
+                                            <i className="bi bi-arrow-counterclockwise" /> Reset All Filters
+                                        </button>
+                                    </div>
+                                )}
                             </div>
-                        )}
+                        </div>
                     </main>
                 </div>
             </div>

@@ -11,8 +11,15 @@
 /* ── Header ─────────────────────────────────────────────── */
 .plp-header {
     background: var(--white);
-    border-bottom: 1px solid var(--border);
     padding: 32px 0 0;
+}
+
+/* ── Category Nav Bar ───────────────────────────────────── */
+.plp-category-nav {
+    background: var(--white);
+    border-bottom: 1px solid var(--border);
+    position: relative;
+    z-index: 30;
 }
 
 .plp-header__row {
@@ -222,18 +229,7 @@
 }
 
 .plp-cat-count {
-    font-size: 0.75rem;
-    font-weight: 700;
-    padding: 2px 8px;
-    border-radius: 20px;
-    background: #F3F4F6;
-    color: var(--text-muted);
-    transition: all 200ms ease;
-}
-
-.plp-cat-count.active {
-    background: rgba(184, 132, 36, 0.15);
-    color: var(--cta, #B88424);
+    display: none !important;
 }
 
 /* ── Toolbar ────────────────────────────────────────────── */
@@ -998,6 +994,24 @@
     gap: 20px;
 }
 
+/* Uniform card text & weight limits for smooth scrolling */
+.plp-grid .glass-card h3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 700;
+}
+
+.plp-grid .glass-card p {
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 /* List mode */
 .plp-grid--list {
     grid-template-columns: 1fr;
@@ -1117,45 +1131,106 @@
     /* ── Mobile 2-in-a-row Product Card Adjustments ── */
     .glass-card {
         min-height: auto !important;
-        padding: 10px 8px !important;
+        padding: 8px !important;
         border-radius: 14px !important;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05) !important;
     }
 
-    .glass-card .h-48 {
-        height: 135px !important;
-        margin-bottom: 8px !important;
-        padding: 6px !important;
+    .glass-card .h-36,
+    .glass-card .h-48,
+    .glass-card .sm\:h-48 {
+        height: 112px !important;
+        margin-bottom: 6px !important;
+        padding: 4px !important;
+        border-radius: 10px !important;
+    }
+
+    .glass-card .absolute.top-1\.5 {
+        font-size: 9px !important;
+        padding: 2px 6px !important;
+    }
+
+    /* Out of Stock Tag on Mobile Screen */
+    .out-of-stock-overlay {
+        padding: 4px !important;
+        background: rgba(0, 0, 0, 0.45) !important;
+    }
+
+    .out-of-stock-pill {
+        font-size: 9px !important;
+        padding: 3px 6px !important;
+        letter-spacing: 0.3px !important;
+        white-space: nowrap !important;
+        gap: 3px !important;
+        border-radius: 6px !important;
+        background: rgba(17, 24, 39, 0.92) !important;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3) !important;
+        border: 1px solid rgba(255, 255, 255, 0.25) !important;
+    }
+
+    .out-of-stock-pill i {
+        font-size: 10px !important;
     }
 
     .glass-card h3 {
-        font-size: 0.82rem !important;
+        font-size: 0.78rem !important;
         line-height: 1.25 !important;
-        margin-bottom: 4px !important;
+        margin-bottom: 3px !important;
         text-align: left !important;
-    }
-
-    .glass-card p {
+        font-weight: 700 !important;
         display: -webkit-box !important;
-        -webkit-line-clamp: 1 !important;
+        -webkit-line-clamp: 2 !important;
         -webkit-box-orient: vertical !important;
         overflow: hidden !important;
-        font-size: 0.65rem !important;
-        line-height: 1.25 !important;
-        color: #6B7280 !important;
-        margin-bottom: 4px !important;
+        text-overflow: ellipsis !important;
+        height: 32px !important;
+    }
+
+    /* Hide redundant description on mobile to keep card clean and roomy */
+    .glass-card p {
+        display: none !important;
+    }
+
+    /* Rating row compact on mobile */
+    .glass-card .min-h-\[16px\] {
         height: 14px !important;
-        text-align: left !important;
+        min-height: 14px !important;
+        margin-bottom: 3px !important;
     }
 
+    .glass-card .min-h-\[16px\] .text-\[11px\] {
+        font-size: 10px !important;
+    }
+
+    .glass-card .min-h-\[16px\] .text-\[10px\] {
+        font-size: 9px !important;
+    }
+
+    /* Price row on mobile */
+    .glass-card .min-h-\[22px\] {
+        min-height: 20px !important;
+        margin-bottom: 6px !important;
+    }
+
+    .glass-card .text-sm,
     .glass-card .text-xl,
-    .glass-card .sm\:text-2xl {
-        font-size: 1.05rem !important;
+    .glass-card .sm\:text-2xl,
+    .glass-card .lg\:text-2xl {
+        font-size: 0.95rem !important;
+        font-weight: 800 !important;
     }
 
+    /* Single-line sleek Add button */
     .glass-card button {
-        padding: 7px 10px !important;
+        padding: 6px 10px !important;
         font-size: 0.75rem !important;
         border-radius: 10px !important;
+        height: 32px !important;
+        white-space: nowrap !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 5px !important;
     }
 
     .plp-toolbar__inner {
@@ -1189,6 +1264,7 @@
         right: 4px;
     }
 }
+
 /* ── Filter Dropdown on Mobile ──────────────────────────── */
 .plp-filter-toggle-wrap {
     position: relative;
@@ -1236,6 +1312,7 @@
         opacity: 0;
         transform: translateY(-8px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);
@@ -1374,6 +1451,7 @@
         opacity: 0;
         transform: scale(0.92);
     }
+
     to {
         opacity: 1;
         transform: scale(1);
@@ -1401,4 +1479,451 @@
     color: var(--text-primary, #111827);
     letter-spacing: 0.2px;
     white-space: nowrap;
+}
+
+/* ── PLP Pagination ────────────────────────────────── */
+.plp-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-top: 36px;
+    padding: 16px 20px;
+    background: #FFFFFF;
+    border: 1px solid #E5E7EB;
+    border-radius: 16px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+}
+
+.plp-pagination__info {
+    font-size: 0.875rem;
+    color: #4B5563;
+    font-weight: 500;
+}
+
+.plp-pagination__info strong {
+    color: #111827;
+    font-weight: 700;
+}
+
+.plp-pagination__controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.plp-pagination__pages {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.plp-pagination__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 40px;
+    min-width: 40px;
+    padding: 0 12px;
+    border-radius: 10px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #374151;
+    background: #FFFFFF;
+    border: 1px solid #E5E7EB;
+    cursor: pointer;
+    transition: all 0.15s ease-in-out;
+    user-select: none;
+}
+
+.plp-pagination__btn:hover:not(:disabled) {
+    background: #F9FAFB;
+    border-color: #D1D5DB;
+    color: #111827;
+}
+
+.plp-pagination__btn:active:not(:disabled) {
+    transform: scale(0.96);
+}
+
+.plp-pagination__btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    background: #F3F4F6;
+    border-color: #E5E7EB;
+}
+
+.plp-pagination__btn--page {
+    padding: 0;
+    min-width: 38px;
+    height: 38px;
+    font-size: 0.875rem;
+}
+
+.plp-pagination__btn--page.active {
+    background: #E5B824;
+    border-color: #E5B824;
+    color: #FFFFFF;
+    font-weight: 700;
+    box-shadow: 0 2px 8px rgba(229, 184, 36, 0.35);
+}
+
+.plp-pagination__ellipsis {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    font-size: 0.9rem;
+    color: #9CA3AF;
+    font-weight: 700;
+}
+
+.plp-pagination__per-page {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.875rem;
+    color: #4B5563;
+    font-weight: 500;
+}
+
+.plp-pagination__select {
+    padding: 6px 12px;
+    border-radius: 8px;
+    border: 1px solid #D1D5DB;
+    background: #FFFFFF;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #111827;
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.15s ease;
+}
+
+.plp-pagination__select:focus {
+    border-color: #E5B824;
+    box-shadow: 0 0 0 2px rgba(229, 184, 36, 0.2);
+}
+
+@media (max-width: 768px) {
+    .plp-pagination {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        gap: 14px;
+        padding: 14px 12px;
+    }
+
+    .plp-pagination__controls {
+        order: 1;
+        width: 100%;
+        justify-content: center;
+        overflow-x: auto;
+        padding: 2px 0;
+    }
+
+    .plp-pagination__info {
+        order: 2;
+        font-size: 0.8125rem;
+    }
+
+    .plp-pagination__per-page {
+        order: 3;
+        font-size: 0.8125rem;
+    }
+
+    .plp-pagination__btn {
+        height: 36px;
+        min-width: 36px;
+        padding: 0 8px;
+        font-size: 0.8125rem;
+    }
+
+    .plp-pagination__btn--page {
+        min-width: 34px;
+        height: 34px;
+    }
+}
+
+/* ── Split Layout & Left Subcategory Rail ─────────────────── */
+.plp-products-split {
+    display: flex;
+    gap: 0;
+    width: 100%;
+}
+
+.plp-products-col {
+    flex: 1;
+    min-width: 0;
+    width: 100%;
+}
+
+.plp-subcat-rail {
+    display: none;
+    /* Hidden on full desktop view */
+}
+
+/* ── Top Brand Scroller (Hidden on big screens, mobile only) ── */
+.plp-brands-bar {
+    display: none;
+    width: 100%;
+    margin-bottom: 14px;
+}
+
+.plp-brands-scroller {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    padding: 2px 2px 8px 2px;
+}
+
+.plp-brands-scroller::-webkit-scrollbar {
+    display: none;
+}
+
+.plp-brand-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 9999px;
+    background: #FFFFFF;
+    border: 1px solid #E5E7EB;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #374151;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+    flex-shrink: 0;
+    user-select: none;
+}
+
+.plp-brand-pill:hover {
+    border-color: #D1D5DB;
+    background: #F9FAFB;
+    color: #111827;
+}
+
+.plp-brand-pill.active {
+    border-color: #E5B824;
+    background: #FEF9C3;
+    color: #854D0E;
+    font-weight: 700;
+    box-shadow: 0 2px 6px rgba(229, 184, 36, 0.25);
+}
+
+.plp-brand-pill i {
+    font-size: 0.75rem;
+    color: #B45309;
+}
+
+/* ── Mobile Split View (Left Subcat Rail + Right Cards) ──── */
+@media (max-width: 900px) {
+
+    /* Page as flex column so we can control mobile visual stack */
+    .products-page {
+        display: flex !important;
+        flex-direction: column !important;
+    }
+
+    /* Hide large desktop breadcrumbs/heading on mobile to keep app view clean & immediate */
+    .plp-header {
+        display: none !important;
+    }
+
+    /* 1. Top Search Bar: Placed at the very top on mobile, not sticky, narrower, centered */
+    .plp-toolbar {
+        order: 1 !important;
+        position: static !important;
+        top: auto !important;
+        box-shadow: none !important;
+        border-bottom: none !important;
+        background: transparent !important;
+        padding: 10px 12px 6px 12px !important;
+    }
+
+    .plp-toolbar__inner {
+        justify-content: center !important;
+        width: 100% !important;
+        padding: 0 !important;
+    }
+
+    .plp-search-wrap {
+        width: 86% !important;
+        max-width: 330px !important;
+        margin: 0 auto !important;
+        flex: none !important;
+        border-radius: 9999px !important;
+        box-shadow: 0 1px 5px rgba(0, 0, 0, 0.07) !important;
+        border: 1.5px solid #E5E7EB !important;
+        background: #FFFFFF !important;
+    }
+
+    .plp-toolbar__right {
+        display: none !important;
+    }
+
+    /* 2. Category Tabs: Placed directly BELOW the Search Bar on mobile */
+    .plp-category-nav {
+        order: 2 !important;
+        background: #FFFFFF !important;
+        border-bottom: 1px solid #E5E7EB !important;
+        border-top: none !important;
+        padding: 0 !important;
+        width: 100% !important;
+    }
+
+    /* 3. Active filter chips (if any) */
+    .plp-active-filters {
+        order: 3 !important;
+    }
+
+    /* 4. Products Body (Brand scroller + Split subcat rail & cards) */
+    .plp-body {
+        order: 4 !important;
+    }
+
+    /* Brand Scroller: Visible on mobile */
+    .plp-brands-bar {
+        display: block !important;
+    }
+
+    /* Split Layout */
+    .plp-products-split {
+        display: flex !important;
+        gap: 8px !important;
+        align-items: flex-start !important;
+        width: 100% !important;
+    }
+
+    /* 3. Left Subcategory Rail: Sticky & Scrollable top to down on mobile screen only */
+    .plp-subcat-rail {
+        display: block !important;
+        width: 76px !important;
+        flex-shrink: 0 !important;
+        position: sticky !important;
+        top: 64px !important;
+        max-height: calc(100vh - 72px) !important;
+        max-height: calc(100dvh - 72px) !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        -webkit-overflow-scrolling: touch !important;
+        overscroll-behavior: contain !important;
+        scrollbar-width: none !important;
+        -ms-overflow-style: none !important;
+        background: #F8F9FA !important;
+        border-right: 1.5px solid #E5E7EB !important;
+        border-radius: 12px !important;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03) !important;
+        padding: 4px 0 32px 0 !important;
+        z-index: 10 !important;
+    }
+
+    @media (min-width: 769px) and (max-width: 900px) {
+        .plp-subcat-rail {
+            top: 76px !important;
+            max-height: calc(100vh - 84px) !important;
+            max-height: calc(100dvh - 84px) !important;
+        }
+    }
+
+    .plp-subcat-rail::-webkit-scrollbar {
+        display: none !important;
+    }
+
+    .plp-subcat-rail__inner {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 1px !important;
+        width: 100% !important;
+    }
+
+    .plp-subcat-rail__item {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        text-align: center !important;
+        padding: 8px 3px 7px 3px !important;
+        background: transparent !important;
+        border: none !important;
+        border-bottom: 1px solid #F1F3F5 !important;
+        border-right: 3px solid transparent !important;
+        cursor: pointer !important;
+        transition: all 0.15s ease !important;
+        width: 100% !important;
+        user-select: none !important;
+    }
+
+    .plp-subcat-rail__item.active {
+        background: #FFFFFF !important;
+        border-right: 3px solid #1E3A8A !important;
+        box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.02) !important;
+    }
+
+    .plp-subcat-rail__item.active .plp-subcat-rail__label {
+        color: #1E3A8A !important;
+        font-weight: 800 !important;
+    }
+
+    .plp-subcat-rail__img-box {
+        width: 46px !important;
+        height: 46px !important;
+        border-radius: 10px !important;
+        background: #FFFFFF !important;
+        border: 1px solid #E5E7EB !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        overflow: hidden !important;
+        margin-bottom: 4px !important;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+        flex-shrink: 0 !important;
+    }
+
+    .plp-subcat-rail__img-box img {
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: contain !important;
+        padding: 2px !important;
+    }
+
+    .plp-subcat-rail__all-icon {
+        font-size: 1.25rem !important;
+        color: #E5B824 !important;
+    }
+
+    .plp-subcat-rail__label {
+        font-size: 0.58rem !important;
+        font-weight: 700 !important;
+        text-transform: uppercase !important;
+        line-height: 1.15 !important;
+        color: #4B5563 !important;
+        word-break: break-word !important;
+        max-width: 68px !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        display: -webkit-box !important;
+        -webkit-line-clamp: 2 !important;
+        -webkit-box-orient: vertical !important;
+    }
+
+    /* 4. Right side (Brands scroller + Cards) */
+    .plp-products-col {
+        flex: 1 1 0 !important;
+        min-width: 0 !important;
+        width: calc(100% - 84px) !important;
+    }
+
+    /* Hide results count on mobile screen only */
+    .plp-results-bar {
+        display: none !important;
+    }
 }

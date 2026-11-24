@@ -1,11 +1,16 @@
-import React, { createContext, useContext, useState, useEffect } from 'react'
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react'
 import { useAuth } from './AuthContext'
 import { fetchCart, addToCartDB, updateCartQtyDB, removeFromCartDB, clearCartDB } from '../lib/cartService'
 
 const CartContext = createContext()
+const CartActionsContext = createContext()
 
 export function useCart() {
     return useContext(CartContext)
+}
+
+export function useCartActions() {
+    return useContext(CartActionsContext)
 }
 
 export function CartProvider({ children }) {
@@ -53,9 +58,8 @@ export function CartProvider({ children }) {
         loadCart()
     }, [user])
 
-    const addToCart = async (product, qty = 1) => {
+    const addToCart = useCallback(async (product, qty = 1) => {
         const inStock = product.in_stock !== false && product.inStock !== false
-        const exists = cartItems.find(i => i.id === product.id)
 
         if (!inStock) {
             alert(`Sorry, "${product.name}" is currently out of stock.`)
@@ -75,25 +79,29 @@ export function CartProvider({ children }) {
         })
 
         if (user) {
-            if (exists) {
-                await updateCartQtyDB(user.id, product.id, exists.quantity + qty)
-            } else {
-                await addToCartDB(user.id, { ...product, quantity: qty })
-            }
+            try {
+                const currentItems = JSON.parse(localStorage.getItem('local_cart') || '[]')
+                const exists = currentItems.find(i => i.id === product.id)
+                if (exists) {
+                    updateCartQtyDB(user.id, product.id, exists.quantity + qty).catch(() => {})
+                } else {
+                    addToCartDB(user.id, { ...product, quantity: qty }).catch(() => {})
+                }
+            } catch (_) {}
         }
         return { success: true }
-    }
+    }, [user])
 
-    const removeFromCart = async (productId) => {
+    const removeFromCart = useCallback(async (productId) => {
         setCartItems(prev => {
             const newCart = prev.filter(i => i.id !== productId)
             if (!user) localStorage.setItem('local_cart', JSON.stringify(newCart))
             return newCart
         })
-        if (user) await removeFromCartDB(user.id, productId)
-    }
+        if (user) removeFromCartDB(user.id, productId).catch(() => {})
+    }, [user])
 
-    const updateQty = async (productId, qty) => {
+    const updateQty = useCallback(async (productId, qty) => {
         if (qty < 1) return removeFromCart(productId)
 
         setCartItems(prev => {
@@ -102,43 +110,53 @@ export function CartProvider({ children }) {
             return newCart
         })
 
-        if (user) await updateCartQtyDB(user.id, productId, qty)
-    }
+        if (user) updateCartQtyDB(user.id, productId, qty).catch(() => {})
+    }, [user, removeFromCart])
 
-    const clearCart = async () => {
+    const clearCart = useCallback(async () => {
         setCartItems([])
         if (user) {
             await clearCartDB(user.id)
         } else {
             localStorage.removeItem('local_cart')
         }
-    }
+    }, [user])
 
     const cartCount = cartItems.reduce((sum, i) => sum + i.quantity, 0)
     const cartTotal = cartItems.reduce((sum, i) => Number(sum) + (Number(i.price) * i.quantity), 0)
 
-    const checkout = async () => {
+    const checkout = useCallback(async () => {
         try {
             window.location.href = '/payment';
         } catch (err) {
             console.error('Checkout failed:', err)
             alert('Failed to start checkout. Please try again.')
         }
-    }
+    }, [])
+
+    const actions = useMemo(() => ({
+        addToCart,
+        removeFromCart,
+        updateQty,
+        clearCart,
+        checkout
+    }), [addToCart, removeFromCart, updateQty, clearCart, checkout])
 
     return (
-        <CartContext.Provider value={{
-            cartItems,
-            addToCart,
-            removeFromCart,
-            updateQty,
-            clearCart,
-            checkout,
-            cartCount,
-            cartTotal,
-            loading
-        }}>
-            {children}
-        </CartContext.Provider>
+        <CartActionsContext.Provider value={actions}>
+            <CartContext.Provider value={{
+                cartItems,
+                addToCart,
+                removeFromCart,
+                updateQty,
+                clearCart,
+                checkout,
+                cartCount,
+                cartTotal,
+                loading
+            }}>
+                {children}
+            </CartContext.Provider>
+        </CartActionsContext.Provider>
     )
 }

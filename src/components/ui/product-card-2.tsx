@@ -1,9 +1,8 @@
 import * as React from "react";
-import { useState } from "react";
+import { useState, useRef, useEffect, memo } from "react";
 import { cn } from "@/lib/utils";
-import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { useCart } from "@/context/CartContext";
+import { useCart, useCartActions } from "@/context/CartContext";
 
 const CATEGORY_ICONS: Record<string, string> = {
   watches: "bi-smartwatch",
@@ -25,7 +24,7 @@ export interface ProductCardProps extends React.HTMLAttributes<HTMLDivElement> {
   onAddToCart?: (e: React.MouseEvent, product: any) => void;
 }
 
-const ProductCard = React.forwardRef<HTMLDivElement, ProductCardProps>(
+const ProductCardComponent = React.forwardRef<HTMLDivElement, ProductCardProps>(
   (
     {
       className,
@@ -44,15 +43,26 @@ const ProductCard = React.forwardRef<HTMLDivElement, ProductCardProps>(
     ref
   ) => {
     const navigate = useNavigate();
-    const { addToCart } = useCart() || {};
-    const [added, setAdded] = useState(false);
+    const cartActions = useCartActions();
+    const cartState = useCart();
+    const addToCart = cartActions?.addToCart || cartState?.addToCart;
+    const updateQty = cartActions?.updateQty || cartState?.updateQty;
+    const removeFromCart = cartActions?.removeFromCart || cartState?.removeFromCart;
+    const cartItems = cartState?.cartItems || [];
 
     const raw = rawProduct || {};
     const id = raw.id;
+    const cartItem = id ? cartItems.find((i: any) => String(i.id) === String(id)) : null;
+    const cartQty = cartItem ? cartItem.quantity : 0;
     const name = propName || raw.name || "Product";
     const brand = raw.brand || null;
     const category = raw.category || null;
     const description = raw.description || tagline || (category ? `${category} Collection` : "Genuine Key & Remote");
+
+    // Performance limits: strict safe truncation (<=55 chars for titles, <=65 chars for descriptions)
+    const cleanName = name.length > 55 ? `${name.substring(0, 52).trim()}…` : name;
+    const cleanDescription = description.length > 65 ? `${description.substring(0, 62).trim()}…` : description;
+
     const rawImage = imageUrl || raw.image_url || raw.image || "";
     const cleanInitialImage = rawImage.startsWith("https://rkkeys.co.in/")
       ? rawImage.replace("https://rkkeys.co.in/", "https://i0.wp.com/rkkeys.co.in/")
@@ -117,10 +127,34 @@ const ProductCard = React.forwardRef<HTMLDivElement, ProductCardProps>(
           inStock: !isOutOfStock,
           in_stock: !isOutOfStock,
           ...raw,
-        });
+        }, 1);
       }
-      setAdded(true);
-      setTimeout(() => setAdded(false), 1600);
+    };
+
+    const handleIncrement = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (isOutOfStock) return;
+      if (updateQty && id) {
+        updateQty(id, cartQty + 1);
+      } else if (addToCart) {
+        addToCart(raw, 1);
+      }
+    };
+
+    const handleDecrement = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (!id) return;
+      if (cartQty <= 1) {
+        if (removeFromCart) {
+          removeFromCart(id);
+        } else if (updateQty) {
+          updateQty(id, 0);
+        }
+      } else {
+        if (updateQty) {
+          updateQty(id, cartQty - 1);
+        }
+      }
     };
 
     const handleCardClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -132,14 +166,13 @@ const ProductCard = React.forwardRef<HTMLDivElement, ProductCardProps>(
     };
 
     return (
-      <motion.div
+      <div
         ref={ref}
         className={cn(
-          "glass-card group relative flex h-full w-full flex-col items-center justify-between p-2.5 sm:p-5 text-center text-[#1C1814] cursor-pointer select-none",
+          "glass-card group relative flex h-full w-full flex-col items-center justify-between p-2.5 sm:p-5 text-center text-[#1C1814] cursor-pointer select-none transition-transform duration-150 ease-out hover:-translate-y-1.5",
           className
         )}
-        whileHover={{ y: -6 }}
-        transition={{ type: "spring", stiffness: 320, damping: 20 }}
+        style={{ contentVisibility: 'auto', containIntrinsicSize: '340px' }}
         onClick={handleCardClick}
         {...props}
       >
@@ -157,14 +190,14 @@ const ProductCard = React.forwardRef<HTMLDivElement, ProductCardProps>(
           />
 
           {/* Top-Left Badge (e.g. Best Seller / Top Rated) */}
-          {badge && (
+          {!isOutOfStock && badge && (
             <span className="absolute top-1.5 left-1.5 rounded-full bg-[#E5B824] px-2 py-0.5 text-[10px] sm:text-[11px] font-bold text-white shadow-md z-10">
               {badge}
             </span>
           )}
 
           {/* Top-Right Discount Tag (-29%) */}
-          {discount > 0 && (
+          {!isOutOfStock && discount > 0 && (
             <span className="absolute top-1.5 right-1.5 rounded-md bg-[#059669] px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-[11px] font-bold text-white shadow-md z-10">
               -{discount}%
             </span>
@@ -172,8 +205,11 @@ const ProductCard = React.forwardRef<HTMLDivElement, ProductCardProps>(
 
           {/* Out of Stock Overlay */}
           {isOutOfStock && (
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center text-white font-bold text-xs uppercase tracking-wider z-10">
-              <i className="bi bi-x-circle mr-1.5" /> Out of Stock
+            <div className="out-of-stock-overlay absolute inset-0 bg-black/45 backdrop-blur-[2px] flex items-center justify-center p-2 z-20">
+              <span className="out-of-stock-pill bg-neutral-900/90 text-white font-bold text-[10px] sm:text-xs uppercase tracking-wider px-2 sm:px-2.5 py-1 rounded-md flex items-center justify-center gap-1 shadow-md whitespace-nowrap text-center border border-white/20">
+                <i className="bi bi-x-circle text-[11px] shrink-0" />
+                <span>Out of Stock</span>
+              </span>
             </div>
           )}
 
@@ -201,9 +237,12 @@ const ProductCard = React.forwardRef<HTMLDivElement, ProductCardProps>(
             </div>
           )}
 
-          {/* Product Title */}
-          <h3 className="font-bold text-xs sm:text-base text-[#1C1814] tracking-wide text-left w-full line-clamp-1 transition-colors duration-200 group-hover:text-[#B88424] mb-1 shrink-0 h-4 sm:h-5">
-            {name}
+          {/* Product Title (Limit: 55 chars, line-clamp-2, font-bold) */}
+          <h3
+            title={name}
+            className="font-bold text-xs sm:text-base text-[#1C1814] tracking-wide text-left w-full line-clamp-2 transition-colors duration-200 group-hover:text-[#B88424] mb-1 shrink-0 min-h-[32px] sm:min-h-[40px] overflow-hidden text-ellipsis leading-tight"
+          >
+            {cleanName}
           </h3>
 
           {/* Rating Stars & Count */}
@@ -234,15 +273,18 @@ const ProductCard = React.forwardRef<HTMLDivElement, ProductCardProps>(
             )}
           </div>
 
-          {/* Product Description (shown in place of rate) */}
-          <p className="text-[10px] sm:text-xs text-[#5E5549] line-clamp-1 text-left w-full font-normal leading-tight mb-2 shrink-0 h-4">
-            {description}
+          {/* Product Description (Limit: 65 chars, line-clamp-1) */}
+          <p
+            title={description}
+            className="text-[10px] sm:text-xs text-[#5E5549] line-clamp-1 text-left w-full font-normal leading-tight mb-2 shrink-0 h-4 overflow-hidden text-ellipsis"
+          >
+            {cleanDescription}
           </p>
 
           {/* Pricing Row: Left-aligned price, Save value on big screens only */}
           <div className="flex items-center justify-between w-full pt-0.5 mb-2 shrink-0 min-h-[22px]">
             <div className="flex items-baseline justify-start gap-1 shrink-0">
-              <span className="text-sm sm:text-xl lg:text-2xl font-black tracking-tight text-[#1C1814]">
+              <span className="text-sm sm:text-xl lg:text-2xl font-bold tracking-tight text-[#1C1814]">
                 {formatPrice(price)}
               </span>
               {originalPrice > price && (
@@ -258,38 +300,63 @@ const ProductCard = React.forwardRef<HTMLDivElement, ProductCardProps>(
             )}
           </div>
 
-          {/* Action Button: Add to Cart */}
-          <button
-            id={id ? `cart-btn-${id}` : undefined}
-            className={cn(
-              "w-full flex items-center justify-center gap-1.5 py-2 sm:py-2.5 px-2.5 sm:px-4 rounded-xl font-bold text-xs sm:text-sm tracking-wide transition-all duration-300 shadow-md",
-              added
-                ? "bg-[#059669] text-white border border-[#059669]"
-                : "bg-[#E5B824] hover:bg-[#F9D949] text-white hover:text-black border border-white/25 hover:shadow-[0_0_20px_rgba(249,217,73,0.5)]"
-            )}
-            onClick={handleAddToCart}
-            disabled={!inStock}
-          >
-            {!inStock ? (
-              <>
-                <i className="bi bi-x-circle" /> Out of Stock
-              </>
-            ) : added ? (
-              <>
-                <i className="bi bi-check-circle-fill" /> Added!
-              </>
-            ) : (
-              <>
-                <i className="bi bi-cart-plus" /> Add to Cart
-              </>
-            )}
-          </button>
+          {/* Action Button: Add or Quantity Stepper */}
+          {cartQty > 0 ? (
+            <div
+              className="w-full h-8 sm:h-9 rounded-full border-2 border-[#E58A1F] overflow-hidden flex items-stretch select-none bg-white shadow-sm"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                aria-label="Decrease quantity"
+                className="w-10 sm:w-12 bg-[#FFF3E6] hover:bg-[#FFE5CC] active:bg-[#FDD8B3] text-[#E58A1F] font-black text-base sm:text-lg flex items-center justify-center transition-colors shrink-0 cursor-pointer border-none outline-none"
+                onClick={handleDecrement}
+              >
+                —
+              </button>
+              <div
+                className="flex-1 bg-white text-[#1C1814] font-extrabold text-xs sm:text-sm flex items-center justify-center px-1 min-w-0"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {cartQty}
+              </div>
+              <button
+                type="button"
+                aria-label="Increase quantity"
+                className="w-10 sm:w-12 bg-[#FFF3E6] hover:bg-[#FFE5CC] active:bg-[#FDD8B3] text-[#E58A1F] font-black text-base sm:text-lg flex items-center justify-center transition-colors shrink-0 cursor-pointer border-none outline-none"
+                onClick={handleIncrement}
+              >
+                +
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              id={id ? `cart-btn-${id}` : undefined}
+              className={cn(
+                "w-full h-8 sm:h-9 rounded-full border-2 border-[#E58A1F] bg-white hover:bg-[#FFF3E6] text-[#E58A1F] font-bold text-xs sm:text-sm tracking-wide transition-all duration-150 active:scale-95 shadow-sm select-none flex items-center justify-center gap-1 cursor-pointer",
+                isOutOfStock && "opacity-50 cursor-not-allowed border-neutral-300 text-neutral-400 hover:bg-white"
+              )}
+              onClick={handleAddToCart}
+              disabled={isOutOfStock}
+            >
+              {isOutOfStock ? (
+                <>
+                  <i className="bi bi-x-circle" /> Out of Stock
+                </>
+              ) : (
+                <>Add</>
+              )}
+            </button>
+          )}
         </div>
-      </motion.div>
+      </div>
     );
   }
 );
 
-ProductCard.displayName = "ProductCard";
+ProductCardComponent.displayName = "ProductCard";
+
+const ProductCard = memo(ProductCardComponent);
 
 export { ProductCard };

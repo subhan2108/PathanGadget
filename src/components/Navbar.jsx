@@ -20,6 +20,7 @@ export default function Navbar() {
     const { signOut } = useAuth()
     const location = useLocation()
     const isHome = location.pathname === '/'
+    const isProducts = location.pathname.startsWith('/products')
     const isTransparent = isHome && !scrolled && !menuOpen
 
     useEffect(() => {
@@ -50,7 +51,7 @@ export default function Navbar() {
         <>
             <header
                 id="navbar"
-                className={`navbar ${isHome ? 'navbar--home' : ''} ${isTransparent ? 'navbar--transparent' : ''} ${scrolled ? 'navbar--scrolled' : ''}`}
+                className={`navbar ${isHome ? 'navbar--home' : ''} ${isProducts ? 'navbar--products' : ''} ${isTransparent ? 'navbar--transparent' : ''} ${scrolled ? 'navbar--scrolled' : ''}`}
             >
                 <div className="container navbar__inner">
 
@@ -80,10 +81,10 @@ export default function Navbar() {
 
                     {/* Right Actions */}
                     <div className="navbar__actions">
-                        {/* Cart Button */}
+                        {/* Cart Button (Desktop only) */}
                         <button
                             id="cart-btn"
-                            className="cart-btn"
+                            className="cart-btn desktop-cart-btn"
                             onClick={() => setCartOpen(!cartOpen)}
                             aria-label={`Open cart (${cartCount} items)`}
                         >
@@ -145,28 +146,6 @@ export default function Navbar() {
                             <i className="bi bi-box-arrow-right" /> Sign Out
                         </button>
                     </SignedIn>
-                    <SignedOut>
-                        <SignInButton mode="modal">
-                            <button className="mobile-menu__link" id="mobile-signin">
-                                <i className="bi bi-box-arrow-in-right" /> Sign In
-                            </button>
-                        </SignInButton>
-                        <SignInButton mode="modal">
-                            <button className="mobile-menu__link" id="mobile-register">
-                                <i className="bi bi-person-plus" /> Create Account
-                            </button>
-                        </SignInButton>
-                    </SignedOut>
-
-                    <button
-                        className="btn btn-primary btn-full mobile-menu__cta"
-                        onClick={() => {
-                            setMenuOpen(false);
-                            checkout();
-                        }}
-                    >
-                        Buy Now <i className="bi bi-arrow-right" />
-                    </button>
                 </div>
             </header>
 
@@ -199,9 +178,9 @@ export default function Navbar() {
                         <ul className="cart-items">
                             {cartItems.map(item => (
                                 <li key={item.id} className="cart-item">
-                                    <img 
-                                        src={item.image || item.image_url || '/logo.png'} 
-                                        alt={item.name} 
+                                    <img
+                                        src={item.image || item.image_url || '/logo.png'}
+                                        alt={item.name}
                                         className="cart-item__img"
                                         style={{ objectFit: 'contain', backgroundColor: '#FFFFFF', padding: '4px' }}
                                         onError={(e) => {
@@ -251,6 +230,17 @@ export default function Navbar() {
                     </div>
                 )}
             </aside>
+
+            {/* ── Mobile Floating Cart Button (Pinned to Bottom-Right on mobile) ── */}
+            <button
+                id="mobile-floating-cart-btn"
+                className="mobile-floating-cart-btn"
+                onClick={() => setCartOpen(!cartOpen)}
+                aria-label={`Open cart (${cartCount} items)`}
+            >
+                <i className="bi bi-cart3" />
+                {cartCount > 0 && <span className="cart-badge">{cartCount}</span>}
+            </button>
 
             {/* ── Auth Modal is now handled by Clerk ── */}
         </>

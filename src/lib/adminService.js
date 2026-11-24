@@ -12,6 +12,14 @@ async function ensureSchema() {
         await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS sku TEXT`;
         await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS subcategory TEXT`;
         await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS stock_quantity INTEGER DEFAULT 5`;
+        await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS is_featured BOOLEAN DEFAULT FALSE`;
+        await sql`
+            CREATE TABLE IF NOT EXISTS homepage_settings (
+                id TEXT PRIMARY KEY,
+                settings JSONB NOT NULL,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            )
+        `;
         schemaChecked = true;
     } catch (e) {
         // Table columns verified
@@ -26,6 +34,7 @@ export async function adminGetProducts() {
             const detailsObj = typeof r.details === 'string' ? JSON.parse(r.details) : (r.details || {});
             return {
                 ...r,
+                is_featured: r.is_featured === true,
                 image_url: formatImageUrl(r.image_url),
                 sku: r.sku || detailsObj.sku || `SMN-${(r.category || 'GEN').substring(0, 3).toUpperCase()}-${String(r.id).padStart(4, '0')}`,
                 subcategory: r.subcategory || detailsObj.subcategory || '',
@@ -509,5 +518,107 @@ export async function fetchStats() {
         };
     } catch (err) {
         return { totalSales: 0, orderCount: 0, customerCount: 0, recentOrders: [] };
+    }
+}
+
+/**
+ * Homepage Showcase Customization Services
+ */
+export async function adminGetHomepageSettings() {
+    try {
+        await ensureSchema();
+        const rows = await sql`SELECT id, settings FROM homepage_settings`;
+        const res = {};
+        for (const r of rows) {
+            res[r.id] = typeof r.settings === 'string' ? JSON.parse(r.settings) : r.settings;
+        }
+        return {
+            hero_slides: Array.isArray(res.hero_slides) ? res.hero_slides : [],
+            category_order: Array.isArray(res.category_order) ? res.category_order : [],
+            featured_product_ids: Array.isArray(res.featured_product_ids) ? res.featured_product_ids : []
+        };
+    } catch (err) {
+        console.error('Error fetching admin homepage settings:', err);
+        return { hero_slides: [], category_order: [], featured_product_ids: [] };
+    }
+}
+
+export async function adminSaveHeroSlides(slides) {
+    try {
+        await ensureSchema();
+        await sql`
+            INSERT INTO homepage_settings (id, settings, updated_at)
+            VALUES ('hero_slides', ${JSON.stringify(slides)}, CURRENT_TIMESTAMP)
+            ON CONFLICT (id) DO UPDATE SET settings = EXCLUDED.settings, updated_at = CURRENT_TIMESTAMP
+        `;
+        return { success: true };
+    } catch (err) {
+        console.error('Error saving hero slides:', err);
+        throw err;
+    }
+}
+
+export async function adminSaveCategoryOrder(order) {
+    try {
+        await ensureSchema();
+        await sql`
+            INSERT INTO homepage_settings (id, settings, updated_at)
+            VALUES ('category_order', ${JSON.stringify(order)}, CURRENT_TIMESTAMP)
+            ON CONFLICT (id) DO UPDATE SET settings = EXCLUDED.settings, updated_at = CURRENT_TIMESTAMP
+        `;
+        return { success: true };
+    } catch (err) {
+        console.error('Error saving category order:', err);
+        throw err;
+    }
+}
+
+export async function adminSaveFeaturedProducts(productIds) {
+    try {
+        await ensureSchema();
+        const cleanIds = (productIds || []).map(Number).filter(n => !isNaN(n));
+        await sql`
+            INSERT INTO homepage_settings (id, settings, updated_at)
+            VALUES ('featured_product_ids', ${JSON.stringify(cleanIds)}, CURRENT_TIMESTAMP)
+            ON CONFLICT (id) DO UPDATE SET settings = EXCLUDED.settings, updated_at = CURRENT_TIMESTAMP
+        `;
+        if (cleanIds.length > 0) {
+            await sql`UPDATE products SET is_featured = (id = ANY(${cleanIds}))`;
+        } else {
+            await sql`UPDATE products SET is_featured = FALSE`;
+        }
+        return { success: true };
+    } catch (err) {
+        console.error('Error saving featured products:', err);
+        throw err;
+    }
+}
+
+export async function adminToggleProductFeatured(productId, isFeatured) {
+    try {
+        await ensureSchema();
+        const id = Number(productId);
+        await sql`UPDATE products SET is_featured = ${isFeatured} WHERE id = ${id}`;
+
+        const rows = await sql`SELECT settings FROM homepage_settings WHERE id = 'featured_product_ids'`;
+        let list = [];
+        if (rows.length > 0) {
+            list = typeof rows[0].settings === 'string' ? JSON.parse(rows[0].settings) : (rows[0].settings || []);
+        }
+        list = list.map(Number).filter(n => !isNaN(n));
+        if (isFeatured) {
+            if (!list.includes(id)) list.push(id);
+        } else {
+            list = list.filter(item => item !== id);
+        }
+        await sql`
+            INSERT INTO homepage_settings (id, settings, updated_at)
+            VALUES ('featured_product_ids', ${JSON.stringify(list)}, CURRENT_TIMESTAMP)
+            ON CONFLICT (id) DO UPDATE SET settings = EXCLUDED.settings, updated_at = CURRENT_TIMESTAMP
+        `;
+        return { success: true, is_featured: isFeatured };
+    } catch (err) {
+        console.error('Error toggling product featured:', err);
+        throw err;
     }
 }

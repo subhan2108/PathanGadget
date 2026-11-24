@@ -1418,6 +1418,54 @@
     box-shadow: 0 2px 8px rgba(229, 184, 36, 0.12);
 }
 
+.pdp-qty-stepper-pill {
+    flex: 1;
+    height: 48px;
+    border-radius: 9999px;
+    border: 2px solid #E58A1F;
+    overflow: hidden;
+    display: flex;
+    align-items: stretch;
+    background: #FFFFFF;
+    box-shadow: 0 2px 8px rgba(229, 138, 31, 0.12);
+    box-sizing: border-box;
+}
+
+.pdp-qty-stepper-btn {
+    width: 52px;
+    background: #FFF3E6;
+    color: #E58A1F;
+    border: none;
+    font-size: 1.3rem;
+    font-weight: 900;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.15s ease;
+    user-select: none;
+}
+
+.pdp-qty-stepper-btn:hover {
+    background: #FFE5CC;
+}
+
+.pdp-qty-stepper-btn:active {
+    background: #FDD8B3;
+}
+
+.pdp-qty-stepper-val {
+    flex: 1;
+    background: #FFFFFF;
+    color: #111827;
+    font-size: 1.1rem;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+}
+
 .pdp-btn-cart:hover:not(:disabled) {
     background: rgba(229, 184, 36, 0.08);
     border-color: var(--cta);
@@ -1497,6 +1545,18 @@
         border-radius: 12px !important;
         gap: 6px !important;
         white-space: nowrap !important;
+    }
+    .pdp-qty-stepper-pill {
+        flex: 1 1 0 !important;
+        width: auto !important;
+        height: 46px !important;
+    }
+    .pdp-qty-stepper-btn {
+        width: 42px !important;
+        font-size: 1.15rem !important;
+    }
+    .pdp-qty-stepper-val {
+        font-size: 1rem !important;
     }
     .pdp-btn-cart i,
     .pdp-btn-buy i {

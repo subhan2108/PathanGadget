@@ -12,12 +12,15 @@ const DEFAULT_CATEGORY_GALLERIES = {};
 export default function ProductDetailPage() {
     const { id } = useParams()
     const navigate = useNavigate()
-    const { addToCart, checkout } = useCart()
+    const { cartItems, addToCart, updateQty, removeFromCart, checkout } = useCart()
 
     const { product, loading: productLoading, error: productError, similarProducts } = useProductDetail(id)
     const { reviews, loading: reviewsLoading, refresh: refreshReviews } = useReviews(id)
     const { user } = useAuth()
     const { products: allProducts } = useAllProducts()
+
+    const inCartItem = (cartItems || []).find(i => String(i.id) === String(id))
+    const cartQty = inCartItem ? inCartItem.quantity : 0
 
     const [activeImg, setActiveImg] = useState(0)
     const [selectedColor, setSelectedColor] = useState(null)
@@ -226,7 +229,7 @@ export default function ProductDetailPage() {
             return;
         }
         setAdded(true)
-        setTimeout(() => setAdded(false), 1600)
+        setTimeout(() => setAdded(false), 650)
     }
 
     const handleBuyNow = async () => {
@@ -596,21 +599,47 @@ export default function ProductDetailPage() {
 
                         {/* Action Buttons */}
                         <div className="pdp-action-buttons">
-                            <button
-                                type="button"
-                                id="pdp-add-to-cart"
-                                className={`pdp-btn-cart ${added ? 'added' : ''}`}
-                                onClick={handleAddToCart}
-                                disabled={!isInStock}
-                            >
-                                {!isInStock ? (
-                                    <><i className="bi bi-x-circle" /> Out of Stock</>
-                                ) : added ? (
-                                    <><i className="bi bi-check-circle-fill" /> Added to Cart!</>
-                                ) : (
-                                    <><i className="bi bi-cart-plus" /> Add to Cart</>
-                                )}
-                            </button>
+                            {cartQty > 0 ? (
+                                <div className="pdp-qty-stepper-pill" id="pdp-qty-stepper">
+                                    <button
+                                        type="button"
+                                        className="pdp-qty-stepper-btn"
+                                        onClick={() => {
+                                            if (cartQty <= 1) {
+                                                removeFromCart(id)
+                                            } else {
+                                                updateQty(id, cartQty - 1)
+                                            }
+                                        }}
+                                        aria-label="Decrease quantity"
+                                    >
+                                        —
+                                    </button>
+                                    <span className="pdp-qty-stepper-val">{cartQty}</span>
+                                    <button
+                                        type="button"
+                                        className="pdp-qty-stepper-btn"
+                                        onClick={() => updateQty(id, cartQty + 1)}
+                                        aria-label="Increase quantity"
+                                    >
+                                        +
+                                    </button>
+                                </div>
+                            ) : (
+                                <button
+                                    type="button"
+                                    id="pdp-add-to-cart"
+                                    className="pdp-btn-cart"
+                                    onClick={handleAddToCart}
+                                    disabled={!isInStock}
+                                >
+                                    {!isInStock ? (
+                                        <><i className="bi bi-x-circle" /> Out of Stock</>
+                                    ) : (
+                                        <><i className="bi bi-cart-plus" /> Add to Cart</>
+                                    )}
+                                </button>
+                            )}
                             <button
                                 type="button"
                                 id="pdp-buy-now"

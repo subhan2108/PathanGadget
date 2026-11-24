@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { formatPrice } from '../lib/productsService'
+import { formatPrice, fetchHomepageSettings } from '../lib/productsService'
 import { useProducts, useCategories } from '../hooks/useProducts'
 import { useCart } from '../context/CartContext'
 import { HeroCarousel } from '@/components/ui/hero-carousel'
@@ -16,6 +16,7 @@ const FEATURES = [
 const HERO_SLIDES = [
     {
         id: 'key-covers',
+        productId: 1,
         title: "Luxury Leather &\nMetal Key Covers",
         image: "https://i0.wp.com/rkkeys.co.in/wp-content/uploads/2026/11/WhatsApp-Image-2026-11-04-at-15.40.30-2.jpeg",
         accent: "#C99738",
@@ -28,6 +29,7 @@ const HERO_SLIDES = [
     },
     {
         id: 'xhorse-remotes',
+        productId: 43,
         title: "Xhorse Universal\nSmart Keys",
         image: "https://i0.wp.com/rkkeys.co.in/wp-content/uploads/2026/10/WhatsApp-Image-2026-10-20-at-12.20.11.jpeg",
         accent: "#9B59B6",
@@ -40,6 +42,7 @@ const HERO_SLIDES = [
     },
     {
         id: 'flip-blades',
+        productId: 88,
         title: "Precision Automotive\nFlip Blades",
         image: "https://i0.wp.com/rkkeys.co.in/wp-content/uploads/2026/10/WhatsApp-Image-2026-10-13-at-12.01.44.jpeg",
         accent: "#34495E",
@@ -52,6 +55,7 @@ const HERO_SLIDES = [
     },
     {
         id: 'car-leds',
+        productId: 38,
         title: "Triple Colour High-Beam\nCar LED Projectors",
         image: "https://i0.wp.com/rkkeys.co.in/wp-content/uploads/2026/10/WhatsApp-Image-2026-10-22-at-16.40.43.jpeg",
         accent: "#F1C40F",
@@ -64,6 +68,7 @@ const HERO_SLIDES = [
     },
     {
         id: 'locksmith-tools',
+        productId: 29,
         title: "Professional Locksmith\nTools & Machines",
         image: "https://i0.wp.com/rkkeys.co.in/wp-content/uploads/2026/11/WhatsApp-Image-2026-11-02-at-11.30.16-1.jpeg",
         accent: "#16A085",
@@ -76,6 +81,7 @@ const HERO_SLIDES = [
     },
     {
         id: 'remote-shells',
+        productId: 28,
         title: "Direct Replacement\nRemote Shells",
         image: "https://i0.wp.com/rkkeys.co.in/wp-content/uploads/2026/11/WhatsApp-Image-2026-11-02-at-19.58.01.jpeg",
         accent: "#FFA502",
@@ -177,139 +183,72 @@ function ProductCardSkeleton() {
 
 export default function HomePage() {
     const navigate = useNavigate()
-    const [activeCategory, setActiveCategory] = useState('all')
     const [visibleCount, setVisibleCount] = useState(8)
+    const [heroSlides, setHeroSlides] = useState(() => {
+        try {
+            const cached = localStorage.getItem('smn_hero_slides')
+            if (cached) {
+                const parsed = JSON.parse(cached)
+                if (Array.isArray(parsed) && parsed.length > 0) return parsed
+            }
+        } catch (e) {}
+        return HERO_SLIDES
+    })
+    const [featuredProductIds, setFeaturedProductIds] = useState(() => {
+        try {
+            const cached = localStorage.getItem('smn_featured_product_ids')
+            if (cached) {
+                const parsed = JSON.parse(cached)
+                if (Array.isArray(parsed)) return parsed
+            }
+        } catch (e) {}
+        return []
+    })
 
-    // Fetch live products based on the active featured tab
-    const filters = activeCategory === 'all' ? {} : { category: activeCategory }
-    const { products: filtered, loading } = useProducts(filters, 'featured')
+    useEffect(() => {
+        let isMounted = true
+        fetchHomepageSettings().then(settings => {
+            if (!isMounted) return
+            if (Array.isArray(settings?.heroSlides) && settings.heroSlides.length > 0) {
+                setHeroSlides(settings.heroSlides)
+                try {
+                    localStorage.setItem('smn_hero_slides', JSON.stringify(settings.heroSlides))
+                } catch (e) {}
+            }
+            if (Array.isArray(settings?.featuredProductIds)) {
+                setFeaturedProductIds(settings.featuredProductIds)
+                try {
+                    localStorage.setItem('smn_featured_product_ids', JSON.stringify(settings.featuredProductIds))
+                } catch (e) {}
+            }
+        }).catch(err => {
+            console.error('Failed to load homepage settings:', err)
+        })
+        return () => { isMounted = false }
+    }, [])
+
+    // Fetch live products strictly marked as featured by the admin
+    const { products: filtered, loading } = useProducts(
+        { featuredOnly: true, featuredProductIds },
+        'featured'
+    )
     const { categories } = useCategories()
 
     const displayed = filtered.slice(0, visibleCount)
-
-    // Horizontal category tabs scroll state and drag handling (matching Products Page)
-    const tabsRef = useRef(null)
-    const [canScrollLeft, setCanScrollLeft] = useState(false)
-    const [canScrollRight, setCanScrollRight] = useState(false)
-    const isDraggingRef = useRef(false)
-    const hasDraggedRef = useRef(false)
-    const dragStartXRef = useRef(0)
-    const dragScrollLeftRef = useRef(0)
-
-    const totalCount = useMemo(() => {
-        return categories.reduce((sum, c) => sum + (c.count || 0), 0)
-    }, [categories])
-
-    const allCategoryTabs = useMemo(() => {
-        return [
-            { id: 'all', name: 'All Products', icon: 'bi-grid', count: totalCount },
-            ...categories.map(c => ({
-                id: c.id,
-                name: c.name || c.id,
-                icon: getCategoryIcon(c.id, c.name),
-                count: c.count || 0,
-            }))
-        ]
-    }, [categories, totalCount])
-
-    const checkTabsScroll = useCallback(() => {
-        const el = tabsRef.current
-        if (!el) return
-        const { scrollLeft, scrollWidth, clientWidth } = el
-        setCanScrollLeft(scrollLeft > 4)
-        setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 4)
-    }, [])
-
-    const scrollTabs = (direction) => {
-        const el = tabsRef.current
-        if (!el) return
-        const scrollAmount = direction === 'left' ? -280 : 280
-        el.scrollBy({ left: scrollAmount, behavior: 'smooth' })
-    }
-
-    const handleMouseDownTabs = (e) => {
-        if (e.button !== 0) return
-        isDraggingRef.current = true
-        hasDraggedRef.current = false
-        dragStartXRef.current = e.pageX
-        dragScrollLeftRef.current = tabsRef.current?.scrollLeft || 0
-    }
-
-    const handleMouseMoveTabs = (e) => {
-        if (!isDraggingRef.current || !tabsRef.current) return
-        const deltaX = e.pageX - dragStartXRef.current
-        if (Math.abs(deltaX) > 4) {
-            hasDraggedRef.current = true
-        }
-        tabsRef.current.scrollLeft = dragScrollLeftRef.current - deltaX
-        checkTabsScroll()
-    }
-
-    const handleMouseUpTabs = () => {
-        isDraggingRef.current = false
-        setTimeout(() => {
-            hasDraggedRef.current = false
-        }, 60)
-    }
-
-    // Wheel event to translate vertical wheel into horizontal scrolling on tabs
-    useEffect(() => {
-        const el = tabsRef.current
-        if (!el) return
-
-        const handleWheel = (e) => {
-            if (el.scrollWidth > el.clientWidth) {
-                const canLeft = el.scrollLeft > 0
-                const canRight = el.scrollLeft < el.scrollWidth - el.clientWidth - 1
-
-                if ((e.deltaY > 0 && canRight) || (e.deltaY < 0 && canLeft)) {
-                    e.preventDefault()
-                    el.scrollLeft += e.deltaY
-                    checkTabsScroll()
-                }
-            }
-        }
-
-        el.addEventListener('wheel', handleWheel, { passive: false })
-        return () => el.removeEventListener('wheel', handleWheel)
-    }, [checkTabsScroll])
-
-    // Update scroll indicators on resize, category changes, or scroll
-    useEffect(() => {
-        checkTabsScroll()
-        const el = tabsRef.current
-        if (el) {
-            el.addEventListener('scroll', checkTabsScroll, { passive: true })
-        }
-        window.addEventListener('resize', checkTabsScroll)
-        return () => {
-            if (el) el.removeEventListener('scroll', checkTabsScroll)
-            window.removeEventListener('resize', checkTabsScroll)
-        }
-    }, [categories, checkTabsScroll])
-
-    // Auto-scroll active tab into view when activeCategory changes
-    useEffect(() => {
-        if (!tabsRef.current) return
-        const tabs = Array.from(tabsRef.current.querySelectorAll('.featured-tab'))
-        const activeBtn = tabs.find(btn => btn.dataset.categoryId === String(activeCategory))
-        if (activeBtn) {
-            activeBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
-        }
-    }, [activeCategory])
 
     return (
         <div className="home-page page-enter" id="home-page">
 
             {/* ── Editorial Hero Carousel ── */}
-            <section className="relative w-full h-[100dvh] min-h-[580px] overflow-hidden bg-black" id="hero-section">
+            <section className="relative w-full h-[100dvh] min-h-[480px] md:min-h-[580px] overflow-hidden bg-black" id="hero-section">
                 <HeroCarousel
-                    items={HERO_SLIDES}
+                    items={heroSlides}
                     defaultIndex={0}
-                    onShopNow={(item) => navigate(item?.link || '/products')}
+                    onCardClick={(item) => navigate(`/products/${item.productId || item.id}`)}
+                    onShopNow={() => navigate('/products')}
                     autoplay={true}
                     autoplayDelay={4500}
-                    className="h-[100dvh] min-h-[580px] w-full"
+                    className="h-[100dvh] min-h-[480px] md:min-h-[580px] w-full"
                 />
             </section>
 
@@ -324,45 +263,45 @@ export default function HomePage() {
                     </div>
                     <div className="categories-grid" id="categories-grid">
                         {categories.map((cat) => (
-                                <div
-                                    key={cat.id}
-                                    id={`category-${cat.id}`}
-                                    className="category-card"
-                                    onClick={() => navigate(`/products?category=${cat.id}`)}
-                                    role="button"
-                                    tabIndex={0}
-                                    onKeyDown={e => {
-                                        if (e.key === 'Enter' || e.key === ' ') {
-                                            e.preventDefault()
-                                            navigate(`/products?category=${cat.id}`)
-                                        }
-                                    }}
-                                >
-                                    <div className="category-card__img-wrap">
-                                        <img
-                                            src={cat.image || '/placeholder-key.svg'}
-                                            alt={cat.name}
-                                            className="category-card__img"
-                                            loading="lazy"
-                                            onError={(e) => {
-                                                if (!e.currentTarget.src.includes('placeholder-key.svg')) {
-                                                    e.currentTarget.src = '/placeholder-key.svg';
-                                                }
-                                            }}
-                                        />
-                                        <div className="category-card__overlay" />
-                                    </div>
-                                    <div className="category-card__glass">
-                                        <i className={`bi ${CATEGORY_ICONS[cat.id] || 'bi-box'} category-card__icon`} />
-                                        <div>
-                                            <h3 className="category-card__name">{cat.name}</h3>
-                                            <p className="category-card__desc">{cat.description}</p>
-                                        </div>
-                                        <span className="category-card__count">
-                                            <i className="bi bi-box-seam" /> {cat.count} items
-                                        </span>
-                                    </div>
+                            <div
+                                key={cat.id}
+                                id={`category-${cat.id}`}
+                                className="category-card"
+                                onClick={() => navigate(`/products?category=${encodeURIComponent(cat.id)}`)}
+                                role="button"
+                                tabIndex={0}
+                                onKeyDown={e => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                        e.preventDefault()
+                                        navigate(`/products?category=${encodeURIComponent(cat.id)}`)
+                                    }
+                                }}
+                            >
+                                <div className="category-card__img-wrap">
+                                    <img
+                                        src={cat.image || '/placeholder-key.svg'}
+                                        alt={cat.name}
+                                        className="category-card__img"
+                                        loading="lazy"
+                                        onError={(e) => {
+                                            if (!e.currentTarget.src.includes('placeholder-key.svg')) {
+                                                e.currentTarget.src = '/placeholder-key.svg';
+                                            }
+                                        }}
+                                    />
+                                    <div className="category-card__overlay" />
                                 </div>
+                                <div className="category-card__glass">
+                                    <i className={`bi ${CATEGORY_ICONS[cat.id] || 'bi-box'} category-card__icon`} />
+                                    <div>
+                                        <h3 className="category-card__name">{cat.name}</h3>
+                                        <p className="category-card__desc">{cat.description}</p>
+                                    </div>
+                                    <span className="category-card__count">
+                                        <i className="bi bi-box-seam" /> {cat.count} items
+                                    </span>
+                                </div>
+                            </div>
                         ))}
                     </div>
                 </div>
@@ -376,71 +315,12 @@ export default function HomePage() {
                         <h2>Featured Products</h2>
                     </div>
 
-                    {/* Featured Category Tabs (Horizontal Scrollable Carousel matching Products Page) */}
-                    <div className={`featured-tabs-wrapper ${canScrollLeft ? 'can-scroll-left' : ''} ${canScrollRight ? 'can-scroll-right' : ''}`}>
-                        {canScrollLeft && (
-                            <button
-                                type="button"
-                                className="featured-cat-arrow featured-cat-arrow--left"
-                                onClick={() => scrollTabs('left')}
-                                aria-label="Scroll categories left"
-                                title="Scroll left"
-                            >
-                                <i className="bi bi-chevron-left" />
-                            </button>
-                        )}
-
-                        <div
-                            ref={tabsRef}
-                            className="featured-tabs"
-                            id="product-filters"
-                            role="tablist"
-                            onMouseDown={handleMouseDownTabs}
-                            onMouseMove={handleMouseMoveTabs}
-                            onMouseUp={handleMouseUpTabs}
-                            onMouseLeave={handleMouseUpTabs}
-                        >
-                            {allCategoryTabs.map(cat => (
-                                <button
-                                    key={cat.id}
-                                    id={`filter-${cat.id}`}
-                                    data-category-id={cat.id}
-                                    role="tab"
-                                    aria-selected={activeCategory === cat.id}
-                                    className={`featured-tab ${activeCategory === cat.id ? 'active' : ''}`}
-                                    onClick={() => {
-                                        if (hasDraggedRef.current) return
-                                        setActiveCategory(cat.id)
-                                        setVisibleCount(8)
-                                    }}
-                                >
-                                    <i className={`bi ${cat.icon}`} />
-                                    <span>{cat.name}</span>
-                                    <span className={`featured-tab-count ${activeCategory === cat.id ? 'active' : ''}`}>
-                                        {cat.count}
-                                    </span>
-                                </button>
-                            ))}
-                        </div>
-
-                        {canScrollRight && (
-                            <button
-                                type="button"
-                                className="featured-cat-arrow featured-cat-arrow--right"
-                                onClick={() => scrollTabs('right')}
-                                aria-label="Scroll categories right"
-                                title="Scroll right"
-                            >
-                                <i className="bi bi-chevron-right" />
-                            </button>
-                        )}
-                    </div>
-
                     {/* Products Grid */}
                     <div className="products-grid" id="products-grid">
-                        {loading
-                            ? Array(8).fill(null).map((_, i) => <ProductCardSkeleton key={i} />)
-                            : displayed.map(raw => {
+                        {loading ? (
+                            Array(8).fill(null).map((_, i) => <ProductCardSkeleton key={i} />)
+                        ) : displayed.length > 0 ? (
+                            displayed.map(raw => {
                                 const product = {
                                     ...raw,
                                     originalPrice: raw.original_price ?? raw.originalPrice ?? raw.price,
@@ -448,12 +328,6 @@ export default function HomePage() {
                                     reviewCount: raw.review_count ?? raw.reviewCount ?? raw.reviews ?? 0,
                                     image: raw.image_url ?? raw.image ?? '',
                                 }
-                                const discount = product.originalPrice > product.price
-                                    ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
-                                    : 0
-                                const offerText = product.badge || (discount > 0 ? `${discount}% Off` : 'Special Deal')
-                                const tagline = product.tagline || product.description || (product.category ? `${product.category.toUpperCase()} Collection` : 'Automotive Key Blanks & Remotes')
-
                                 return (
                                     <ProductCard
                                         key={product.id}
@@ -462,7 +336,15 @@ export default function HomePage() {
                                     />
                                 )
                             })
-                        }
+                        ) : (
+                            <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '60px 20px', color: 'var(--text-muted)' }}>
+                                <i className="bi bi-stars" style={{ fontSize: '2.5rem', color: '#D97706', display: 'block', marginBottom: 12 }} />
+                                <h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 6 }}>No Featured Products Selected Yet</h3>
+                                <p style={{ fontSize: '0.9rem', maxWidth: 460, margin: '0 auto' }}>
+                                    Mark your best products as Featured in your Admin Panel to showcase them here.
+                                </p>
+                            </div>
+                        )}
                     </div>
 
                     {!loading && filtered.length > visibleCount && (
