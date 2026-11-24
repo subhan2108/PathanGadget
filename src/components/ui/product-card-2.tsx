@@ -3,6 +3,7 @@ import { useState, useRef, useEffect, memo } from "react";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import { useCart, useCartActions } from "@/context/CartContext";
+import { cacheProduct } from "@/lib/productsService";
 
 const CATEGORY_ICONS: Record<string, string> = {
   watches: "bi-smartwatch",
@@ -163,7 +164,24 @@ const ProductCardComponent = React.forwardRef<HTMLDivElement, ProductCardProps>(
       if (onClick) {
         onClick(e);
       } else if (id) {
-        navigate(`/products/${id}`);
+        const fullProd = {
+          id,
+          name,
+          brand,
+          category,
+          price,
+          originalPrice,
+          image,
+          image_url: image,
+          inStock: !isOutOfStock,
+          in_stock: !isOutOfStock,
+          rating,
+          reviewCount,
+          badge,
+          ...raw,
+        };
+        cacheProduct(fullProd);
+        navigate(`/products/${id}`, { state: { product: fullProd } });
       }
     };
 
@@ -189,6 +207,9 @@ const ProductCardComponent = React.forwardRef<HTMLDivElement, ProductCardProps>(
             onError={handleImgError}
             className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-105"
             loading="lazy"
+            decoding="async"
+            width="180"
+            height="180"
           />
 
           {/* Top-Left Badge (e.g. Best Seller / Top Rated) */}

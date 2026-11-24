@@ -283,6 +283,9 @@ export default function HomePage() {
                                         alt={cat.name}
                                         className="category-card__img"
                                         loading="lazy"
+                                        decoding="async"
+                                        width="320"
+                                        height="240"
                                         onError={(e) => {
                                             if (!e.currentTarget.src.includes('placeholder-key.svg')) {
                                                 e.currentTarget.src = '/placeholder-key.svg';

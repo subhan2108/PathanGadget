@@ -1,11 +1,21 @@
-import https from 'https';
+export const config = {
+  runtime: 'edge',
+};
 
-export default async function handler(req, res) {
+export default async function handler(req) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+      status: 405,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 
-  const connStr = req.headers['neon-connection-string'] || process.env.DATABASE_URL || process.env.VITE_DATABASE_URL;
+  const connStr =
+    req.headers.get('neon-connection-string') ||
+    process.env.DATABASE_URL ||
+    process.env.VITE_DATABASE_URL ||
+    '';
+
   let targetHost = 'api.c-2.ap-southeast-1.aws.neon.tech';
   if (connStr) {
     try {
@@ -14,52 +24,35 @@ export default async function handler(req, res) {
     } catch (_) {}
   }
 
-  let body = '';
-  if (typeof req.body === 'string') {
-    body = req.body;
-  } else if (req.body && typeof req.body === 'object') {
-    body = JSON.stringify(req.body);
-  } else {
-    await new Promise((resolve) => {
-      req.on('data', chunk => { body += chunk; });
-      req.on('end', resolve);
-    });
-  }
+  const body = await req.text();
+  const headers = new Headers();
+  headers.set('Host', targetHost);
+  headers.set('Content-Type', req.headers.get('content-type') || 'application/json');
+  if (connStr) headers.set('Neon-Connection-String', connStr);
+  headers.set('Neon-Raw-Text-Output', req.headers.get('neon-raw-text-output') || 'true');
+  headers.set('Neon-Array-Mode', req.headers.get('neon-array-mode') || 'true');
 
-  const options = {
-    hostname: targetHost,
-    port: 443,
-    path: '/sql',
-    method: 'POST',
-    headers: {
-      'Host': targetHost,
-      'Content-Type': req.headers['content-type'] || 'application/json',
-      'Neon-Connection-String': connStr,
-      'Neon-Raw-Text-Output': req.headers['neon-raw-text-output'] || 'true',
-      'Neon-Array-Mode': req.headers['neon-array-mode'] || 'true',
-    }
-  };
+  const auth = req.headers.get('authorization');
+  if (auth) headers.set('Authorization', auth);
 
-  if (req.headers['authorization']) {
-    options.headers['Authorization'] = req.headers['authorization'];
-  }
-  if (req.headers['neon-batch-isolation-level']) {
-    options.headers['Neon-Batch-Isolation-Level'] = req.headers['neon-batch-isolation-level'];
-  }
+  const batchIso = req.headers.get('neon-batch-isolation-level');
+  if (batchIso) headers.set('Neon-Batch-Isolation-Level', batchIso);
 
-  return new Promise((resolve) => {
-    const proxyReq = https.request(options, (neonRes) => {
-      res.writeHead(neonRes.statusCode, neonRes.headers);
-      neonRes.pipe(res);
-      neonRes.on('end', resolve);
+  try {
+    const upstream = await fetch(`https://${targetHost}/sql`, {
+      method: 'POST',
+      headers,
+      body,
     });
 
-    proxyReq.on('error', (err) => {
-      res.status(502).json({ error: err.message });
-      resolve();
+    return new Response(upstream.body, {
+      status: upstream.status,
+      headers: upstream.headers,
     });
-
-    proxyReq.write(body);
-    proxyReq.end();
-  });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: err.message }), {
+      status: 502,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
 }

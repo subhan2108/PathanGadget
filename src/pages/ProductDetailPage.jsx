@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
-import { Link, useParams, useNavigate } from 'react-router-dom'
-import { useProductDetail, useReviews, useAllProducts } from '../hooks/useProducts'
-import { formatPrice, submitReview } from '../lib/productsService'
+import { Link, useParams, useNavigate, useLocation } from 'react-router-dom'
+import { useProductDetail, useReviews } from '../hooks/useProducts'
+import { formatPrice, submitReview, cacheProduct } from '../lib/productsService'
 import { useCart } from '../context/CartContext'
 import { useAuth } from '../context/AuthContext'
 import { ProductCard } from '@/components/ui/product-card-2'
@@ -12,12 +12,17 @@ const DEFAULT_CATEGORY_GALLERIES = {};
 export default function ProductDetailPage() {
     const { id } = useParams()
     const navigate = useNavigate()
+    const location = useLocation()
     const { cartItems, addToCart, updateQty, removeFromCart, checkout } = useCart()
+
+    // Pre-seed cache from navigation state for 0ms instantaneous opening
+    if (location.state?.product) {
+        cacheProduct(location.state.product)
+    }
 
     const { product, loading: productLoading, error: productError, similarProducts } = useProductDetail(id)
     const { reviews, loading: reviewsLoading, refresh: refreshReviews } = useReviews(id)
     const { user } = useAuth()
-    const { products: allProducts } = useAllProducts()
 
     const inCartItem = (cartItems || []).find(i => String(i.id) === String(id))
     const cartQty = inCartItem ? inCartItem.quantity : 0
@@ -324,7 +329,7 @@ export default function ProductDetailPage() {
                                             boxShadow: activeImg === idx ? '0 2px 8px rgba(229, 184, 36, 0.25)' : 'none'
                                         }}
                                     >
-                                        <img src={img} alt={`Thumb ${idx}`} onError={handleImgError} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                                        <img src={img} alt={`Thumb ${idx}`} onError={handleImgError} loading="lazy" decoding="async" width="74" height="74" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                                     </div>
                                 ))}
                             </div>
@@ -367,6 +372,8 @@ export default function ProductDetailPage() {
                                     src={gallery[activeImg] || gallery[0]}
                                     alt={product.name}
                                     onError={handleImgError}
+                                    fetchPriority="high"
+                                    decoding="async"
                                     style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                                 />
                             ) : (

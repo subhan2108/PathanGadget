@@ -110,6 +110,20 @@ export default defineConfig(({ mode }) => {
           autoprefixer()
         ]
       }
+    },
+    build: {
+      target: 'es2020',
+      cssCodeSplit: true,
+      chunkSizeWarningLimit: 600,
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+            'vendor-clerk': ['@clerk/clerk-react'],
+            'vendor-db': ['@neondatabase/serverless'],
+          }
+        }
+      }
     }
   }
 })

@@ -10,7 +10,8 @@ import {
     fetchCategories,
     fetchProductById,
     fetchSimilarProducts,
-    fetchReviews
+    fetchReviews,
+    getCachedProduct
 } from '../lib/productsService'
 
 /**
@@ -25,15 +26,18 @@ export function useProducts(filters = {}, sortBy = 'featured') {
     useEffect(() => {
         let isMounted = true
         async function load() {
-            setLoading(true)
             setError(null)
             try {
                 const data = await fetchProducts(filters, sortBy)
-                if (isMounted) setProducts(data)
+                if (isMounted) {
+                    setProducts(data)
+                    setLoading(false)
+                }
             } catch (err) {
-                if (isMounted) setError(err.message)
-            } finally {
-                if (isMounted) setLoading(false)
+                if (isMounted) {
+                    setError(err.message)
+                    setLoading(false)
+                }
             }
         }
         load()
@@ -98,14 +102,21 @@ export function useCategories() {
  * Hook for a single product's detail page.
  */
 export function useProductDetail(id) {
-    const [product, setProduct] = useState(null)
+    const initialProduct = getCachedProduct(id)
+    const [product, setProduct] = useState(initialProduct || null)
     const [similarProducts, setSimilarProducts] = useState([])
-    const [loading, setLoading] = useState(true)
+    const [loading, setLoading] = useState(!initialProduct)
     const [error, setError] = useState(null)
 
     useEffect(() => {
         if (!id) return
-        setLoading(true)
+        const cached = getCachedProduct(id)
+        if (cached) {
+            setProduct(cached)
+            setLoading(false)
+        } else {
+            setLoading(true)
+        }
         setError(null)
 
         fetchProductById(id)
@@ -120,7 +131,7 @@ export function useProductDetail(id) {
                 setSimilarProducts(similar)
             })
             .catch(err => {
-                setError(err.message)
+                if (!cached) setError(err.message)
             })
             .finally(() => {
                 setLoading(false)

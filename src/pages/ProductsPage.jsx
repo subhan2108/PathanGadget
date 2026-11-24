@@ -1035,6 +1035,9 @@ export default function ProductsPage() {
                                                             src={subImg}
                                                             alt={sub}
                                                             loading="lazy"
+                                                            decoding="async"
+                                                            width="48"
+                                                            height="48"
                                                             onError={(e) => {
                                                                 e.currentTarget.onerror = null
                                                                 e.currentTarget.src = '/placeholder-key.svg'
