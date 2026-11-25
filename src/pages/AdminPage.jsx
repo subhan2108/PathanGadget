@@ -100,6 +100,7 @@ export default function AdminPage() {
     const [billOrder, setBillOrder] = useState(null)
     const [billShippingCharge, setBillShippingCharge] = useState(0)
     const [savingShipping, setSavingShipping] = useState(false)
+    const [taxInvoiceData, setTaxInvoiceData] = useState(null)
 
     // Image Upload States
     const [uploadingSlot, setUploadingSlot] = useState(null)
@@ -1105,6 +1106,76 @@ export default function AdminPage() {
         return output.trim() + ' Rupees Only'
     }
 
+    const calculateTaxInvoiceTotals = (data) => {
+        if (!data) return { itemsWithTax: [], hsnGroups: [], totalQty: 0, totalTaxable: 0, totalCgst: 0, totalSgst: 0, shippingCharge: 0, grandTotal: 0 };
+        
+        let totalQty = 0;
+        let totalTaxable = 0;
+        let totalCgst = 0;
+        let totalSgst = 0;
+
+        const itemsWithTax = (data.items || []).map((it, idx) => {
+            const qty = Math.max(0, Number(it.qty) || 0);
+            const price = Math.max(0, Number(it.price) || 0);
+            const taxable = Math.round(qty * price * 100) / 100;
+            const cgstRate = Math.max(0, Number(it.cgst_rate) || 0);
+            const sgstRate = Math.max(0, Number(it.sgst_rate) || 0);
+            const cgstAmt = Math.round(((taxable * cgstRate) / 100) * 100) / 100;
+            const sgstAmt = Math.round(((taxable * sgstRate) / 100) * 100) / 100;
+            const lineTotal = Math.round((taxable + cgstAmt + sgstAmt) * 100) / 100;
+
+            totalQty += qty;
+            totalTaxable += taxable;
+            totalCgst += cgstAmt;
+            totalSgst += sgstAmt;
+
+            return {
+                ...it,
+                taxable,
+                cgstAmt,
+                sgstAmt,
+                lineTotal
+            };
+        });
+
+        const shippingCharge = Math.max(0, Number(data.shipping_charge) || 0);
+        const grandTotal = Math.round((totalTaxable + totalCgst + totalSgst + shippingCharge) * 100) / 100;
+
+        const hsnMap = {};
+        itemsWithTax.forEach(it => {
+            const hsn = (it.hsn || '8301').trim();
+            const totalTaxRate = (Number(it.cgst_rate) || 0) + (Number(it.sgst_rate) || 0);
+            const key = `${hsn}_${totalTaxRate}`;
+            if (!hsnMap[key]) {
+                hsnMap[key] = {
+                    hsn: hsn,
+                    taxRate: `${totalTaxRate}%`,
+                    taxableAmt: 0,
+                    cgstAmt: 0,
+                    sgstAmt: 0,
+                    totalTax: 0
+                };
+            }
+            hsnMap[key].taxableAmt += it.taxable;
+            hsnMap[key].cgstAmt += it.cgstAmt;
+            hsnMap[key].sgstAmt += it.sgstAmt;
+            hsnMap[key].totalTax += (it.cgstAmt + it.sgstAmt);
+        });
+
+        const hsnGroups = Object.values(hsnMap);
+
+        return {
+            itemsWithTax,
+            hsnGroups,
+            totalQty,
+            totalTaxable,
+            totalCgst,
+            totalSgst,
+            shippingCharge,
+            grandTotal
+        };
+    };
+
     const openBillModal = async (order) => {
         try {
             if (!order.order_items || order.order_items.length === 0) {
@@ -1227,6 +1298,239 @@ export default function AdminPage() {
             }
         }, 250)
     }
+
+    const openTaxInvoiceModal = async (order) => {
+        let full = order;
+        try {
+            if (!order.order_items || order.order_items.length === 0) {
+                full = await adminGetOrderDetails(order.id) || order;
+            }
+        } catch {
+            full = order;
+        }
+
+        const ship = typeof full.shipping_address === 'string' ? JSON.parse(full.shipping_address) : (full.shipping_address || {});
+        const recipientName = full.customer_shop_name || ship.shopName || ship.name || `${ship.firstName || ''} ${ship.lastName || ''}`.trim() || 'Smiley N Trader Delhi';
+        const phone = full.customer_phone || ship.phone || '';
+        const address = `${full.customer_address || ship.address || 'B-54-KH NO-12/2, AMAN PURI, Nangloi'}, ${full.customer_city || ship.city || 'New Delhi'}, ${full.customer_state || ship.state || 'West Delhi, Delhi'}, ${full.customer_pincode || ship.pincode || '110041'}`.trim();
+
+        const rawItems = full.order_items || [];
+        const items = rawItems.length > 0 ? rawItems.map((item, idx) => {
+            const qty = Number(item.quantity || 1);
+            const rawPrice = Number(item.price || 0);
+            const baseRate = Math.round((rawPrice / 1.18) * 100) / 100;
+            return {
+                id: item.id || idx + 1,
+                description: item.name || item.title || item.product_name || 'Automotive Key Blank',
+                hsn: item.hsn || (idx === 0 ? '8301' : (idx === 1 ? '8401' : '87082900')),
+                qty: qty,
+                unit: 'Pcs',
+                price: baseRate > 0 ? baseRate : rawPrice,
+                cgst_rate: 9.00,
+                sgst_rate: 9.00
+            };
+        }) : [
+            { id: 1, description: 'Remote Shell', hsn: '8301', qty: 12, unit: 'Pcs', price: 119.17, cgst_rate: 9.00, sgst_rate: 9.00 },
+            { id: 2, description: 'Remote Key', hsn: '8401', qty: 2, unit: 'Pcs', price: 330.51, cgst_rate: 9.00, sgst_rate: 9.00 }
+        ];
+
+        const curDate = new Date(full.created_at || Date.now());
+        const curYear = curDate.getFullYear();
+        const nextYearShort = String(curYear + 1).slice(-2);
+        const finYear = `${curYear}-${nextYearShort}`;
+
+        const formattedDate = curDate.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
+        const numPart = full.order_number ? (full.order_number.replace(/\D/g, '').slice(-4) || '1101') : '1101';
+
+        setTaxInvoiceData({
+            order_id: full.id,
+            seller_gstin: '07AISPU2851R1Z4',
+            seller_name: `SMILEY N TRADERS (${finYear})`,
+            seller_address: 'Plot No. 132 / B-54, Aman Puri, Main B-Block, Nangloi, New Delhi - 110041',
+            seller_contact: 'Tel: +91 81787 68308  Email: smileyntraders@gmail.com',
+            copy_type: 'Original Copy',
+
+            invoice_no: numPart,
+            invoice_date: formattedDate,
+            place_of_supply: full.customer_state ? `${full.customer_state} (07)` : 'Delhi (07)',
+            reverse_charge: 'N',
+            sale_type: '',
+            commodity_code: '',
+            party_ir_code: '',
+
+            // Billed To
+            billed_name: recipientName,
+            billed_address: address,
+            billed_pan: '',
+            billed_email: ship.email || '',
+            billed_mobile: phone ? `+91 ${phone.replace(/\D/g, '').slice(-10)}` : '+91 87500 12909',
+            billed_aadhaar: '',
+            billed_gstin: '',
+
+            // Shipped To
+            shipped_name: recipientName,
+            shipped_address: address,
+            shipped_pan: '',
+            shipped_email: ship.email || '',
+            shipped_mobile: phone ? `+91 ${phone.replace(/\D/g, '').slice(-10)}` : '+91 87500 12909',
+            shipped_aadhaar: '',
+            shipped_gstin: '',
+
+            items: items,
+            shipping_charge: Number(full.delivery_fee || 0),
+
+            declaration_line1: 'All keys and transponders are strictly intended for duplication purposes only, not for use in lost key cases. The company not responsible if customer engages in unusual activity.',
+            declaration_line2: 'No Return Claim.',
+
+            bank_name: 'Axis Bank',
+            bank_ifsc: 'UTIB0000593',
+            bank_acc: '918020104116923',
+
+            terms: [
+                '1. Goods once sold will not be taken back.',
+                '2. Interest @ 18% p.a. will be charged if the payment is not made within the stipulated time.',
+                '3. Subject to Delhi Jurisdiction only.'
+            ]
+        });
+    };
+
+    const handlePrintTaxInvoice = () => {
+        const invoiceElem = document.getElementById('printable-tally-invoice');
+        if (!invoiceElem) {
+            window.print();
+            return;
+        }
+
+        const clone = invoiceElem.cloneNode(true);
+        const origInputs = invoiceElem.querySelectorAll('input, textarea, select');
+        const cloneInputs = clone.querySelectorAll('input, textarea, select');
+        origInputs.forEach((orig, idx) => {
+            const val = orig.value || '';
+            const cloneEl = cloneInputs[idx];
+            if (!cloneEl) return;
+
+            const isTextarea = orig.tagName.toLowerCase() === 'textarea';
+            const rep = document.createElement(isTextarea ? 'div' : 'span');
+            rep.textContent = val;
+            rep.style.fontFamily = orig.style.fontFamily || 'inherit';
+            rep.style.fontSize = orig.style.fontSize || 'inherit';
+            rep.style.fontWeight = orig.style.fontWeight || 'inherit';
+            rep.style.letterSpacing = orig.style.letterSpacing || 'inherit';
+            rep.style.color = '#000000';
+            rep.style.textAlign = orig.style.textAlign || 'left';
+            rep.style.lineHeight = orig.style.lineHeight || 'inherit';
+
+            if (isTextarea) {
+                rep.style.display = 'block';
+                rep.style.width = '100%';
+                rep.style.whiteSpace = 'pre-line';
+            } else if (orig.style.width === '100%') {
+                rep.style.display = 'block';
+                rep.style.width = '100%';
+            } else {
+                rep.style.display = 'inline-block';
+                if (orig.style.flex) {
+                    rep.style.flex = orig.style.flex;
+                }
+                if (orig.style.minWidth) {
+                    rep.style.minWidth = orig.style.minWidth;
+                }
+                if (orig.style.width) {
+                    rep.style.width = orig.style.width;
+                }
+            }
+
+            cloneEl.parentNode.replaceChild(rep, cloneEl);
+        });
+
+        clone.querySelectorAll('.no-print').forEach(el => el.remove());
+
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = '0';
+        document.body.appendChild(iframe);
+
+        const doc = iframe.contentWindow.document;
+        doc.open();
+        doc.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8" />
+                <title>Tax_Invoice_${taxInvoiceData?.invoice_no || 'Tally'}</title>
+                <style>
+                    @page {
+                        size: A4 portrait;
+                        margin: 6mm 5mm;
+                    }
+                    * {
+                        box-sizing: border-box;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                    html, body {
+                        margin: 0;
+                        padding: 0;
+                        background: #FFFFFF;
+                        font-family: Arial, "Helvetica Neue", Helvetica, sans-serif;
+                        color: #000000;
+                        font-size: 10px;
+                        line-height: 1.25;
+                    }
+                    .tally-invoice-printable {
+                        width: 100% !important;
+                        max-width: 800px !important;
+                        margin: 0 auto !important;
+                        box-shadow: none !important;
+                        border: 1.5px solid #000000 !important;
+                        page-break-inside: avoid !important;
+                        break-inside: avoid !important;
+                    }
+                    table {
+                        border-collapse: collapse;
+                        width: 100%;
+                    }
+                    th, td {
+                        border: 1px solid #000000;
+                        padding: 2.5px 4px;
+                        font-size: 10px;
+                    }
+                    th {
+                        background-color: transparent !important;
+                        font-weight: 700;
+                    }
+                    .no-print {
+                        display: none !important;
+                    }
+                </style>
+            </head>
+            <body>
+                ${clone.outerHTML}
+            </body>
+            </html>
+        `);
+        doc.close();
+
+        setTimeout(() => {
+            try {
+                iframe.contentWindow.focus();
+                iframe.contentWindow.print();
+            } catch (err) {
+                console.error('Iframe tax invoice print error:', err);
+                window.print();
+            } finally {
+                setTimeout(() => {
+                    if (document.body.contains(iframe)) {
+                        document.body.removeChild(iframe);
+                    }
+                }, 1000);
+            }
+        }, 250);
+    };
 
     const handleWhatsAppOrder = (order) => {
         const ship = typeof order.shipping_address === 'string' ? JSON.parse(order.shipping_address) : (order.shipping_address || {})
@@ -3052,7 +3356,7 @@ export default function AdminPage() {
                                             <button
                                                 type="button"
                                                 className="btn btn-sm"
-                                                style={{ background: '#059669', color: '#FFFFFF', fontWeight: 700, padding: '8px 16px', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+                                                style={{ background: '#059669', color: '#FFFFFF', fontWeight: 700, padding: '8px 14px', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                                                 onClick={() => {
                                                     if (orders.length > 0) openBillModal(orders[0]);
                                                     else alert('No orders found to generate challan.');
@@ -3060,7 +3364,21 @@ export default function AdminPage() {
                                                 title="Generate & Print Delivery Challan"
                                             >
                                                 <i className="bi bi-file-earmark-text" />
-                                                Create Delivery Challan
+                                                Delivery Challan
+                                            </button>
+
+                                            <button
+                                                type="button"
+                                                className="btn btn-sm"
+                                                style={{ background: '#1E40AF', color: '#FFFFFF', fontWeight: 700, padding: '8px 14px', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                                                onClick={() => {
+                                                    if (orders.length > 0) openTaxInvoiceModal(orders[0]);
+                                                    else alert('No orders found to generate tax invoice.');
+                                                }}
+                                                title="Generate & Edit Tally-Style Tax Invoice"
+                                            >
+                                                <i className="bi bi-file-earmark-spreadsheet" />
+                                                Tax Invoice (Tally)
                                             </button>
                                         </div>
                                     </div>
@@ -3273,6 +3591,15 @@ export default function AdminPage() {
                                                                             title="Generate & Print Delivery Challan"
                                                                         >
                                                                             <i className="bi bi-file-earmark-text" /> Challan
+                                                                        </button>
+                                                                        <button
+                                                                            type="button"
+                                                                            className="btn btn-sm btn-outline-primary"
+                                                                            onClick={() => openTaxInvoiceModal(o)}
+                                                                            style={{ padding: '4px 8px', fontSize: '0.8125rem', fontWeight: 600 }}
+                                                                            title="Generate & Edit Tally-Style Tax Invoice"
+                                                                        >
+                                                                            <i className="bi bi-file-earmark-spreadsheet" /> Invoice
                                                                         </button>
                                                                         <button
                                                                             type="button"
@@ -3855,6 +4182,15 @@ export default function AdminPage() {
                                             <i className="bi bi-file-earmark-text" /> Delivery Challan
                                         </button>
 
+                                        <button
+                                            type="button"
+                                            className="btn btn-sm btn-outline-primary"
+                                            style={{ fontWeight: 700 }}
+                                            onClick={() => openTaxInvoiceModal(selectedOrder)}
+                                        >
+                                            <i className="bi bi-file-earmark-spreadsheet" /> Tax Invoice (Tally)
+                                        </button>
+
                                         <a
                                             href={`/track/${selectedOrder.order_number}`}
                                             target="_blank"
@@ -4101,7 +4437,7 @@ export default function AdminPage() {
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #111827', paddingBottom: '10px', marginBottom: '12px' }}>
                                     <div>
                                         <div style={{ fontSize: '1.35rem', fontWeight: 900, letterSpacing: '0.5px' }}>
-                                            S.N.Traders
+                                            S.N.T
                                         </div>
                                         <div style={{ fontSize: '0.75rem', color: '#4B5563', textTransform: 'uppercase', fontWeight: 700 }}>
 
@@ -4171,7 +4507,7 @@ export default function AdminPage() {
                                                     From (Sender):
                                                 </div>
                                                 <div style={{ fontSize: '1rem', fontWeight: 800, color: '#111827' }}>
-                                                    S.N.Traders
+                                                    S.N.T
                                                 </div>
                                                 <div style={{ fontSize: '1rem', lineHeight: '1.4', marginTop: '6px', fontWeight: 600, color: '#111827' }}>
                                                     Amanpuri B-54, Nangloi, New Delhi - 110041
@@ -4565,6 +4901,645 @@ export default function AdminPage() {
                                 onClick={handlePrintBill}
                             >
                                 <i className="bi bi-printer-fill" /> Print Challan / Save PDF
+                            </button>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
+
+{/* ── TALLY STYLE TAX INVOICE MODAL (FULLY EDITABLE) ── */}
+            {taxInvoiceData && createPortal(
+                <div 
+                    className="admin-modal-overlay" 
+                    style={{ overflowY: 'auto', padding: '16px', display: 'flex', alignItems: 'flex-start', justifyContent: 'center' }}
+                    onClick={(e) => { if (e.target === e.currentTarget) setTaxInvoiceData(null) }}
+                >
+                    <div 
+                        className="admin-modal" 
+                        style={{ 
+                            maxWidth: '920px', 
+                            width: '100%',
+                            maxHeight: '94vh', 
+                            display: 'flex', 
+                            flexDirection: 'column', 
+                            borderRadius: '14px',
+                            overflow: 'hidden',
+                            boxShadow: '0 25px 60px rgba(0,0,0,0.35)',
+                            margin: 'auto'
+                        }} 
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Modal Head */}
+                        <div className="admin-modal__head no-print" style={{ flexShrink: 0, padding: '12px 20px', background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                                <h3 style={{ margin: 0, fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <i className="bi bi-file-earmark-spreadsheet-fill" style={{ color: '#1E40AF' }} />
+                                    Tax Invoice (Tally Style GST Bill)
+                                </h3>
+                                <div style={{ fontSize: '0.8rem', color: '#6B7280', marginTop: '2px' }}>
+                                    Click any field below to edit (Party PAN, Aadhaar, GSTIN, HSN, Quantities, Rates) like Tally, then Print or Save PDF.
+                                </div>
+                            </div>
+                            <button className="close-btn" onClick={() => setTaxInvoiceData(null)}>
+                                <i className="bi bi-x-lg" />
+                            </button>
+                        </div>
+
+                        {/* Top Interactive Controls Toolbar */}
+                        <div className="no-print" style={{ flexShrink: 0, background: '#EFF6FF', borderBottom: '1px solid #BFDBFE', padding: '10px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                <button 
+                                    type="button" 
+                                    className="btn btn-sm" 
+                                    style={{ background: '#1E40AF', color: '#FFFFFF', fontWeight: 700, fontSize: '0.8rem' }}
+                                    onClick={() => {
+                                        const newItem = {
+                                            id: Date.now(),
+                                            description: '',
+                                            hsn: '8301',
+                                            qty: 1,
+                                            unit: 'Pcs',
+                                            price: 0,
+                                            cgst_rate: 9.00,
+                                            sgst_rate: 9.00
+                                        };
+                                        setTaxInvoiceData({ ...taxInvoiceData, items: [...(taxInvoiceData.items || []), newItem] });
+                                    }}
+                                >
+                                    <i className="bi bi-plus-circle" /> Add Item
+                                </button>
+                                <button 
+                                    type="button" 
+                                    className="btn btn-sm btn-outline-primary" 
+                                    style={{ fontWeight: 700, fontSize: '0.8rem' }}
+                                    onClick={() => {
+                                        setTaxInvoiceData({
+                                            ...taxInvoiceData,
+                                            shipped_name: taxInvoiceData.billed_name,
+                                            shipped_address: taxInvoiceData.billed_address,
+                                            shipped_pan: taxInvoiceData.billed_pan,
+                                            shipped_email: taxInvoiceData.billed_email,
+                                            shipped_mobile: taxInvoiceData.billed_mobile,
+                                            shipped_aadhaar: taxInvoiceData.billed_aadhaar,
+                                            shipped_gstin: taxInvoiceData.billed_gstin
+                                        });
+                                    }}
+                                    title="Copy Billed To details to Shipped To"
+                                >
+                                    <i className="bi bi-arrow-repeat" /> Copy Billed to Shipped
+                                </button>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', fontWeight: 700, color: '#1E3A8A' }}>
+                                    <span>Shipping (₹):</span>
+                                    <input 
+                                        type="number"
+                                        min="0"
+                                        style={{ width: '70px', padding: '2px 6px', borderRadius: '4px', border: '1px solid #93C5FD', fontWeight: 800 }}
+                                        value={taxInvoiceData.shipping_charge}
+                                        onChange={(e) => setTaxInvoiceData({ ...taxInvoiceData, shipping_charge: Math.max(0, Number(e.target.value) || 0) })}
+                                    />
+                                </div>
+                                <div style={{ display: 'flex', gap: '3px' }}>
+                                    {[18, 28, 5, 0].map(tax => (
+                                        <button 
+                                            key={tax} 
+                                            type="button" 
+                                            className="btn btn-xs" 
+                                            style={{ padding: '2px 6px', fontSize: '0.72rem', background: '#FFFFFF', border: '1px solid #93C5FD', color: '#1E40AF', fontWeight: 700 }}
+                                            onClick={() => {
+                                                const half = tax / 2;
+                                                const updated = (taxInvoiceData.items || []).map(it => ({ ...it, cgst_rate: half, sgst_rate: half }));
+                                                setTaxInvoiceData({ ...taxInvoiceData, items: updated });
+                                            }}
+                                        >
+                                            {tax}% GST
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <button 
+                                type="button" 
+                                className="btn btn-sm btn-primary"
+                                style={{ background: '#059669', borderColor: '#059669', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                                onClick={handlePrintTaxInvoice}
+                            >
+                                <i className="bi bi-printer-fill" /> Print Tax Invoice / Save PDF
+                            </button>
+                        </div>
+
+                        {/* Modal Body: Scrollable Document Area */}
+                        <div className="admin-modal__body" style={{ flex: '1 1 auto', minHeight: 0, overflowY: 'auto', padding: '20px', background: '#F1F5F9' }}>
+                            {(() => {
+                                const calc = calculateTaxInvoiceTotals(taxInvoiceData);
+                                const cellBorder = '1px solid #000000';
+                                const rowInputStyle = {
+                                    width: '100%',
+                                    border: '1px solid transparent',
+                                    borderRadius: '2px',
+                                    background: 'transparent',
+                                    padding: '2px 3px',
+                                    fontSize: '10.5px',
+                                    color: '#000000',
+                                    outline: 'none',
+                                    fontFamily: 'inherit'
+                                };
+
+                                return (
+                                    <div 
+                                        className="tally-invoice-printable" 
+                                        id="printable-tally-invoice"
+                                        style={{
+                                            background: '#FFFFFF',
+                                            border: '1.5px solid #000000',
+                                            padding: '14px 18px',
+                                            color: '#000000',
+                                            fontFamily: 'Arial, sans-serif',
+                                            fontSize: '11px',
+                                            lineHeight: '1.28',
+                                            boxShadow: '0 4px 14px rgba(0,0,0,0.08)',
+                                            margin: '0 auto',
+                                            maxWidth: '820px'
+                                        }}
+                                    >
+                                        {/* 1. Top Header Row: GSTIN (Left) | TAX INVOICE (Center) | Copy (Right) */}
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', paddingBottom: '6px', borderBottom: '1px solid #000000' }}>
+                                            <div style={{ fontSize: '11px', fontWeight: 700, display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>
+                                                <span style={{ marginRight: '4px', flexShrink: 0 }}>GSTIN :</span>
+                                                <input 
+                                                    style={{ border: 'none', borderBottom: '1px dashed #9CA3AF', fontWeight: 800, fontFamily: 'monospace', fontSize: '11px', width: '160px', background: 'transparent' }}
+                                                    value={taxInvoiceData.seller_gstin}
+                                                    onChange={(e) => setTaxInvoiceData({ ...taxInvoiceData, seller_gstin: e.target.value.toUpperCase() })}
+                                                />
+                                            </div>
+                                            <div style={{ textAlign: 'center', fontSize: '16px', fontWeight: 900, letterSpacing: '1px', textTransform: 'uppercase', padding: '0 10px' }}>
+                                                TAX INVOICE
+                                            </div>
+                                            <div style={{ textAlign: 'right', fontSize: '10px', fontStyle: 'italic', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', whiteSpace: 'nowrap' }}>
+                                                <input 
+                                                    style={{ border: 'none', borderBottom: '1px dashed #9CA3AF', fontSize: '10px', textAlign: 'right', fontStyle: 'italic', width: '100px', background: 'transparent' }}
+                                                    value={taxInvoiceData.copy_type}
+                                                    onChange={(e) => setTaxInvoiceData({ ...taxInvoiceData, copy_type: e.target.value })}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* 2. Company Name & Contact Header */}
+                                        <div style={{ textAlign: 'center', padding: '6px 0 8px 0' }}>
+                                            <input 
+                                                style={{ width: '100%', textAlign: 'center', fontSize: '18px', fontWeight: 900, border: 'none', borderBottom: '1px dashed #E2E8F0', color: '#000000', background: 'transparent', letterSpacing: '0.5px' }}
+                                                value={taxInvoiceData.seller_name}
+                                                onChange={(e) => setTaxInvoiceData({ ...taxInvoiceData, seller_name: e.target.value })}
+                                            />
+                                            <input 
+                                                style={{ width: '100%', textAlign: 'center', fontSize: '10px', border: 'none', borderBottom: '1px dashed #E2E8F0', color: '#374151', background: 'transparent', marginTop: '2px' }}
+                                                value={taxInvoiceData.seller_address}
+                                                onChange={(e) => setTaxInvoiceData({ ...taxInvoiceData, seller_address: e.target.value })}
+                                            />
+                                            <input 
+                                                style={{ width: '100%', textAlign: 'center', fontSize: '10px', border: 'none', borderBottom: '1px dashed #E2E8F0', color: '#374151', background: 'transparent', marginTop: '2px' }}
+                                                value={taxInvoiceData.seller_contact}
+                                                onChange={(e) => setTaxInvoiceData({ ...taxInvoiceData, seller_contact: e.target.value })}
+                                            />
+                                        </div>
+
+                                        {/* 3. Upper Meta Box (Invoice No, Date, etc.) */}
+                                        <div style={{ borderTop: '1px solid #000000', display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
+                                            <div style={{ borderRight: '1px solid #000000', padding: '4px 8px', fontSize: '10px' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '3px', whiteSpace: 'nowrap' }}>
+                                                    <span style={{ width: '105px', flexShrink: 0 }}>Invoice No.</span>
+                                                    <span style={{ width: '12px', flexShrink: 0, textAlign: 'center', fontWeight: 700 }}>:</span>
+                                                    <input style={{ flex: 1, minWidth: 0, border: 'none', borderBottom: '1px dashed #9CA3AF', fontWeight: 800, fontFamily: 'monospace', fontSize: '10.5px', background: 'transparent' }} value={taxInvoiceData.invoice_no} onChange={(e) => setTaxInvoiceData({ ...taxInvoiceData, invoice_no: e.target.value })} />
+                                                </div>
+                                                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '3px', whiteSpace: 'nowrap' }}>
+                                                    <span style={{ width: '105px', flexShrink: 0 }}>Dated</span>
+                                                    <span style={{ width: '12px', flexShrink: 0, textAlign: 'center', fontWeight: 700 }}>:</span>
+                                                    <input style={{ flex: 1, minWidth: 0, border: 'none', borderBottom: '1px dashed #9CA3AF', fontSize: '10px', background: 'transparent' }} value={taxInvoiceData.invoice_date} onChange={(e) => setTaxInvoiceData({ ...taxInvoiceData, invoice_date: e.target.value })} />
+                                                </div>
+                                                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '3px', whiteSpace: 'nowrap' }}>
+                                                    <span style={{ width: '105px', flexShrink: 0 }}>Place of Supply</span>
+                                                    <span style={{ width: '12px', flexShrink: 0, textAlign: 'center', fontWeight: 700 }}>:</span>
+                                                    <input style={{ flex: 1, minWidth: 0, border: 'none', borderBottom: '1px dashed #9CA3AF', fontSize: '10px', background: 'transparent' }} value={taxInvoiceData.place_of_supply} onChange={(e) => setTaxInvoiceData({ ...taxInvoiceData, place_of_supply: e.target.value })} />
+                                                </div>
+                                                <div style={{ display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>
+                                                    <span style={{ width: '105px', flexShrink: 0 }}>Reverse Charge</span>
+                                                    <span style={{ width: '12px', flexShrink: 0, textAlign: 'center', fontWeight: 700 }}>:</span>
+                                                    <input style={{ flex: 1, minWidth: 0, border: 'none', borderBottom: '1px dashed #9CA3AF', fontSize: '10px', background: 'transparent' }} value={taxInvoiceData.reverse_charge} onChange={(e) => setTaxInvoiceData({ ...taxInvoiceData, reverse_charge: e.target.value })} />
+                                                </div>
+                                            </div>
+
+                                            <div style={{ padding: '4px 8px', fontSize: '10px' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '3px', whiteSpace: 'nowrap' }}>
+                                                    <span style={{ width: '125px', flexShrink: 0 }}>Sale Type</span>
+                                                    <span style={{ width: '12px', flexShrink: 0, textAlign: 'center', fontWeight: 700 }}>:</span>
+                                                    <input style={{ flex: 1, minWidth: 0, border: 'none', borderBottom: '1px dashed #9CA3AF', fontSize: '10px', background: 'transparent' }} value={taxInvoiceData.sale_type} placeholder="Interstate / Local" onChange={(e) => setTaxInvoiceData({ ...taxInvoiceData, sale_type: e.target.value })} />
+                                                </div>
+                                                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '3px', whiteSpace: 'nowrap' }}>
+                                                    <span style={{ width: '125px', flexShrink: 0 }}>Commodity Tr. Code</span>
+                                                    <span style={{ width: '12px', flexShrink: 0, textAlign: 'center', fontWeight: 700 }}>:</span>
+                                                    <input style={{ flex: 1, minWidth: 0, border: 'none', borderBottom: '1px dashed #9CA3AF', fontSize: '10px', background: 'transparent' }} value={taxInvoiceData.commodity_code} onChange={(e) => setTaxInvoiceData({ ...taxInvoiceData, commodity_code: e.target.value })} />
+                                                </div>
+                                                <div style={{ display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>
+                                                    <span style={{ width: '125px', flexShrink: 0 }}>Party IR Code</span>
+                                                    <span style={{ width: '12px', flexShrink: 0, textAlign: 'center', fontWeight: 700 }}>:</span>
+                                                    <input style={{ flex: 1, minWidth: 0, border: 'none', borderBottom: '1px dashed #9CA3AF', fontSize: '10px', background: 'transparent' }} value={taxInvoiceData.party_ir_code} onChange={(e) => setTaxInvoiceData({ ...taxInvoiceData, party_ir_code: e.target.value })} />
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* 4. Party Details Box (Billed To vs Shipped To) */}
+                                        <div style={{ borderTop: '1px solid #000000', display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
+                                            {/* Billed To */}
+                                            <div style={{ borderRight: '1px solid #000000', padding: '5px 8px', fontSize: '10px' }}>
+                                                <div style={{ fontWeight: 800, textDecoration: 'underline', marginBottom: '3px' }}>
+                                                    Billed to :
+                                                </div>
+                                                <input 
+                                                    style={{ width: '100%', fontWeight: 800, fontSize: '11px', border: 'none', borderBottom: '1px dashed #CBD5E1', marginBottom: '2px', background: 'transparent' }}
+                                                    placeholder="Party Name (e.g. Smiley N Trader Delhi)"
+                                                    value={taxInvoiceData.billed_name}
+                                                    onChange={(e) => setTaxInvoiceData({ ...taxInvoiceData, billed_name: e.target.value })}
+                                                />
+                                                <textarea 
+                                                    rows="2"
+                                                    style={{ width: '100%', fontSize: '10px', border: 'none', borderBottom: '1px dashed #CBD5E1', resize: 'vertical', lineHeight: 1.25, background: 'transparent', marginBottom: '4px' }}
+                                                    placeholder="Party Full Address"
+                                                    value={taxInvoiceData.billed_address}
+                                                    onChange={(e) => setTaxInvoiceData({ ...taxInvoiceData, billed_address: e.target.value })}
+                                                />
+                                                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '2px', whiteSpace: 'nowrap' }}>
+                                                    <span style={{ width: '95px', flexShrink: 0 }}>Party PAN</span>
+                                                    <span style={{ width: '12px', flexShrink: 0, textAlign: 'center', fontWeight: 700 }}>:</span>
+                                                    <input style={{ flex: 1, minWidth: 0, border: 'none', borderBottom: '1px dashed #CBD5E1', textTransform: 'uppercase', fontFamily: 'monospace', fontWeight: 700, fontSize: '10px', background: 'transparent' }} placeholder="DFVPG0717K" value={taxInvoiceData.billed_pan} onChange={(e) => setTaxInvoiceData({ ...taxInvoiceData, billed_pan: e.target.value.toUpperCase() })} />
+                                                </div>
+                                                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '2px', whiteSpace: 'nowrap' }}>
+                                                    <span style={{ width: '95px', flexShrink: 0 }}>Party E-Mail ID</span>
+                                                    <span style={{ width: '12px', flexShrink: 0, textAlign: 'center', fontWeight: 700 }}>:</span>
+                                                    <input style={{ flex: 1, minWidth: 0, border: 'none', borderBottom: '1px dashed #CBD5E1', fontSize: '10px', background: 'transparent' }} placeholder="" value={taxInvoiceData.billed_email} onChange={(e) => setTaxInvoiceData({ ...taxInvoiceData, billed_email: e.target.value })} />
+                                                </div>
+                                                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '2px', whiteSpace: 'nowrap' }}>
+                                                    <span style={{ width: '95px', flexShrink: 0 }}>Party Mobile No</span>
+                                                    <span style={{ width: '12px', flexShrink: 0, textAlign: 'center', fontWeight: 700 }}>:</span>
+                                                    <input style={{ flex: 1, minWidth: 0, border: 'none', borderBottom: '1px dashed #CBD5E1', fontWeight: 600, fontSize: '10px', background: 'transparent' }} placeholder="+91 87500 12909" value={taxInvoiceData.billed_mobile} onChange={(e) => setTaxInvoiceData({ ...taxInvoiceData, billed_mobile: e.target.value })} />
+                                                </div>
+                                                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '2px', whiteSpace: 'nowrap' }}>
+                                                    <span style={{ width: '95px', flexShrink: 0 }}>Party AadhaarNo</span>
+                                                    <span style={{ width: '12px', flexShrink: 0, textAlign: 'center', fontWeight: 700 }}>:</span>
+                                                    <input style={{ flex: 1, minWidth: 0, border: 'none', borderBottom: '1px dashed #CBD5E1', fontSize: '10px', background: 'transparent' }} placeholder="" value={taxInvoiceData.billed_aadhaar} onChange={(e) => setTaxInvoiceData({ ...taxInvoiceData, billed_aadhaar: e.target.value })} />
+                                                </div>
+                                                <div style={{ display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>
+                                                    <span style={{ width: '95px', flexShrink: 0, fontWeight: 700 }}>GSTIN / UIN</span>
+                                                    <span style={{ width: '12px', flexShrink: 0, textAlign: 'center', fontWeight: 700 }}>:</span>
+                                                    <input style={{ flex: 1, minWidth: 0, border: 'none', borderBottom: '1px dashed #CBD5E1', fontWeight: 800, textTransform: 'uppercase', fontFamily: 'monospace', fontSize: '10px', background: 'transparent' }} placeholder="07DFVPG0717K1Z4" value={taxInvoiceData.billed_gstin} onChange={(e) => setTaxInvoiceData({ ...taxInvoiceData, billed_gstin: e.target.value.toUpperCase() })} />
+                                                </div>
+                                            </div>
+
+                                            {/* Shipped To */}
+                                            <div style={{ padding: '5px 8px', fontSize: '10px' }}>
+                                                <div style={{ fontWeight: 800, textDecoration: 'underline', marginBottom: '3px' }}>
+                                                    Shipped to :
+                                                </div>
+                                                <input 
+                                                    style={{ width: '100%', fontWeight: 800, fontSize: '11px', border: 'none', borderBottom: '1px dashed #CBD5E1', marginBottom: '2px', background: 'transparent' }}
+                                                    placeholder="Consignee Name (e.g. Smiley N Trader Delhi)"
+                                                    value={taxInvoiceData.shipped_name}
+                                                    onChange={(e) => setTaxInvoiceData({ ...taxInvoiceData, shipped_name: e.target.value })}
+                                                />
+                                                <textarea 
+                                                    rows="2"
+                                                    style={{ width: '100%', fontSize: '10px', border: 'none', borderBottom: '1px dashed #CBD5E1', resize: 'vertical', lineHeight: 1.25, background: 'transparent', marginBottom: '4px' }}
+                                                    placeholder="Consignee Delivery Address"
+                                                    value={taxInvoiceData.shipped_address}
+                                                    onChange={(e) => setTaxInvoiceData({ ...taxInvoiceData, shipped_address: e.target.value })}
+                                                />
+                                                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '2px', whiteSpace: 'nowrap' }}>
+                                                    <span style={{ width: '95px', flexShrink: 0 }}>Party PAN</span>
+                                                    <span style={{ width: '12px', flexShrink: 0, textAlign: 'center', fontWeight: 700 }}>:</span>
+                                                    <input style={{ flex: 1, minWidth: 0, border: 'none', borderBottom: '1px dashed #CBD5E1', textTransform: 'uppercase', fontFamily: 'monospace', fontWeight: 700, fontSize: '10px', background: 'transparent' }} placeholder="DFVPG0717K" value={taxInvoiceData.shipped_pan} onChange={(e) => setTaxInvoiceData({ ...taxInvoiceData, shipped_pan: e.target.value.toUpperCase() })} />
+                                                </div>
+                                                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '2px', whiteSpace: 'nowrap' }}>
+                                                    <span style={{ width: '95px', flexShrink: 0 }}>Party E-Mail ID</span>
+                                                    <span style={{ width: '12px', flexShrink: 0, textAlign: 'center', fontWeight: 700 }}>:</span>
+                                                    <input style={{ flex: 1, minWidth: 0, border: 'none', borderBottom: '1px dashed #CBD5E1', fontSize: '10px', background: 'transparent' }} placeholder="" value={taxInvoiceData.shipped_email} onChange={(e) => setTaxInvoiceData({ ...taxInvoiceData, shipped_email: e.target.value })} />
+                                                </div>
+                                                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '2px', whiteSpace: 'nowrap' }}>
+                                                    <span style={{ width: '95px', flexShrink: 0 }}>Party Mobile No</span>
+                                                    <span style={{ width: '12px', flexShrink: 0, textAlign: 'center', fontWeight: 700 }}>:</span>
+                                                    <input style={{ flex: 1, minWidth: 0, border: 'none', borderBottom: '1px dashed #CBD5E1', fontWeight: 600, fontSize: '10px', background: 'transparent' }} placeholder="+91 87500 12909" value={taxInvoiceData.shipped_mobile} onChange={(e) => setTaxInvoiceData({ ...taxInvoiceData, shipped_mobile: e.target.value })} />
+                                                </div>
+                                                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '2px', whiteSpace: 'nowrap' }}>
+                                                    <span style={{ width: '95px', flexShrink: 0 }}>Party AadhaarNo</span>
+                                                    <span style={{ width: '12px', flexShrink: 0, textAlign: 'center', fontWeight: 700 }}>:</span>
+                                                    <input style={{ flex: 1, minWidth: 0, border: 'none', borderBottom: '1px dashed #CBD5E1', fontSize: '10px', background: 'transparent' }} placeholder="" value={taxInvoiceData.shipped_aadhaar} onChange={(e) => setTaxInvoiceData({ ...taxInvoiceData, shipped_aadhaar: e.target.value })} />
+                                                </div>
+                                                <div style={{ display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>
+                                                    <span style={{ width: '95px', flexShrink: 0, fontWeight: 700 }}>GSTIN / UIN</span>
+                                                    <span style={{ width: '12px', flexShrink: 0, textAlign: 'center', fontWeight: 700 }}>:</span>
+                                                    <input style={{ flex: 1, minWidth: 0, border: 'none', borderBottom: '1px dashed #CBD5E1', fontWeight: 800, textTransform: 'uppercase', fontFamily: 'monospace', fontSize: '10px', background: 'transparent' }} placeholder="07DFVPG0717K1Z4" value={taxInvoiceData.shipped_gstin} onChange={(e) => setTaxInvoiceData({ ...taxInvoiceData, shipped_gstin: e.target.value.toUpperCase() })} />
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* 5. Main Line Items Table */}
+                                        <table style={{ width: '100%', borderCollapse: 'collapse', borderTop: '1px solid #000000', margin: 0 }}>
+                                            <thead>
+                                                <tr>
+                                                    <th style={{ border: cellBorder, borderTop: 'none', width: '28px', textAlign: 'center', fontSize: '9.5px' }}>S.N.</th>
+                                                    <th style={{ border: cellBorder, borderTop: 'none', textAlign: 'left', fontSize: '9.5px' }}>Description of Goods</th>
+                                                    <th style={{ border: cellBorder, borderTop: 'none', width: '65px', textAlign: 'center', fontSize: '9.5px' }}>HSN/SAC Code</th>
+                                                    <th style={{ border: cellBorder, borderTop: 'none', width: '45px', textAlign: 'center', fontSize: '9.5px' }}>Qty.</th>
+                                                    <th style={{ border: cellBorder, borderTop: 'none', width: '35px', textAlign: 'center', fontSize: '9.5px' }}>Unit</th>
+                                                    <th style={{ border: cellBorder, borderTop: 'none', width: '60px', textAlign: 'right', fontSize: '9.5px' }}>Price</th>
+                                                    <th style={{ border: cellBorder, borderTop: 'none', width: '48px', textAlign: 'right', fontSize: '9.5px' }}>CGST Rate</th>
+                                                    <th style={{ border: cellBorder, borderTop: 'none', width: '58px', textAlign: 'right', fontSize: '9.5px' }}>CGST Amount</th>
+                                                    <th style={{ border: cellBorder, borderTop: 'none', width: '48px', textAlign: 'right', fontSize: '9.5px' }}>SGST Rate</th>
+                                                    <th style={{ border: cellBorder, borderTop: 'none', width: '58px', textAlign: 'right', fontSize: '9.5px' }}>SGST Amount</th>
+                                                    <th style={{ border: cellBorder, borderTop: 'none', width: '75px', textAlign: 'right', fontSize: '9.5px' }}>Amount(₹)</th>
+                                                    <th className="no-print" style={{ border: cellBorder, borderTop: 'none', width: '24px' }}></th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {calc.itemsWithTax.map((it, idx) => (
+                                                    <tr key={it.id || idx}>
+                                                        <td style={{ border: cellBorder, textAlign: 'center', fontSize: '10px' }}>{idx + 1}.</td>
+                                                        <td style={{ border: cellBorder, padding: '2px 4px' }}>
+                                                            <input 
+                                                                style={{ ...rowInputStyle, fontWeight: 700 }}
+                                                                value={it.description}
+                                                                placeholder="Item description"
+                                                                onChange={(e) => {
+                                                                    const updated = [...taxInvoiceData.items];
+                                                                    updated[idx] = { ...updated[idx], description: e.target.value };
+                                                                    setTaxInvoiceData({ ...taxInvoiceData, items: updated });
+                                                                }}
+                                                            />
+                                                        </td>
+                                                        <td style={{ border: cellBorder, padding: '2px 4px', textAlign: 'center' }}>
+                                                            <input 
+                                                                style={{ ...rowInputStyle, textAlign: 'center', fontFamily: 'monospace' }}
+                                                                value={it.hsn}
+                                                                placeholder="HSN"
+                                                                onChange={(e) => {
+                                                                    const updated = [...taxInvoiceData.items];
+                                                                    updated[idx] = { ...updated[idx], hsn: e.target.value };
+                                                                    setTaxInvoiceData({ ...taxInvoiceData, items: updated });
+                                                                }}
+                                                            />
+                                                        </td>
+                                                        <td style={{ border: cellBorder, padding: '2px 4px', textAlign: 'center' }}>
+                                                            <input 
+                                                                type="number"
+                                                                min="0"
+                                                                style={{ ...rowInputStyle, textAlign: 'center', fontWeight: 700 }}
+                                                                value={it.qty}
+                                                                onChange={(e) => {
+                                                                    const updated = [...taxInvoiceData.items];
+                                                                    updated[idx] = { ...updated[idx], qty: e.target.value };
+                                                                    setTaxInvoiceData({ ...taxInvoiceData, items: updated });
+                                                                }}
+                                                            />
+                                                        </td>
+                                                        <td style={{ border: cellBorder, padding: '2px 4px', textAlign: 'center' }}>
+                                                            <input 
+                                                                style={{ ...rowInputStyle, textAlign: 'center' }}
+                                                                value={it.unit || 'Pcs'}
+                                                                onChange={(e) => {
+                                                                    const updated = [...taxInvoiceData.items];
+                                                                    updated[idx] = { ...updated[idx], unit: e.target.value };
+                                                                    setTaxInvoiceData({ ...taxInvoiceData, items: updated });
+                                                                }}
+                                                            />
+                                                        </td>
+                                                        <td style={{ border: cellBorder, padding: '2px 4px', textAlign: 'right' }}>
+                                                            <input 
+                                                                type="number"
+                                                                step="0.01"
+                                                                style={{ ...rowInputStyle, textAlign: 'right' }}
+                                                                value={it.price}
+                                                                onChange={(e) => {
+                                                                    const updated = [...taxInvoiceData.items];
+                                                                    updated[idx] = { ...updated[idx], price: e.target.value };
+                                                                    setTaxInvoiceData({ ...taxInvoiceData, items: updated });
+                                                                }}
+                                                            />
+                                                        </td>
+                                                        <td style={{ border: cellBorder, padding: '2px 4px', textAlign: 'right' }}>
+                                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+                                                                <input 
+                                                                    type="number"
+                                                                    step="0.01"
+                                                                    style={{ ...rowInputStyle, width: '36px', textAlign: 'right' }}
+                                                                    value={it.cgst_rate}
+                                                                    onChange={(e) => {
+                                                                        const updated = [...taxInvoiceData.items];
+                                                                        updated[idx] = { ...updated[idx], cgst_rate: e.target.value };
+                                                                        setTaxInvoiceData({ ...taxInvoiceData, items: updated });
+                                                                    }}
+                                                                />
+                                                                <span>%</span>
+                                                            </div>
+                                                        </td>
+                                                        <td style={{ border: cellBorder, padding: '2px 4px', textAlign: 'right', fontWeight: 600 }}>
+                                                            {it.cgstAmt.toFixed(2)}
+                                                        </td>
+                                                        <td style={{ border: cellBorder, padding: '2px 4px', textAlign: 'right' }}>
+                                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+                                                                <input 
+                                                                    type="number"
+                                                                    step="0.01"
+                                                                    style={{ ...rowInputStyle, width: '36px', textAlign: 'right' }}
+                                                                    value={it.sgst_rate}
+                                                                    onChange={(e) => {
+                                                                        const updated = [...taxInvoiceData.items];
+                                                                        updated[idx] = { ...updated[idx], sgst_rate: e.target.value };
+                                                                        setTaxInvoiceData({ ...taxInvoiceData, items: updated });
+                                                                    }}
+                                                                />
+                                                                <span>%</span>
+                                                            </div>
+                                                        </td>
+                                                        <td style={{ border: cellBorder, padding: '2px 4px', textAlign: 'right', fontWeight: 600 }}>
+                                                            {it.sgstAmt.toFixed(2)}
+                                                        </td>
+                                                        <td style={{ border: cellBorder, padding: '2px 6px', textAlign: 'right', fontWeight: 700 }}>
+                                                            {it.lineTotal.toFixed(2)}
+                                                        </td>
+                                                        <td className="no-print" style={{ border: cellBorder, textAlign: 'center', padding: '0 2px' }}>
+                                                            <button 
+                                                                type="button" 
+                                                                onClick={() => {
+                                                                    const updated = [...taxInvoiceData.items];
+                                                                    updated.splice(idx, 1);
+                                                                    setTaxInvoiceData({ ...taxInvoiceData, items: updated });
+                                                                }}
+                                                                style={{ border: 'none', background: 'transparent', color: '#EF4444', cursor: 'pointer', padding: 0, fontSize: '12px' }}
+                                                                title="Delete Item"
+                                                            >
+                                                                ✕
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+
+                                                {/* Shipping Charge Row if Present */}
+                                                {calc.shippingCharge > 0 && (
+                                                    <tr>
+                                                        <td style={{ border: cellBorder, textAlign: 'center', fontSize: '10px' }}>-</td>
+                                                        <td style={{ border: cellBorder, padding: '2px 4px', fontWeight: 600 }}>Shipping & Handling / Courier Freight</td>
+                                                        <td style={{ border: cellBorder, textAlign: 'center' }}>9968</td>
+                                                        <td style={{ border: cellBorder, textAlign: 'center' }}>1</td>
+                                                        <td style={{ border: cellBorder, textAlign: 'center' }}>Pcs</td>
+                                                        <td style={{ border: cellBorder, textAlign: 'right' }}>{calc.shippingCharge.toFixed(2)}</td>
+                                                        <td style={{ border: cellBorder, textAlign: 'right' }}>0.00 %</td>
+                                                        <td style={{ border: cellBorder, textAlign: 'right' }}>0.00</td>
+                                                        <td style={{ border: cellBorder, textAlign: 'right' }}>0.00 %</td>
+                                                        <td style={{ border: cellBorder, textAlign: 'right' }}>0.00</td>
+                                                        <td style={{ border: cellBorder, textAlign: 'right', fontWeight: 700 }}>{calc.shippingCharge.toFixed(2)}</td>
+                                                        <td className="no-print" style={{ border: cellBorder }}></td>
+                                                    </tr>
+                                                )}
+
+                                                {/* Grand Total Row Matching Image */}
+                                                <tr style={{ fontWeight: 800 }}>
+                                                    <td colSpan="3" style={{ border: cellBorder, textAlign: 'right', padding: '3px 8px' }}>
+                                                        Grand Total
+                                                    </td>
+                                                    <td colSpan="2" style={{ border: cellBorder, textAlign: 'center', padding: '3px 4px' }}>
+                                                        {calc.totalQty.toFixed(2)} Pcs.
+                                                    </td>
+                                                    <td colSpan="5" style={{ border: cellBorder, textAlign: 'right', padding: '3px 6px' }}>
+                                                        ₹
+                                                    </td>
+                                                    <td style={{ border: cellBorder, textAlign: 'right', padding: '3px 6px', fontSize: '11px', fontWeight: 900 }}>
+                                                        {calc.grandTotal.toFixed(2)}
+                                                    </td>
+                                                    <td className="no-print" style={{ border: cellBorder }}></td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+
+                                        {/* 6. HSN/SAC Tax Summary Table Matching Image */}
+                                        <div style={{ marginTop: '4px', width: '60%' }}>
+                                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '9.5px' }}>
+                                                <thead>
+                                                    <tr style={{ background: 'transparent' }}>
+                                                        <th style={{ border: cellBorder, padding: '2px 4px', textAlign: 'left' }}>HSN/SAC</th>
+                                                        <th style={{ border: cellBorder, padding: '2px 4px', textAlign: 'center' }}>Tax Rate</th>
+                                                        <th style={{ border: cellBorder, padding: '2px 4px', textAlign: 'right' }}>Taxable Amt.</th>
+                                                        <th style={{ border: cellBorder, padding: '2px 4px', textAlign: 'right' }}>CGST Amt.</th>
+                                                        <th style={{ border: cellBorder, padding: '2px 4px', textAlign: 'right' }}>SGST Amt.</th>
+                                                        <th style={{ border: cellBorder, padding: '2px 4px', textAlign: 'right' }}>Total Tax</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {calc.hsnGroups.map((grp, gidx) => (
+                                                        <tr key={gidx}>
+                                                            <td style={{ border: cellBorder, padding: '2px 4px' }}>{grp.hsn}</td>
+                                                            <td style={{ border: cellBorder, padding: '2px 4px', textAlign: 'center' }}>{grp.taxRate}</td>
+                                                            <td style={{ border: cellBorder, padding: '2px 4px', textAlign: 'right' }}>{grp.taxableAmt.toFixed(2)}</td>
+                                                            <td style={{ border: cellBorder, padding: '2px 4px', textAlign: 'right' }}>{grp.cgstAmt.toFixed(2)}</td>
+                                                            <td style={{ border: cellBorder, padding: '2px 4px', textAlign: 'right' }}>{grp.sgstAmt.toFixed(2)}</td>
+                                                            <td style={{ border: cellBorder, padding: '2px 4px', textAlign: 'right', fontWeight: 700 }}>{grp.totalTax.toFixed(2)}</td>
+                                                        </tr>
+                                                    ))}
+                                                    <tr style={{ fontWeight: 800 }}>
+                                                        <td style={{ border: cellBorder, padding: '2px 4px' }}>Total</td>
+                                                        <td style={{ border: cellBorder, padding: '2px 4px' }}></td>
+                                                        <td style={{ border: cellBorder, padding: '2px 4px', textAlign: 'right' }}>{calc.totalTaxable.toFixed(2)}</td>
+                                                        <td style={{ border: cellBorder, padding: '2px 4px', textAlign: 'right' }}>{calc.totalCgst.toFixed(2)}</td>
+                                                        <td style={{ border: cellBorder, padding: '2px 4px', textAlign: 'right' }}>{calc.totalSgst.toFixed(2)}</td>
+                                                        <td style={{ border: cellBorder, padding: '2px 4px', textAlign: 'right' }}>{(calc.totalCgst + calc.totalSgst).toFixed(2)}</td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        {/* 7. Amount in Words Matching Image */}
+                                        <div style={{ marginTop: '8px', fontSize: '11px', fontWeight: 800 }}>
+                                            Rupees {numberToIndianWords(Math.round(calc.grandTotal))}
+                                        </div>
+
+                                        {/* 8. Declaration Box Matching Image */}
+                                        <div style={{ borderTop: '1px solid #000000', marginTop: '6px', paddingTop: '4px', textAlign: 'center' }}>
+                                            <div style={{ fontWeight: 800, textDecoration: 'underline', fontSize: '10.5px', marginBottom: '2px' }}>
+                                                Declaration
+                                            </div>
+                                            <textarea 
+                                                rows="2"
+                                                style={{ width: '100%', fontSize: '9px', textAlign: 'center', border: 'none', background: 'transparent', resize: 'vertical', lineHeight: 1.25, color: '#222' }}
+                                                value={taxInvoiceData.declaration_line1}
+                                                onChange={(e) => setTaxInvoiceData({ ...taxInvoiceData, declaration_line1: e.target.value })}
+                                            />
+                                            <div style={{ display: 'flex', justifyContent: 'center', marginTop: '2px' }}>
+                                                <input 
+                                                    style={{ width: '140px', fontSize: '9px', textAlign: 'center', border: 'none', background: 'transparent', fontWeight: 600 }}
+                                                    value={taxInvoiceData.declaration_line2}
+                                                    onChange={(e) => setTaxInvoiceData({ ...taxInvoiceData, declaration_line2: e.target.value })}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* 9. Bank Details Box Matching Image */}
+                                        <div style={{ borderTop: '1px solid #000000', marginTop: '4px', padding: '4px 2px', fontSize: '10px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px' }}>
+                                            <strong style={{ whiteSpace: 'nowrap' }}>Bank Details :</strong>
+                                            <span style={{ display: 'inline-flex', alignItems: 'center', whiteSpace: 'nowrap' }}>
+                                                Bank Name :&nbsp;
+                                                <input style={{ border: 'none', borderBottom: '1px dashed #999', width: '110px', fontSize: '10px', fontWeight: 700, background: 'transparent' }} value={taxInvoiceData.bank_name} onChange={(e) => setTaxInvoiceData({ ...taxInvoiceData, bank_name: e.target.value })} />
+                                            </span>,
+                                            <span style={{ display: 'inline-flex', alignItems: 'center', whiteSpace: 'nowrap' }}>
+                                                &nbsp;IFSC :&nbsp;
+                                                <input style={{ border: 'none', borderBottom: '1px dashed #999', width: '110px', fontSize: '10px', fontFamily: 'monospace', fontWeight: 700, background: 'transparent' }} value={taxInvoiceData.bank_ifsc} onChange={(e) => setTaxInvoiceData({ ...taxInvoiceData, bank_ifsc: e.target.value })} />
+                                            </span>,
+                                            <span style={{ display: 'inline-flex', alignItems: 'center', whiteSpace: 'nowrap' }}>
+                                                &nbsp;Account No.:&nbsp;
+                                                <input style={{ border: 'none', borderBottom: '1px dashed #999', width: '140px', fontSize: '10px', fontFamily: 'monospace', fontWeight: 800, background: 'transparent' }} value={taxInvoiceData.bank_acc} onChange={(e) => setTaxInvoiceData({ ...taxInvoiceData, bank_acc: e.target.value })} />
+                                            </span>
+                                        </div>
+
+                                        {/* 10. Footer Terms & Signatures Matching Image */}
+                                        <div style={{ borderTop: '1px solid #000000', marginTop: '4px', paddingTop: '4px', display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', minHeight: '90px' }}>
+                                            <div style={{ fontSize: '9px', color: '#111827', lineHeight: 1.35 }}>
+                                                <div style={{ fontWeight: 800, textDecoration: 'underline' }}>Terms & Conditions</div>
+                                                <div style={{ fontStyle: 'italic', fontWeight: 700 }}>E.& O.E.</div>
+                                                <div>1. Goods once sold will not be taken back.</div>
+                                                <div>2. Interest @ 18% p.a. will be charged if the payment is not made within the stipulated time.</div>
+                                                <div>3. Subject to Delhi Jurisdiction only.</div>
+                                            </div>
+
+                                            <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', paddingLeft: '8px', fontSize: '9.5px' }}>
+                                                <div>Receiver's Signature : </div>
+                                            </div>
+
+                                            <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'flex-end', fontSize: '10.5px' }}>
+                                                <div style={{ fontWeight: 800 }}>
+                                                    For SMILEY N TRADERS (2026-27)
+                                                </div>
+                                                <div style={{ borderTop: '1px solid #000000', width: '150px', textAlign: 'center', paddingTop: '3px', fontWeight: 700, fontSize: '10px' }}>
+                                                    Authorised Signatory
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+                        </div>
+
+                        {/* Modal Action Footer */}
+                        <div className="no-print" style={{ flexShrink: 0, padding: '10px 20px', background: '#FFFFFF', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                            <button 
+                                type="button" 
+                                className="btn btn-outline-secondary" 
+                                onClick={() => setTaxInvoiceData(null)}
+                            >
+                                Close
+                            </button>
+                            <button 
+                                type="button" 
+                                className="btn btn-primary"
+                                style={{ background: '#059669', borderColor: '#059669', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+                                onClick={handlePrintTaxInvoice}
+                            >
+                                <i className="bi bi-printer-fill" /> Print Tax Invoice / Save PDF
                             </button>
                         </div>
                     </div>
