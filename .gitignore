@@ -9,6 +9,7 @@ dist-ssr/
 
 # Environment — NEVER commit these
 .env
+.env*
 .env.local
 .env.*.local
 scratch/

@@ -10,6 +10,15 @@ export function formatImageUrl(url, size = 'thumb') {
   const trimmed = url.trim();
   if (!trimmed) return '/placeholder-key.svg';
 
+  // Cloudinary High-Speed Edge CDN Delivery
+  if (trimmed.includes('res.cloudinary.com')) {
+    if (trimmed.includes('/upload/') && !trimmed.includes('/upload/f_auto')) {
+      const transform = size === 'hero' ? 'f_auto,q_auto,w_800,c_limit' : 'f_auto,q_auto,w_360,c_limit';
+      return trimmed.replace('/upload/', `/upload/${transform}/`);
+    }
+    return trimmed;
+  }
+
   let cdnUrl = trimmed;
   if (trimmed.startsWith('https://rkkeys.co.in/')) {
     cdnUrl = trimmed.replace('https://rkkeys.co.in/', 'https://i0.wp.com/rkkeys.co.in/');
