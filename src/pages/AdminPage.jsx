@@ -19,7 +19,7 @@ import {
     adminApprovePayment,
     adminDispatchOrder,
     adminMarkDelivered,
-    adminExportToVyapar,
+    adminUpdateOrderShipping,
     adminGetHomepageSettings,
     adminSaveHeroSlides,
     adminSaveCategoryOrder,
@@ -91,13 +91,15 @@ export default function AdminPage() {
     const [selectedOrder, setSelectedOrder] = useState(null)
     const [trackingForm, setTrackingForm] = useState({ label: '', description: '', status: 'processing', is_current: true })
 
-    // Courier Dispatch & Vyapar States
+    // Courier Dispatch & In-Website Billing States
     const [dispatchModalOrder, setDispatchModalOrder] = useState(null)
     const [dispatchForm, setDispatchForm] = useState({ courier_name: 'DTDC', tracking_number: '' })
     const [orderFilter, setOrderFilter] = useState('all')
     const [orderSearchQuery, setOrderSearchQuery] = useState('')
-    const [exportingVyapar, setExportingVyapar] = useState(false)
     const [printLabelOrder, setPrintLabelOrder] = useState(null)
+    const [billOrder, setBillOrder] = useState(null)
+    const [billShippingCharge, setBillShippingCharge] = useState(0)
+    const [savingShipping, setSavingShipping] = useState(false)
 
     // Image Upload States
     const [uploadingSlot, setUploadingSlot] = useState(null)
@@ -1066,31 +1068,164 @@ export default function AdminPage() {
         }
     }
 
-    const handleExportToVyapar = async (targetOrderIds = null) => {
-        setExportingVyapar(true)
-        try {
-            const res = await adminExportToVyapar(targetOrderIds)
-            if (!res || res.count === 0) {
-                alert('No orders found to export.')
-                return
-            }
-            const blob = new Blob([res.csvContent], { type: 'text/csv;charset=utf-8;' })
-            const url = URL.createObjectURL(blob)
-            const link = document.createElement('a')
-            link.href = url
-            link.download = `vyapar_sales_invoices_${new Date().toISOString().slice(0, 10)}.csv`
-            document.body.appendChild(link)
-            link.click()
-            document.body.removeChild(link)
-            URL.revokeObjectURL(url)
+    const numberToIndianWords = (num) => {
+        if (!num || isNaN(num) || num <= 0) return 'Zero Rupees Only'
+        const a = ['', 'One ', 'Two ', 'Three ', 'Four ', 'Five ', 'Six ', 'Seven ', 'Eight ', 'Nine ', 'Ten ', 'Eleven ', 'Twelve ', 'Thirteen ', 'Fourteen ', 'Fifteen ', 'Sixteen ', 'Seventeen ', 'Eighteen ', 'Nineteen ']
+        const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety']
 
-            alert(`✅ Successfully generated Vyapar CSV with ${res.count} orders (${res.rows.length} line items)!\nAll exported orders have been marked as exported in the system.`)
-            loadOrders()
-        } catch (err) {
-            alert('Failed to export to Vyapar: ' + err.message)
-        } finally {
-            setExportingVyapar(false)
+        const inWords = (n) => {
+            let str = ''
+            if (n > 99) {
+                str += a[Math.floor(n / 100)] + 'Hundred '
+                n %= 100
+            }
+            if (n > 19) {
+                str += b[Math.floor(n / 10)] + ' ' + a[n % 10]
+            } else if (n > 0) {
+                str += a[n]
+            }
+            return str
         }
+
+        let n = Math.floor(num)
+        let output = ''
+        const crore = Math.floor(n / 10000000)
+        n %= 10000000
+        const lakh = Math.floor(n / 100000)
+        n %= 100000
+        const thousand = Math.floor(n / 1000)
+        n %= 1000
+        const remainder = n
+
+        if (crore > 0) output += inWords(crore) + 'Crore '
+        if (lakh > 0) output += inWords(lakh) + 'Lakh '
+        if (thousand > 0) output += inWords(thousand) + 'Thousand '
+        if (remainder > 0) output += inWords(remainder)
+
+        return output.trim() + ' Rupees Only'
+    }
+
+    const openBillModal = async (order) => {
+        try {
+            if (!order.order_items || order.order_items.length === 0) {
+                const full = await adminGetOrderDetails(order.id)
+                setBillOrder(full || order)
+                setBillShippingCharge(Number((full || order).delivery_fee || 0))
+            } else {
+                setBillOrder(order)
+                setBillShippingCharge(Number(order.delivery_fee || 0))
+            }
+        } catch {
+            setBillOrder(order)
+            setBillShippingCharge(Number(order.delivery_fee || 0))
+        }
+    }
+
+    const handleSaveOrderShipping = async (orderId, charge) => {
+        setSavingShipping(true)
+        try {
+            const res = await adminUpdateOrderShipping(orderId, charge)
+            if (res.success) {
+                setBillOrder(prev => prev ? { ...prev, delivery_fee: res.delivery_fee, total: res.total } : prev)
+                setOrders(prev => prev.map(o => o.id === orderId ? { ...o, delivery_fee: res.delivery_fee, total: res.total } : o))
+                if (selectedOrder && selectedOrder.id === orderId) {
+                    setSelectedOrder(prev => prev ? { ...prev, delivery_fee: res.delivery_fee, total: res.total } : prev)
+                }
+                alert(`✅ Shipping charge of ₹${charge} saved! Updated order total to ₹${res.total}.`)
+            }
+        } catch (err) {
+            alert('Failed to save shipping charge: ' + err.message)
+        } finally {
+            setSavingShipping(false)
+        }
+    }
+
+    const handlePrintBill = () => {
+        const billElem = document.getElementById('printable-tax-invoice')
+        if (!billElem) {
+            window.print()
+            return
+        }
+
+        const iframe = document.createElement('iframe')
+        iframe.style.position = 'fixed'
+        iframe.style.right = '0'
+        iframe.style.bottom = '0'
+        iframe.style.width = '0'
+        iframe.style.height = '0'
+        iframe.style.border = '0'
+        document.body.appendChild(iframe)
+
+        const doc = iframe.contentWindow.document
+        doc.open()
+        doc.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8" />
+                <title>Invoice_${billOrder?.order_number || 'Bill'}</title>
+                <style>
+                    @page {
+                        size: A4 portrait;
+                        margin: 10mm;
+                    }
+                    * {
+                        box-sizing: border-box;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                    html, body {
+                        margin: 0;
+                        padding: 0;
+                        background: #FFFFFF;
+                        font-family: Arial, Helvetica, sans-serif;
+                        color: #111827;
+                    }
+                    .bill-printable {
+                        width: 100% !important;
+                        max-width: 800px !important;
+                        margin: 0 auto !important;
+                        box-shadow: none !important;
+                        page-break-inside: avoid !important;
+                        break-inside: avoid !important;
+                    }
+                    table {
+                        border-collapse: collapse;
+                        width: 100%;
+                    }
+                    th, td {
+                        border: 1px solid #D1D5DB;
+                        padding: 6px 8px;
+                        font-size: 12px;
+                    }
+                    th {
+                        background-color: #F3F4F6 !important;
+                        font-weight: 700;
+                    }
+                </style>
+            </head>
+            <body>
+                ${billElem.outerHTML}
+            </body>
+            </html>
+        `)
+        doc.close()
+
+        setTimeout(() => {
+            try {
+                iframe.contentWindow.focus()
+                iframe.contentWindow.print()
+            } catch (err) {
+                console.error('Iframe bill print error:', err)
+                window.print()
+            } finally {
+                setTimeout(() => {
+                    if (document.body.contains(iframe)) {
+                        document.body.removeChild(iframe)
+                    }
+                }, 1000)
+            }
+        }, 250)
     }
 
     const handleWhatsAppOrder = (order) => {
@@ -2870,7 +3005,6 @@ export default function AdminPage() {
 
                         {/* ── ORDERS TAB ── */}
                         {tab === 'orders' && (() => {
-                            const unexportedOrders = orders.filter(o => !o.is_exported_to_vyapar);
                             const pendingOrders = orders.filter(o => o.status === 'pending_verification' || o.status === 'pending');
                             const readyOrders = orders.filter(o => o.status === 'processing' || o.status === 'confirmed');
                             const dispatchedOrders = orders.filter(o => o.status === 'dispatched');
@@ -2880,7 +3014,6 @@ export default function AdminPage() {
                                 if (orderFilter === 'ready' && o.status !== 'processing' && o.status !== 'confirmed') return false;
                                 if (orderFilter === 'dispatched' && o.status !== 'dispatched') return false;
                                 if (orderFilter === 'delivered' && o.status !== 'delivered') return false;
-                                if (orderFilter === 'unexported' && o.is_exported_to_vyapar) return false;
 
                                 if (orderSearchQuery.trim()) {
                                     const q = orderSearchQuery.toLowerCase().trim();
@@ -2893,7 +3026,7 @@ export default function AdminPage() {
 
                             return (
                                 <div className="admin-panel" id="admin-orders-panel">
-                                    {/* Panel Header & Vyapar Export Toolbar */}
+                                    {/* Panel Header & Order Tools */}
                                     <div className="admin-panel__header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px', marginBottom: '20px' }}>
                                         <div>
                                             <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -2901,7 +3034,7 @@ export default function AdminPage() {
                                                 Customer Orders ({orders.length})
                                             </h2>
                                             <p style={{ margin: '4px 0 0', color: '#6B7280', fontSize: '0.875rem' }}>
-                                                Manage verification, DTDC / Shree Maruti shipping labels, and 1-click Vyapar app export.
+                                                Manage verification, S.N.T shipping labels, DTDC / Maruti courier dispatch, and in-website billing.
                                             </p>
                                         </div>
 
@@ -2920,21 +3053,14 @@ export default function AdminPage() {
                                                 type="button" 
                                                 className="btn btn-sm"
                                                 style={{ background: '#059669', color: '#FFFFFF', fontWeight: 700, padding: '8px 16px', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
-                                                onClick={() => handleExportToVyapar()}
-                                                disabled={exportingVyapar || unexportedOrders.length === 0}
-                                                title="Generate Excel/CSV file formatted specifically for Vyapar Sales Invoice import"
+                                                onClick={() => {
+                                                    if (orders.length > 0) openBillModal(orders[0]);
+                                                    else alert('No orders found to bill.');
+                                                }}
+                                                title="Generate & Print Tax Invoice / Bill"
                                             >
-                                                {exportingVyapar ? (
-                                                    <>
-                                                        <span className="spinner-border spinner-border-sm" />
-                                                        Exporting...
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <i className="bi bi-file-earmark-spreadsheet-fill" />
-                                                        Export to Vyapar ({unexportedOrders.length} New)
-                                                    </>
-                                                )}
+                                                <i className="bi bi-receipt" />
+                                                Create Bill / Invoice
                                             </button>
                                         </div>
                                     </div>
@@ -2947,8 +3073,7 @@ export default function AdminPage() {
                                                 { id: 'all', label: `All (${orders.length})` },
                                                 { id: 'pending', label: `⏳ Pending Payment (${pendingOrders.length})` },
                                                 { id: 'ready', label: `⚙️ Ready to Dispatch (${readyOrders.length})` },
-                                                { id: 'dispatched', label: `🚚 Dispatched (${dispatchedOrders.length})` },
-                                                { id: 'unexported', label: `📥 Vyapar Unexported (${unexportedOrders.length})` }
+                                                { id: 'dispatched', label: `🚚 Dispatched (${dispatchedOrders.length})` }
                                             ].map(filter => (
                                                 <button
                                                     key={filter.id}
@@ -2993,14 +3118,13 @@ export default function AdminPage() {
                                                     <th>Total</th>
                                                     <th>Payment & UTR</th>
                                                     <th>Shipping & Courier</th>
-                                                    <th>Vyapar Sync</th>
                                                     <th>Actions</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 {displayedOrders.length === 0 ? (
                                                     <tr>
-                                                        <td colSpan="7" style={{ textAlign: 'center', padding: '36px', color: '#9CA3AF' }}>
+                                                        <td colSpan="6" style={{ textAlign: 'center', padding: '36px', color: '#9CA3AF' }}>
                                                             <i className="bi bi-inbox" style={{ fontSize: '2rem', display: 'block', marginBottom: '8px' }} />
                                                             No orders found matching the filter.
                                                         </td>
@@ -3120,19 +3244,6 @@ export default function AdminPage() {
                                                                     )}
                                                                 </td>
 
-                                                                {/* Vyapar Sync */}
-                                                                <td>
-                                                                    {o.is_exported_to_vyapar ? (
-                                                                        <span style={{ background: '#D1FAE5', color: '#065F46', fontSize: '0.75rem', fontWeight: 700, padding: '2px 8px', borderRadius: '4px' }}>
-                                                                            ✓ Exported
-                                                                        </span>
-                                                                    ) : (
-                                                                        <span style={{ background: '#F3F4F6', color: '#6B7280', fontSize: '0.75rem', fontWeight: 600, padding: '2px 8px', borderRadius: '4px' }}>
-                                                                            Unexported
-                                                                        </span>
-                                                                    )}
-                                                                </td>
-
                                                                 {/* Actions */}
                                                                 <td>
                                                                     <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
@@ -3150,9 +3261,18 @@ export default function AdminPage() {
                                                                             className="btn btn-sm btn-outline-dark" 
                                                                             onClick={() => openPrintLabelModal(o)}
                                                                             style={{ padding: '4px 8px', fontSize: '0.8125rem' }}
-                                                                            title="Print Courier Shipping Label (TO & FROM)"
+                                                                            title="Print Courier Shipping Label (S.N.T TO & FROM)"
                                                                         >
                                                                             <i className="bi bi-printer" /> Label
+                                                                        </button>
+                                                                        <button 
+                                                                            type="button"
+                                                                            className="btn btn-sm btn-outline-success" 
+                                                                            onClick={() => openBillModal(o)}
+                                                                            style={{ padding: '4px 8px', fontSize: '0.8125rem', fontWeight: 600 }}
+                                                                            title="Generate & Print Tax Invoice / Bill"
+                                                                        >
+                                                                            <i className="bi bi-receipt" /> Bill
                                                                         </button>
                                                                         <button 
                                                                             type="button"
@@ -3726,6 +3846,15 @@ export default function AdminPage() {
                                             <i className="bi bi-printer-fill" /> Print Shipping Label
                                         </button>
 
+                                        <button 
+                                            type="button" 
+                                            className="btn btn-sm btn-outline-success"
+                                            style={{ fontWeight: 700 }}
+                                            onClick={() => openBillModal(selectedOrder)}
+                                        >
+                                            <i className="bi bi-receipt" /> Generate / Print Bill
+                                        </button>
+
                                         <a 
                                             href={`/track/${selectedOrder.order_number}`}
                                             target="_blank"
@@ -3971,8 +4100,8 @@ export default function AdminPage() {
                                 {/* Header */}
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #111827', paddingBottom: '10px', marginBottom: '12px' }}>
                                     <div>
-                                        <div style={{ fontSize: '1.25rem', fontWeight: 900, letterSpacing: '0.5px' }}>
-                                            SMILEY N TRADERS
+                                        <div style={{ fontSize: '1.35rem', fontWeight: 900, letterSpacing: '0.5px' }}>
+                                            S.N.T
                                         </div>
                                         <div style={{ fontSize: '0.75rem', color: '#4B5563', textTransform: 'uppercase', fontWeight: 700 }}>
                                             Automotive Key Blanks, Flip Keys & Remotes
@@ -4041,11 +4170,11 @@ export default function AdminPage() {
                                                 <div style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', color: '#4B5563', marginBottom: '4px' }}>
                                                     IF UNDELIVERED, RETURN TO (Consignor / Sender):
                                                 </div>
-                                                <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#111827' }}>
-                                                    SMILEY N TRADERS
+                                                <div style={{ fontSize: '1rem', fontWeight: 800, color: '#111827' }}>
+                                                    S.N.T
                                                 </div>
-                                                <div style={{ fontSize: '0.8125rem', color: '#374151', lineHeight: '1.3' }}>
-                                                    Automotive Spare Parts & Key Blank Hub, India
+                                                <div style={{ fontSize: '0.8125rem', color: '#374151', lineHeight: '1.35' }}>
+                                                    Amanpuri B-54, Nangloi, New Delhi - 110041
                                                 </div>
                                                 <div style={{ fontSize: '0.875rem', fontWeight: 800, marginTop: '4px', color: '#111827' }}>
                                                     📞 PHONE: +91 81787 68308
@@ -4057,9 +4186,7 @@ export default function AdminPage() {
 
                                 {/* Footer Info & Tracking QR */}
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #111827', paddingTop: '8px' }}>
-                                    <div style={{ fontSize: '0.78rem', color: '#374151', lineHeight: 1.4 }}>
-                                        <div><strong>Total Items:</strong> {printLabelOrder.order_items?.length || 1} item(s)</div>
-                                        <div><strong>Payment Mode:</strong> {printLabelOrder.payment_method || 'Prepaid'} (₹{printLabelOrder.total})</div>
+                                    <div style={{ fontSize: '0.8125rem', color: '#374151', lineHeight: 1.4 }}>
                                         <div><strong>Date:</strong> {new Date(printLabelOrder.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
                                     </div>
 
@@ -4094,6 +4221,350 @@ export default function AdminPage() {
                                 onClick={handlePrintShippingLabel}
                             >
                                 <i className="bi bi-printer-fill" /> Print / Save as PDF
+                            </button>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
+
+            {/* ── IN-WEBSITE TAX INVOICE / BILL MODAL ── */}
+            {billOrder && createPortal(
+                <div 
+                    className="admin-modal-overlay" 
+                    style={{ overflowY: 'auto', padding: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    onClick={(e) => { if (e.target === e.currentTarget) setBillOrder(null) }}
+                >
+                    <div 
+                        className="admin-modal" 
+                        style={{ 
+                            maxWidth: '840px', 
+                            width: '100%',
+                            maxHeight: '92vh', 
+                            display: 'flex', 
+                            flexDirection: 'column', 
+                            borderRadius: '16px',
+                            overflow: 'hidden',
+                            boxShadow: '0 25px 60px rgba(0,0,0,0.35)',
+                            margin: 'auto'
+                        }} 
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Pinned Modal Header */}
+                        <div className="admin-modal__head no-print" style={{ flexShrink: 0, padding: '14px 20px', background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                                <h3 style={{ margin: 0, fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <i className="bi bi-receipt" style={{ color: '#059669' }} />
+                                    Tax Invoice / Retail Bill
+                                </h3>
+                                <div style={{ fontSize: '0.8rem', color: '#6B7280', marginTop: '2px' }}>
+                                    Order #{billOrder.order_number} &bull; Sender: S.N.T (Nangloi, New Delhi)
+                                </div>
+                            </div>
+                            <button className="close-btn" onClick={() => setBillOrder(null)}>
+                                <i className="bi bi-x-lg" />
+                            </button>
+                        </div>
+
+                        {/* Scrollable Modal Body */}
+                        <div className="admin-modal__body" style={{ flex: '1 1 auto', minHeight: 0, overflowY: 'auto', padding: '20px', background: '#F8FAFC' }}>
+                            {/* Live Shipping Charges Configuration Bar */}
+                            <div className="no-print" style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '8px', padding: '12px 16px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                                    <label style={{ fontWeight: 700, fontSize: '0.85rem', color: '#1E40AF', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <i className="bi bi-truck" /> Add / Adjust Shipping Charges:
+                                    </label>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <span style={{ fontWeight: 800, color: '#1E40AF' }}>₹</span>
+                                        <input 
+                                            type="number"
+                                            min="0"
+                                            className="form-control form-control-sm"
+                                            style={{ width: '90px', fontWeight: 800, background: '#FFFFFF' }}
+                                            value={billShippingCharge}
+                                            onChange={(e) => setBillShippingCharge(Math.max(0, Number(e.target.value) || 0))}
+                                        />
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                                        {[0, 50, 70, 80, 100, 150].map(amt => (
+                                            <button 
+                                                key={amt}
+                                                type="button"
+                                                className="btn btn-xs"
+                                                style={{
+                                                    padding: '2px 8px',
+                                                    fontSize: '0.75rem',
+                                                    borderRadius: '4px',
+                                                    background: billShippingCharge === amt ? '#1D4ED8' : '#FFFFFF',
+                                                    color: billShippingCharge === amt ? '#FFFFFF' : '#1E40AF',
+                                                    border: '1px solid #93C5FD',
+                                                    fontWeight: 700,
+                                                    cursor: 'pointer'
+                                                }}
+                                                onClick={() => setBillShippingCharge(amt)}
+                                            >
+                                                {amt === 0 ? 'Free' : `₹${amt}`}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div>
+                                    <button 
+                                        type="button"
+                                        className="btn btn-sm btn-outline-primary"
+                                        onClick={() => handleSaveOrderShipping(billOrder.id, billShippingCharge)}
+                                        disabled={savingShipping}
+                                        title="Save this shipping charge and updated total into the order database"
+                                    >
+                                        <i className="bi bi-save" /> {savingShipping ? 'Saving...' : 'Save to Order Total'}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Printable Bill Box */}
+                            <div className="bill-printable" id="printable-tax-invoice" style={{
+                                background: '#FFFFFF',
+                                border: '2px solid #111827',
+                                borderRadius: '6px',
+                                padding: '24px',
+                                color: '#111827',
+                                fontFamily: 'Arial, sans-serif',
+                                fontSize: '13px',
+                                lineHeight: '1.4',
+                                boxShadow: '0 4px 12px rgba(0,0,0,0.06)'
+                            }}>
+                                {/* 1. Header */}
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #111827', paddingBottom: '14px', marginBottom: '14px' }}>
+                                    <div>
+                                        <div style={{ fontSize: '1.6rem', fontWeight: 900, letterSpacing: '1px', color: '#111827' }}>
+                                            S.N.T
+                                        </div>
+                                        <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#374151', textTransform: 'uppercase', marginTop: '2px' }}>
+                                            Automotive Key Blanks, Flip Keys & Remotes
+                                        </div>
+                                        <div style={{ fontSize: '0.82rem', color: '#4B5563', marginTop: '3px' }}>
+                                            Amanpuri B-54, Nangloi, New Delhi - 110041
+                                        </div>
+                                        <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#111827', marginTop: '3px' }}>
+                                            📞 Phone / WhatsApp: +91 81787 68308
+                                        </div>
+                                    </div>
+                                    <div style={{ textAlign: 'right' }}>
+                                        <div style={{ display: 'inline-block', background: '#111827', color: '#FFFFFF', padding: '4px 12px', borderRadius: '4px', fontSize: '0.85rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                            TAX INVOICE / RETAIL BILL
+                                        </div>
+                                        <div style={{ fontSize: '0.75rem', color: '#6B7280', marginTop: '4px', fontWeight: 600 }}>
+                                            ORIGINAL FOR RECIPIENT
+                                        </div>
+                                        <div style={{ marginTop: '6px', fontSize: '0.9rem', fontWeight: 800 }}>
+                                            Invoice No: <span style={{ fontFamily: 'monospace' }}>INV-{billOrder.order_number}</span>
+                                        </div>
+                                        <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#374151' }}>
+                                            Date: {new Date(billOrder.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* 2. Customer & Dispatch Details */}
+                                {(() => {
+                                    const ship = typeof billOrder.shipping_address === 'string' ? JSON.parse(billOrder.shipping_address) : (billOrder.shipping_address || {});
+                                    const recipientName = billOrder.customer_shop_name || ship.shopName || ship.name || `${ship.firstName || ''} ${ship.lastName || ''}`.trim() || 'Valued Customer';
+                                    const contactPerson = ship.firstName ? `${ship.firstName} ${ship.lastName || ''}`.trim() : '';
+                                    const phone = billOrder.customer_phone || ship.phone || '';
+                                    const address = billOrder.customer_address || ship.address || '';
+                                    const city = billOrder.customer_city || ship.city || '';
+                                    const state = billOrder.customer_state || ship.state || '';
+                                    const pincode = billOrder.customer_pincode || ship.pincode || '';
+
+                                    return (
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', borderBottom: '1.5px solid #111827', paddingBottom: '12px', marginBottom: '16px' }}>
+                                            <div style={{ borderRight: '1px dashed #D1D5DB', paddingRight: '12px' }}>
+                                                <div style={{ fontSize: '0.75rem', fontWeight: 900, textTransform: 'uppercase', color: '#4B5563', marginBottom: '4px' }}>
+                                                    BILLED TO / CONSIGNEE:
+                                                </div>
+                                                <div style={{ fontSize: '1.05rem', fontWeight: 900, color: '#000000' }}>
+                                                    {recipientName}
+                                                </div>
+                                                {contactPerson && contactPerson !== recipientName && (
+                                                    <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#374151', marginTop: '2px' }}>
+                                                        Attn: {contactPerson}
+                                                    </div>
+                                                )}
+                                                <div style={{ fontSize: '0.85rem', color: '#1F2937', marginTop: '4px', lineHeight: 1.35 }}>
+                                                    {address}
+                                                </div>
+                                                <div style={{ fontSize: '0.85rem', fontWeight: 800, marginTop: '2px' }}>
+                                                    {city ? `${city}, ` : ''}{state ? `${state} ` : ''}- {pincode}
+                                                </div>
+                                                <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#000000', marginTop: '4px' }}>
+                                                    📞 Contact: +91 {phone}
+                                                </div>
+                                            </div>
+
+                                            <div style={{ paddingLeft: '8px' }}>
+                                                <div style={{ fontSize: '0.75rem', fontWeight: 900, textTransform: 'uppercase', color: '#4B5563', marginBottom: '4px' }}>
+                                                    DISPATCH & PAYMENT INFO:
+                                                </div>
+                                                <div style={{ fontSize: '0.85rem', marginBottom: '3px' }}>
+                                                    <strong>Order ID:</strong> #{billOrder.order_number}
+                                                </div>
+                                                <div style={{ fontSize: '0.85rem', marginBottom: '3px' }}>
+                                                    <strong>Payment Mode:</strong> {billOrder.payment_method || 'Prepaid UPI'}
+                                                </div>
+                                                {billOrder.utr_number && (
+                                                    <div style={{ fontSize: '0.85rem', marginBottom: '3px' }}>
+                                                        <strong>UTR / Transaction Ref:</strong> <code style={{ fontWeight: 800 }}>{billOrder.utr_number}</code>
+                                                    </div>
+                                                )}
+                                                <div style={{ fontSize: '0.85rem', marginBottom: '3px' }}>
+                                                    <strong>Courier:</strong> {billOrder.courier_name || 'Standard Courier Service'}
+                                                </div>
+                                                {billOrder.tracking_number && (
+                                                    <div style={{ fontSize: '0.85rem', marginBottom: '3px' }}>
+                                                        <strong>AWB / Tracking No:</strong> <code style={{ fontWeight: 800 }}>{billOrder.tracking_number}</code>
+                                                    </div>
+                                                )}
+                                                <div style={{ fontSize: '0.85rem' }}>
+                                                    <strong>Dispatched From:</strong> Nangloi, New Delhi - 110041
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
+
+                                {/* 3. Items Table */}
+                                {(() => {
+                                    const items = billOrder.order_items || [];
+                                    const calculatedSubtotal = items.reduce((sum, item) => sum + (Number(item.price || 0) * Number(item.quantity || 1)), 0);
+                                    const finalSubtotal = calculatedSubtotal > 0 ? calculatedSubtotal : Number(billOrder.subtotal || billOrder.total || 0);
+                                    const shippingFee = Number(billShippingCharge || 0);
+                                    const grandTotal = finalSubtotal + shippingFee;
+
+                                    return (
+                                        <>
+                                            <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '14px' }}>
+                                                <thead>
+                                                    <tr style={{ background: '#F3F4F6' }}>
+                                                        <th style={{ border: '1px solid #9CA3AF', padding: '6px 8px', fontSize: '0.75rem', fontWeight: 800, textAlign: 'center', width: '36px' }}>#</th>
+                                                        <th style={{ border: '1px solid #9CA3AF', padding: '6px 8px', fontSize: '0.75rem', fontWeight: 800, textAlign: 'left' }}>Item Description</th>
+                                                        <th style={{ border: '1px solid #9CA3AF', padding: '6px 8px', fontSize: '0.75rem', fontWeight: 800, textAlign: 'center', width: '70px' }}>HSN</th>
+                                                        <th style={{ border: '1px solid #9CA3AF', padding: '6px 8px', fontSize: '0.75rem', fontWeight: 800, textAlign: 'center', width: '55px' }}>Qty</th>
+                                                        <th style={{ border: '1px solid #9CA3AF', padding: '6px 8px', fontSize: '0.75rem', fontWeight: 800, textAlign: 'right', width: '85px' }}>Rate (₹)</th>
+                                                        <th style={{ border: '1px solid #9CA3AF', padding: '6px 8px', fontSize: '0.75rem', fontWeight: 800, textAlign: 'right', width: '95px' }}>Amount (₹)</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {items.length === 0 ? (
+                                                        <tr>
+                                                            <td colSpan="6" style={{ textAlign: 'center', padding: '12px', border: '1px solid #D1D5DB' }}>
+                                                                Order Items (Total: ₹{billOrder.total})
+                                                            </td>
+                                                        </tr>
+                                                    ) : (
+                                                        items.map((item, idx) => {
+                                                            const qty = Number(item.quantity || 1);
+                                                            const price = Number(item.price || 0);
+                                                            const lineTotal = qty * price;
+                                                            return (
+                                                                <tr key={item.id || idx}>
+                                                                    <td style={{ border: '1px solid #D1D5DB', padding: '6px 8px', textAlign: 'center', fontSize: '0.8rem' }}>{idx + 1}</td>
+                                                                    <td style={{ border: '1px solid #D1D5DB', padding: '6px 8px', fontSize: '0.82rem', fontWeight: 600 }}>
+                                                                        {item.title || item.product_name || 'Automotive Key Blank'}
+                                                                        {item.sku && <span style={{ fontSize: '0.72rem', color: '#6B7280', display: 'block' }}>SKU: {item.sku}</span>}
+                                                                    </td>
+                                                                    <td style={{ border: '1px solid #D1D5DB', padding: '6px 8px', textAlign: 'center', fontSize: '0.75rem', color: '#4B5563' }}>8301</td>
+                                                                    <td style={{ border: '1px solid #D1D5DB', padding: '6px 8px', textAlign: 'center', fontSize: '0.82rem', fontWeight: 700 }}>{qty}</td>
+                                                                    <td style={{ border: '1px solid #D1D5DB', padding: '6px 8px', textAlign: 'right', fontSize: '0.82rem' }}>{price.toFixed(2)}</td>
+                                                                    <td style={{ border: '1px solid #D1D5DB', padding: '6px 8px', textAlign: 'right', fontSize: '0.85rem', fontWeight: 700 }}>{lineTotal.toFixed(2)}</td>
+                                                                </tr>
+                                                            );
+                                                        })
+                                                    )}
+                                                </tbody>
+                                            </table>
+
+                                            {/* 4. Total and In Words */}
+                                            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '16px', marginBottom: '14px' }}>
+                                                <div style={{ border: '1px solid #E5E7EB', borderRadius: '6px', padding: '10px 12px', background: '#FAFAFA' }}>
+                                                    <div style={{ fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', color: '#6B7280', marginBottom: '4px' }}>
+                                                        Invoice Amount In Words:
+                                                    </div>
+                                                    <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#111827', fontStyle: 'italic', lineHeight: 1.3 }}>
+                                                        {numberToIndianWords(grandTotal)}
+                                                    </div>
+                                                    <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px dashed #D1D5DB', fontSize: '0.75rem', color: '#4B5563' }}>
+                                                        <strong>Bank / UPI Details for Payment:</strong><br />
+                                                        Payee: <strong>S.N.T</strong> &bull; UPI / PhonePe / GPay: <strong>+91 81787 68308</strong>
+                                                    </div>
+                                                </div>
+
+                                                <div style={{ border: '1px solid #111827', borderRadius: '6px', overflow: 'hidden' }}>
+                                                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                                                        <tbody>
+                                                            <tr>
+                                                                <td style={{ padding: '6px 10px', borderBottom: '1px solid #E5E7EB', color: '#4B5563' }}>Subtotal (Goods):</td>
+                                                                <td style={{ padding: '6px 10px', borderBottom: '1px solid #E5E7EB', textAlign: 'right', fontWeight: 600 }}>₹{finalSubtotal.toFixed(2)}</td>
+                                                            </tr>
+                                                            <tr>
+                                                                <td style={{ padding: '6px 10px', borderBottom: '1px solid #E5E7EB', color: '#1E40AF', fontWeight: 700 }}>
+                                                                    Shipping & Handling Charges:
+                                                                </td>
+                                                                <td style={{ padding: '6px 10px', borderBottom: '1px solid #E5E7EB', textAlign: 'right', fontWeight: 700, color: '#1E40AF' }}>
+                                                                    {shippingFee > 0 ? `₹${shippingFee.toFixed(2)}` : 'FREE'}
+                                                                </td>
+                                                            </tr>
+                                                            <tr style={{ background: '#F3F4F6', borderTop: '2px solid #111827' }}>
+                                                                <td style={{ padding: '8px 10px', fontWeight: 900, fontSize: '0.95rem' }}>GRAND TOTAL:</td>
+                                                                <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 900, fontSize: '1.1rem', color: '#000000' }}>
+                                                                    ₹{grandTotal.toFixed(2)}
+                                                                </td>
+                                                            </tr>
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+
+                                            {/* 5. Terms & Signatures */}
+                                            <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: '16px', borderTop: '1px solid #111827', paddingTop: '10px', marginTop: '10px' }}>
+                                                <div style={{ fontSize: '0.72rem', color: '#4B5563', lineHeight: 1.4 }}>
+                                                    <div style={{ fontWeight: 800, textTransform: 'uppercase', color: '#111827', marginBottom: '3px' }}>
+                                                        Terms & Conditions:
+                                                    </div>
+                                                    1. Goods once sold will be replaced only if found defective on arrival.<br />
+                                                    2. All disputes are subject to New Delhi jurisdiction only.<br />
+                                                    3. This is a computer generated invoice and requires no physical signature.
+                                                </div>
+                                                <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'flex-end', minHeight: '65px' }}>
+                                                    <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#111827' }}>
+                                                        For S.N.T
+                                                    </div>
+                                                    <div style={{ fontSize: '0.72rem', color: '#6B7280', borderTop: '1px solid #9CA3AF', width: '140px', textAlign: 'center', paddingTop: '4px', fontWeight: 700 }}>
+                                                        Authorized Signatory
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </>
+                                    );
+                                })()}
+                            </div>
+                        </div>
+
+                        {/* Pinned Action Footer */}
+                        <div className="no-print" style={{ flexShrink: 0, padding: '12px 20px', background: '#FFFFFF', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                            <button 
+                                type="button" 
+                                className="btn btn-outline-secondary" 
+                                onClick={() => setBillOrder(null)}
+                            >
+                                Close
+                            </button>
+                            <button 
+                                type="button" 
+                                className="btn btn-primary"
+                                style={{ background: '#059669', borderColor: '#059669', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+                                onClick={handlePrintBill}
+                            >
+                                <i className="bi bi-printer-fill" /> Print Bill / Save PDF
                             </button>
                         </div>
                     </div>

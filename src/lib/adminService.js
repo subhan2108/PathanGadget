@@ -347,107 +347,20 @@ export async function adminMarkDelivered(orderId) {
     }
 }
 
-export async function adminExportToVyapar(orderIds) {
+export async function adminUpdateOrderShipping(orderId, shippingCharge) {
     try {
-        let ordersQuery;
-        if (Array.isArray(orderIds) && orderIds.length > 0) {
-            const numIds = orderIds.map(Number).filter(n => !isNaN(n));
-            ordersQuery = await sql`SELECT * FROM orders WHERE id = ANY(${numIds}) ORDER BY created_at DESC`;
-        } else {
-            ordersQuery = await sql`SELECT * FROM orders WHERE is_exported_to_vyapar = false OR is_exported_to_vyapar IS NULL ORDER BY created_at DESC`;
-        }
-
-        if (ordersQuery.length === 0) {
-            return { rows: [], count: 0, csvContent: '' };
-        }
-
-        const ids = ordersQuery.map(o => o.id);
-        const allItems = await sql`SELECT * FROM order_items WHERE order_id = ANY(${ids})`;
-
-        // Build flat array matching Vyapar's Sales Invoice Import format
-        const vyaparRows = [];
-        for (const order of ordersQuery) {
-            const ship = typeof order.shipping_address === 'string' ? JSON.parse(order.shipping_address) : (order.shipping_address || {});
-            const customerName = order.customer_shop_name || ship.shopName || ship.name || `${ship.firstName || ''} ${ship.lastName || ''}`.trim() || 'Direct Customer';
-            const customerPhone = order.customer_phone || ship.phone || '';
-            const fullAddress = order.customer_address || ship.address || '';
-            const city = order.customer_city || ship.city || '';
-            const state = order.customer_state || ship.state || '';
-            const pincode = order.customer_pincode || ship.pincode || '';
-            const orderDate = new Date(order.created_at).toLocaleDateString('en-GB'); // DD/MM/YYYY
-            const items = allItems.filter(i => i.order_id === order.id);
-
-            if (items.length === 0) {
-                vyaparRows.push({
-                    'Invoice Date': orderDate,
-                    'Invoice Number': order.order_number,
-                    'Party Name': customerName,
-                    'Phone Number': customerPhone,
-                    'Item Name': 'Automotive Key / Blank',
-                    'Item SKU': 'MISC',
-                    'Quantity': 1,
-                    'Unit': 'PCS',
-                    'Sale Price': order.total,
-                    'Total Amount': order.total,
-                    'Payment Type': order.payment_method || 'UPI',
-                    'Payment Reference / UTR': order.utr_number || '',
-                    'Shipping Address': `${fullAddress}, ${city}, ${state} ${pincode}`.trim(),
-                    'City': city,
-                    'State': state,
-                    'Pincode': pincode
-                });
-            } else {
-                for (const it of items) {
-                    vyaparRows.push({
-                        'Invoice Date': orderDate,
-                        'Invoice Number': order.order_number,
-                        'Party Name': customerName,
-                        'Phone Number': customerPhone,
-                        'Item Name': it.name,
-                        'Item SKU': it.sku || `PROD-${it.product_id}`,
-                        'Quantity': it.quantity,
-                        'Unit': 'PCS',
-                        'Sale Price': it.price,
-                        'Total Amount': Number(it.price) * Number(it.quantity),
-                        'Payment Type': order.payment_method || 'UPI',
-                        'Payment Reference / UTR': order.utr_number || '',
-                        'Shipping Address': `${fullAddress}, ${city}, ${state} ${pincode}`.trim(),
-                        'City': city,
-                        'State': state,
-                        'Pincode': pincode
-                    });
-                }
-            }
-        }
-
-        // Generate CSV content
-        if (vyaparRows.length > 0) {
-            const headers = Object.keys(vyaparRows[0]);
-            const csvLines = [
-                headers.map(h => `"${h.replace(/"/g, '""')}"`).join(',')
-            ];
-            for (const r of vyaparRows) {
-                const line = headers.map(h => {
-                    const val = r[h] !== undefined && r[h] !== null ? String(r[h]) : '';
-                    return `"${val.replace(/"/g, '""')}"`;
-                }).join(',');
-                csvLines.push(line);
-            }
-            const csvContent = csvLines.join('\r\n');
-
-            // Mark as exported in database
-            await sql`
-                UPDATE orders 
-                SET is_exported_to_vyapar = true 
-                WHERE id = ANY(${ids})
-            `;
-
-            return { rows: vyaparRows, count: ordersQuery.length, csvContent };
-        }
-
-        return { rows: [], count: 0, csvContent: '' };
+        const numCharge = Math.max(0, Number(shippingCharge) || 0);
+        const [order] = await sql`SELECT subtotal, total FROM orders WHERE id = ${orderId}`;
+        const subtotal = order ? Number(order.subtotal || order.total || 0) : 0;
+        const newTotal = subtotal + numCharge;
+        await sql`
+            UPDATE orders 
+            SET delivery_fee = ${numCharge}, total = ${newTotal} 
+            WHERE id = ${orderId}
+        `;
+        return { success: true, delivery_fee: numCharge, total: newTotal };
     } catch (err) {
-        console.error('Error preparing Vyapar export:', err);
+        console.error('Error updating order shipping charge:', err);
         throw err;
     }
 }
