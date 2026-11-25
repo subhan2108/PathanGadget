@@ -55,7 +55,7 @@ export default function AdminPage() {
         if (passwordInput.trim() === ADMIN_PASSWORD) {
             try {
                 sessionStorage.setItem('smn_admin_auth', 'true')
-            } catch {}
+            } catch { }
             setIsAuthenticated(true)
             setPasswordError('')
         } else {
@@ -66,7 +66,7 @@ export default function AdminPage() {
     const handleLockAdmin = () => {
         try {
             sessionStorage.removeItem('smn_admin_auth')
-        } catch {}
+        } catch { }
         setIsAuthenticated(false)
         setPasswordInput('')
         setPasswordError('')
@@ -245,8 +245,8 @@ export default function AdminPage() {
             if (!collectionProductSearch.trim()) return true;
             const q = collectionProductSearch.toLowerCase().trim();
             return (p.name && p.name.toLowerCase().includes(q)) ||
-                   (p.sku && p.sku.toLowerCase().includes(q)) ||
-                   (p.brand && p.brand.toLowerCase().includes(q));
+                (p.sku && p.sku.toLowerCase().includes(q)) ||
+                (p.brand && p.brand.toLowerCase().includes(q));
         });
     }, [products, selectedCollectionCategory, selectedCollectionSubcategory, collectionProductSearch]);
 
@@ -387,7 +387,7 @@ export default function AdminPage() {
         if (targetCat) changesList.push(`Category -> "${targetCat}"`);
         if (targetSub) changesList.push(`Subcategory -> "${targetSub}"`);
         const confirmMsg = `Are you sure you want to assign ${changesList.join(' and ')} to all ${selectedProductIds.size} selected products?`;
-        
+
         if (!window.confirm(confirmMsg)) return;
 
         try {
@@ -595,7 +595,7 @@ export default function AdminPage() {
             await adminSaveHeroSlides(heroSlides)
             try {
                 localStorage.setItem('smn_hero_slides', JSON.stringify(heroSlides))
-            } catch (e) {}
+            } catch (e) { }
             setHomepageNotice('Hero Carousel slides saved successfully!')
             setTimeout(() => setHomepageNotice(''), 4000)
         } catch (err) {
@@ -674,7 +674,7 @@ export default function AdminPage() {
             await adminSaveFeaturedProducts(featuredProductIds)
             try {
                 localStorage.setItem('smn_featured_product_ids', JSON.stringify(featuredProductIds))
-            } catch (e) {}
+            } catch (e) { }
             setProducts(prev => prev.map(p => ({
                 ...p,
                 is_featured: featuredProductIds.includes(p.id)
@@ -698,7 +698,7 @@ export default function AdminPage() {
             setFeaturedProductIds(nextList)
             try {
                 localStorage.setItem('smn_featured_product_ids', JSON.stringify(nextList))
-            } catch (e) {}
+            } catch (e) { }
         } catch (err) {
             alert('Failed to toggle featured status: ' + err.message)
         }
@@ -751,14 +751,14 @@ export default function AdminPage() {
 
     const openProductModal = (prod = null, defaultCategory = '', defaultSubcategory = '') => {
         setEditingProductId(prod ? prod.id : null)
-        
+
         const detailsObj = prod?.details || {};
         const existingSpecs = (detailsObj.specifications && Object.keys(detailsObj.specifications).length > 0)
             ? detailsObj.specifications
             : (detailsObj.specs && Object.keys(detailsObj.specs).length > 0
                 ? detailsObj.specs
                 : (prod?.specs || {}));
-        
+
         let existingExtraImages = [];
         if (Array.isArray(detailsObj.extraImages)) {
             existingExtraImages = detailsObj.extraImages;
@@ -788,20 +788,20 @@ export default function AdminPage() {
             image5: existingExtraImages[3] || '',
             image6: existingExtraImages[4] || '',
             highlights: (detailsObj.highlights || prod?.highlights || []).join('\n'),
-            specifications: Object.entries(existingSpecs).filter(([k]) => k.toUpperCase() !== 'SKU').map(([k,v]) => `${k}: ${v}`).join('\n'),
+            specifications: Object.entries(existingSpecs).filter(([k]) => k.toUpperCase() !== 'SKU').map(([k, v]) => `${k}: ${v}`).join('\n'),
             whyChooseUs: (detailsObj.whyChooseUs || []).join('\n'),
             buy2Discount: detailsObj.discounts?.buy2 || 0,
             buy3Discount: detailsObj.discounts?.buy3 || 0,
             hasOffer: detailsObj.hasOffer !== false // default to true
         } : {
-            name: '', sku: '', price: 0, original_price: 0, 
-            category: defaultCategory || 'Key Cover', 
-            subcategory: defaultSubcategory || '', 
+            name: '', sku: '', price: 0, original_price: 0,
+            category: defaultCategory || 'Key Cover',
+            subcategory: defaultSubcategory || '',
             brand: '',
             description: '', image_url: '', badge: '', in_stock: true,
-            rating: 0, review_count: 0, colors: '', 
+            rating: 0, review_count: 0, colors: '',
             image2: '', image3: '', image4: '', image5: '', image6: '',
-            highlights: '', specifications: '', whyChooseUs: '', 
+            highlights: '', specifications: '', whyChooseUs: '',
             buy2Discount: 0, buy3Discount: 0, hasOffer: true
         })
         setShowProductModal(true)
@@ -810,13 +810,13 @@ export default function AdminPage() {
     const handleProductSubmit = async (e) => {
         e.preventDefault()
         try {
-            const { 
+            const {
                 image2, image3, image4, image5, image6,
-                highlights, specifications, whyChooseUs, 
+                highlights, specifications, whyChooseUs,
                 buy2Discount, buy3Discount, hasOffer,
-                ...restForm 
+                ...restForm
             } = productForm;
-            
+
             // Parse specifications (Key: Value)
             const specsObj = {};
             if (specifications) {
@@ -1163,7 +1163,7 @@ export default function AdminPage() {
             <html>
             <head>
                 <meta charset="utf-8" />
-                <title>Invoice_${billOrder?.order_number || 'Bill'}</title>
+                <title>Delivery_Challan_${billOrder?.order_number || 'Challan'}</title>
                 <style>
                     @page {
                         size: A4 portrait;
@@ -1402,7 +1402,7 @@ export default function AdminPage() {
                     <p>Manage products, orders, and real-time shipment updates.</p>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                    <button 
+                    <button
                         className="btn btn-outline-danger"
                         onClick={handleLockAdmin}
                         title="Lock and sign out of admin panel"
@@ -1411,7 +1411,7 @@ export default function AdminPage() {
                         <i className="bi bi-lock-fill" />
                         Lock Admin
                     </button>
-                    <button 
+                    <button
                         className="btn btn-outline-primary"
                         onClick={handleSyncMockData}
                         disabled={syncing}
@@ -1569,8 +1569,8 @@ export default function AdminPage() {
                                         <thead>
                                             <tr>
                                                 <th style={{ width: '40px' }}>
-                                                    <input 
-                                                        type="checkbox" 
+                                                    <input
+                                                        type="checkbox"
                                                         className="admin-checkbox"
                                                         checked={filteredAdminProducts.length > 0 && filteredAdminProducts.every(p => selectedProductIds.has(p.id))}
                                                         onChange={() => handleSelectAllProducts(filteredAdminProducts)}
@@ -1592,8 +1592,8 @@ export default function AdminPage() {
                                             {filteredAdminProducts.map(p => (
                                                 <tr key={p.id} style={{ background: selectedProductIds.has(p.id) ? 'rgba(184, 132, 36, 0.08)' : undefined }}>
                                                     <td>
-                                                        <input 
-                                                            type="checkbox" 
+                                                        <input
+                                                            type="checkbox"
                                                             className="admin-checkbox"
                                                             checked={selectedProductIds.has(p.id)}
                                                             onChange={() => toggleSelectProduct(p.id)}
@@ -1601,16 +1601,16 @@ export default function AdminPage() {
                                                     </td>
                                                     <td>{p.id}</td>
                                                     <td>
-                                                        <img 
-                                                            src={formatImageUrl(p.image_url)} 
-                                                            alt="" 
-                                                            width="40" 
-                                                            height="40" 
+                                                        <img
+                                                            src={formatImageUrl(p.image_url)}
+                                                            alt=""
+                                                            width="40"
+                                                            height="40"
                                                             loading="lazy"
                                                             decoding="async"
                                                             referrerPolicy="no-referrer"
-                                                            onError={handleAdminImgError} 
-                                                            style={{ objectFit: 'contain', borderRadius: '4px', border: '1px solid #E5E7EB', backgroundColor: '#F9FAFB' }} 
+                                                            onError={handleAdminImgError}
+                                                            style={{ objectFit: 'contain', borderRadius: '4px', border: '1px solid #E5E7EB', backgroundColor: '#F9FAFB' }}
                                                         />
                                                     </td>
                                                     <td>
@@ -1750,8 +1750,8 @@ export default function AdminPage() {
                                                 <i className="bi bi-lightning-charge-fill" style={{ color: 'var(--primary-color)' }} />
                                                 Quick Jump:
                                             </div>
-                                            <select 
-                                                className="form-control" 
+                                            <select
+                                                className="form-control"
                                                 style={{ width: '220px', padding: '8px 12px', fontSize: '0.88rem' }}
                                                 value={quickCategorySelect}
                                                 onChange={(e) => {
@@ -1767,8 +1767,8 @@ export default function AdminPage() {
                                                 ))}
                                             </select>
 
-                                            <select 
-                                                className="form-control" 
+                                            <select
+                                                className="form-control"
                                                 style={{ width: '240px', padding: '8px 12px', fontSize: '0.88rem' }}
                                                 value={quickSubcategorySelect}
                                                 disabled={!quickCategorySelect}
@@ -1851,9 +1851,9 @@ export default function AdminPage() {
                                                         <div className="collection-card__body">
                                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem', color: '#6B7280', marginBottom: '4px' }}>
                                                                 <span>Subcategories ({cat.subcategoriesList.length})</span>
-                                                                <button 
+                                                                <button
                                                                     type="button"
-                                                                    className="btn btn-link" 
+                                                                    className="btn btn-link"
                                                                     style={{ padding: 0, fontSize: '0.82rem', color: 'var(--primary-color)', textDecoration: 'none', fontWeight: 600 }}
                                                                     onClick={() => {
                                                                         setSelectedCollectionCategory(cat.category);
@@ -1935,9 +1935,9 @@ export default function AdminPage() {
                                         {/* Breadcrumb Navigation & Back Button */}
                                         <div className="collection-breadcrumbs-bar">
                                             <div className="collection-breadcrumbs">
-                                                <button 
-                                                    type="button" 
-                                                    className="crumb-link" 
+                                                <button
+                                                    type="button"
+                                                    className="crumb-link"
                                                     onClick={() => {
                                                         setSelectedCollectionSubcategory(null);
                                                         setCollectionProductSearch('');
@@ -1954,7 +1954,7 @@ export default function AdminPage() {
                                                 </span>
                                             </div>
 
-                                            <button 
+                                            <button
                                                 type="button"
                                                 className="btn btn-outline-secondary btn-sm"
                                                 onClick={() => {
@@ -1973,7 +1973,7 @@ export default function AdminPage() {
                                                 {/* Switch Category */}
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                                     <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#6B7280' }}>Category:</span>
-                                                    <select 
+                                                    <select
                                                         className="form-control form-control-sm"
                                                         style={{ width: '180px', fontWeight: 600 }}
                                                         value={selectedCollectionCategory || ''}
@@ -1992,7 +1992,7 @@ export default function AdminPage() {
                                                 {/* Switch Subcategory */}
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                                     <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#6B7280' }}>Subcategory:</span>
-                                                    <select 
+                                                    <select
                                                         className="form-control form-control-sm"
                                                         style={{ width: '210px', fontWeight: 600 }}
                                                         value={selectedCollectionSubcategory || ''}
@@ -2028,7 +2028,7 @@ export default function AdminPage() {
                                                 </div>
 
                                                 {/* Add Product prefilled */}
-                                                <button 
+                                                <button
                                                     className="btn btn-primary btn-sm"
                                                     onClick={() => openProductModal(null, selectedCollectionCategory, selectedCollectionSubcategory === 'all' ? '' : selectedCollectionSubcategory)}
                                                     style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
@@ -2048,7 +2048,7 @@ export default function AdminPage() {
                                                     Category: <span className="badge badge-secondary">{selectedCollectionCategory}</span>
                                                 </span>
                                                 {selectedCollectionSubcategory !== 'all' && (
-                                                    <button 
+                                                    <button
                                                         type="button"
                                                         className="btn btn-sm btn-outline-secondary"
                                                         style={{ fontSize: '0.78rem', padding: '2px 8px', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}
@@ -2164,8 +2164,8 @@ export default function AdminPage() {
                                                 <thead>
                                                     <tr>
                                                         <th style={{ width: '40px' }}>
-                                                            <input 
-                                                                type="checkbox" 
+                                                            <input
+                                                                type="checkbox"
                                                                 className="admin-checkbox"
                                                                 checked={collectionFilteredProducts.length > 0 && collectionFilteredProducts.every(p => selectedProductIds.has(p.id))}
                                                                 onChange={() => handleSelectAllProducts(collectionFilteredProducts)}
@@ -2194,8 +2194,8 @@ export default function AdminPage() {
                                                         collectionFilteredProducts.map(p => (
                                                             <tr key={p.id} style={{ background: selectedProductIds.has(p.id) ? 'rgba(184, 132, 36, 0.08)' : undefined }}>
                                                                 <td>
-                                                                    <input 
-                                                                        type="checkbox" 
+                                                                    <input
+                                                                        type="checkbox"
                                                                         className="admin-checkbox"
                                                                         checked={selectedProductIds.has(p.id)}
                                                                         onChange={() => toggleSelectProduct(p.id)}
@@ -2203,16 +2203,16 @@ export default function AdminPage() {
                                                                 </td>
                                                                 <td>{p.id}</td>
                                                                 <td>
-                                                                    <img 
-                                                                        src={formatImageUrl(p.image_url)} 
-                                                                        alt="" 
-                                                                        width="40" 
-                                                                        height="40" 
+                                                                    <img
+                                                                        src={formatImageUrl(p.image_url)}
+                                                                        alt=""
+                                                                        width="40"
+                                                                        height="40"
                                                                         loading="lazy"
                                                                         decoding="async"
                                                                         referrerPolicy="no-referrer"
-                                                                        onError={handleAdminImgError} 
-                                                                        style={{ objectFit: 'contain', borderRadius: '4px', border: '1px solid #E5E7EB', backgroundColor: '#F9FAFB' }} 
+                                                                        onError={handleAdminImgError}
+                                                                        style={{ objectFit: 'contain', borderRadius: '4px', border: '1px solid #E5E7EB', backgroundColor: '#F9FAFB' }}
                                                                     />
                                                                 </td>
                                                                 <td>
@@ -2539,12 +2539,12 @@ export default function AdminPage() {
                                         .filter(Boolean)
 
                                     const availableToFeature = featuredSearchQuery.trim()
-                                        ? products.filter(p => 
+                                        ? products.filter(p =>
                                             !featuredProductIds.includes(p.id) &&
                                             (p.name?.toLowerCase().includes(featuredSearchQuery.toLowerCase()) ||
-                                             p.sku?.toLowerCase().includes(featuredSearchQuery.toLowerCase()) ||
-                                             p.category?.toLowerCase().includes(featuredSearchQuery.toLowerCase()))
-                                          ).slice(0, 8)
+                                                p.sku?.toLowerCase().includes(featuredSearchQuery.toLowerCase()) ||
+                                                p.category?.toLowerCase().includes(featuredSearchQuery.toLowerCase()))
+                                        ).slice(0, 8)
                                         : []
 
                                     return (
@@ -2743,7 +2743,7 @@ export default function AdminPage() {
                                 <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center', background: '#F8FAFC', padding: '16px 20px', borderRadius: '12px', border: '1px solid var(--border-color)', marginBottom: '16px' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                         <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>Category:</span>
-                                        <select 
+                                        <select
                                             className="form-control form-control-sm"
                                             style={{ width: '190px', fontWeight: 600 }}
                                             value={bulkFilterCategory}
@@ -2761,7 +2761,7 @@ export default function AdminPage() {
 
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                         <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>Subcategory:</span>
-                                        <select 
+                                        <select
                                             className="form-control form-control-sm"
                                             style={{ width: '220px', fontWeight: 600 }}
                                             value={bulkFilterSubcategory}
@@ -2905,8 +2905,8 @@ export default function AdminPage() {
                                         <thead>
                                             <tr>
                                                 <th style={{ width: '65px', textAlign: 'center' }}>
-                                                    <input 
-                                                        type="checkbox" 
+                                                    <input
+                                                        type="checkbox"
                                                         className="admin-checkbox"
                                                         checked={bulkFilteredProducts.length > 0 && bulkFilteredProducts.every(p => selectedProductIds.has(p.id))}
                                                         onChange={() => handleSelectAllProducts(bulkFilteredProducts)}
@@ -2937,8 +2937,8 @@ export default function AdminPage() {
                                                 bulkFilteredProducts.map(p => (
                                                     <tr key={p.id} style={{ background: selectedProductIds.has(p.id) ? 'rgba(184, 132, 36, 0.08)' : undefined }}>
                                                         <td style={{ textAlign: 'center' }}>
-                                                            <input 
-                                                                type="checkbox" 
+                                                            <input
+                                                                type="checkbox"
                                                                 className="admin-checkbox"
                                                                 checked={selectedProductIds.has(p.id)}
                                                                 onChange={() => toggleSelectProduct(p.id)}
@@ -2946,16 +2946,16 @@ export default function AdminPage() {
                                                         </td>
                                                         <td>{p.id}</td>
                                                         <td>
-                                                            <img 
-                                                                src={formatImageUrl(p.image_url)} 
-                                                                alt="" 
-                                                                width="40" 
-                                                                height="40" 
+                                                            <img
+                                                                src={formatImageUrl(p.image_url)}
+                                                                alt=""
+                                                                width="40"
+                                                                height="40"
                                                                 loading="lazy"
                                                                 decoding="async"
                                                                 referrerPolicy="no-referrer"
-                                                                onError={handleAdminImgError} 
-                                                                style={{ objectFit: 'contain', borderRadius: '4px', border: '1px solid #E5E7EB', backgroundColor: '#F9FAFB' }} 
+                                                                onError={handleAdminImgError}
+                                                                style={{ objectFit: 'contain', borderRadius: '4px', border: '1px solid #E5E7EB', backgroundColor: '#F9FAFB' }}
                                                             />
                                                         </td>
                                                         <td>
@@ -3039,8 +3039,8 @@ export default function AdminPage() {
                                         </div>
 
                                         <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-                                            <button 
-                                                type="button" 
+                                            <button
+                                                type="button"
                                                 className="btn btn-outline-secondary btn-sm"
                                                 onClick={loadOrders}
                                                 disabled={loading}
@@ -3049,18 +3049,18 @@ export default function AdminPage() {
                                                 <i className="bi bi-arrow-clockwise" /> Refresh
                                             </button>
 
-                                            <button 
-                                                type="button" 
+                                            <button
+                                                type="button"
                                                 className="btn btn-sm"
                                                 style={{ background: '#059669', color: '#FFFFFF', fontWeight: 700, padding: '8px 16px', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
                                                 onClick={() => {
                                                     if (orders.length > 0) openBillModal(orders[0]);
-                                                    else alert('No orders found to bill.');
+                                                    else alert('No orders found to generate challan.');
                                                 }}
-                                                title="Generate & Print Tax Invoice / Bill"
+                                                title="Generate & Print Delivery Challan"
                                             >
-                                                <i className="bi bi-receipt" />
-                                                Create Bill / Invoice
+                                                <i className="bi bi-file-earmark-text" />
+                                                Create Delivery Challan
                                             </button>
                                         </div>
                                     </div>
@@ -3097,7 +3097,7 @@ export default function AdminPage() {
 
                                         {/* Search Input */}
                                         <div style={{ minWidth: '260px' }}>
-                                            <input 
+                                            <input
                                                 type="text"
                                                 className="form-control form-control-sm"
                                                 placeholder="Search Order #, phone, shop, UTR..."
@@ -3172,7 +3172,7 @@ export default function AdminPage() {
                                                                         ₹{o.total}
                                                                     </strong>
                                                                     <div style={{ fontSize: '0.75rem', color: '#6B7280' }}>
-                                                                        {o.payment_method || 'UPI'}
+                                                                        {(!o.payment_method || o.payment_method.toLowerCase().includes('whatsapp')) ? 'UPI' : o.payment_method}
                                                                     </div>
                                                                 </td>
 
@@ -3188,8 +3188,8 @@ export default function AdminPage() {
                                                                                     UTR: <code>{o.utr_number}</code>
                                                                                 </div>
                                                                             )}
-                                                                            <button 
-                                                                                type="button" 
+                                                                            <button
+                                                                                type="button"
                                                                                 className="btn btn-sm"
                                                                                 style={{ background: '#059669', color: '#FFFFFF', padding: '3px 8px', fontSize: '0.75rem', fontWeight: 700, borderRadius: '4px', marginTop: '4px', display: 'block' }}
                                                                                 onClick={() => handleApprovePayment(o.id)}
@@ -3222,7 +3222,7 @@ export default function AdminPage() {
                                                                                 {o.tracking_number}
                                                                             </div>
                                                                             {o.status === 'dispatched' && (
-                                                                                <button 
+                                                                                <button
                                                                                     type="button"
                                                                                     className="btn btn-link btn-sm"
                                                                                     style={{ padding: 0, fontSize: '0.75rem', color: '#059669', fontWeight: 700, textDecoration: 'none', display: 'block', marginTop: '2px' }}
@@ -3233,8 +3233,8 @@ export default function AdminPage() {
                                                                             )}
                                                                         </div>
                                                                     ) : (
-                                                                        <button 
-                                                                            type="button" 
+                                                                        <button
+                                                                            type="button"
                                                                             className="btn btn-sm btn-outline-warning"
                                                                             style={{ padding: '3px 8px', fontSize: '0.75rem', fontWeight: 700 }}
                                                                             onClick={() => openDispatchModal(o)}
@@ -3247,7 +3247,7 @@ export default function AdminPage() {
                                                                 {/* Actions */}
                                                                 <td>
                                                                     <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                                                                        <button 
+                                                                        <button
                                                                             type="button"
                                                                             className="btn btn-sm"
                                                                             style={{ background: '#25D366', color: '#FFFFFF', padding: '4px 8px', fontSize: '0.8125rem', borderRadius: '4px' }}
@@ -3256,27 +3256,27 @@ export default function AdminPage() {
                                                                         >
                                                                             <i className="bi bi-whatsapp" />
                                                                         </button>
-                                                                        <button 
+                                                                        <button
                                                                             type="button"
-                                                                            className="btn btn-sm btn-outline-dark" 
+                                                                            className="btn btn-sm btn-outline-dark"
                                                                             onClick={() => openPrintLabelModal(o)}
                                                                             style={{ padding: '4px 8px', fontSize: '0.8125rem' }}
                                                                             title="Print Courier Shipping Label (S.N.T TO & FROM)"
                                                                         >
                                                                             <i className="bi bi-printer" /> Label
                                                                         </button>
-                                                                        <button 
+                                                                        <button
                                                                             type="button"
-                                                                            className="btn btn-sm btn-outline-success" 
+                                                                            className="btn btn-sm btn-outline-success"
                                                                             onClick={() => openBillModal(o)}
                                                                             style={{ padding: '4px 8px', fontSize: '0.8125rem', fontWeight: 600 }}
-                                                                            title="Generate & Print Tax Invoice / Bill"
+                                                                            title="Generate & Print Delivery Challan"
                                                                         >
-                                                                            <i className="bi bi-receipt" /> Bill
+                                                                            <i className="bi bi-file-earmark-text" /> Challan
                                                                         </button>
-                                                                        <button 
+                                                                        <button
                                                                             type="button"
-                                                                            className="btn btn-sm btn-primary" 
+                                                                            className="btn btn-sm btn-primary"
                                                                             onClick={() => openOrderModal(o.id)}
                                                                             style={{ padding: '4px 8px', fontSize: '0.8125rem' }}
                                                                         >
@@ -3302,8 +3302,8 @@ export default function AdminPage() {
 
             {/* ── PRODUCT MODAL ── */}
             {showProductModal && createPortal(
-                <div 
-                    className="admin-modal-overlay" 
+                <div
+                    className="admin-modal-overlay"
                     onClick={(e) => { if (e.target === e.currentTarget) setShowProductModal(false) }}
                 >
                     <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
@@ -3339,14 +3339,14 @@ export default function AdminPage() {
                                             <i className="bi bi-magic" /> Auto-Gen
                                         </button>
                                     </div>
-                                    <input 
-                                        type="text" 
-                                        className="form-control" 
-                                        placeholder="e.g. SMN-WAT-0001" 
-                                        name="sku" 
-                                        value={productForm.sku || ''} 
+                                    <input
+                                        type="text"
+                                        className="form-control"
+                                        placeholder="e.g. SMN-WAT-0001"
+                                        name="sku"
+                                        value={productForm.sku || ''}
                                         onChange={e => setProductForm({ ...productForm, sku: e.target.value })}
-                                        style={{ fontFamily: 'monospace', fontWeight: '700', letterSpacing: '0.5px' }} 
+                                        style={{ fontFamily: 'monospace', fontWeight: '700', letterSpacing: '0.5px' }}
                                     />
                                 </div>
                                 <div className="form-group" style={{ flex: 1 }}>
@@ -3360,13 +3360,13 @@ export default function AdminPage() {
                                 </div>
                                 <div className="form-group" style={{ flex: 1 }}>
                                     <label style={{ marginBottom: '6px' }}>Subcategory</label>
-                                    <input 
-                                        type="text" 
-                                        list="admin-subcategories" 
-                                        className="form-control" 
-                                        value={productForm.subcategory || ''} 
-                                        onChange={e => setProductForm({ ...productForm, subcategory: e.target.value })} 
-                                        placeholder="Select or enter subcategory..." 
+                                    <input
+                                        type="text"
+                                        list="admin-subcategories"
+                                        className="form-control"
+                                        value={productForm.subcategory || ''}
+                                        onChange={e => setProductForm({ ...productForm, subcategory: e.target.value })}
+                                        placeholder="Select or enter subcategory..."
                                     />
                                     <datalist id="admin-subcategories">
                                         {availableSubcategories.map((sub, i) => (
@@ -3416,13 +3416,13 @@ export default function AdminPage() {
                                             {[productForm.image_url, productForm.image2, productForm.image3, productForm.image4, productForm.image5, productForm.image6].filter(Boolean).length} / 6 Images
                                         </span>
                                         {/* Bulk Upload Button */}
-                                        <input 
-                                            type="file" 
-                                            id="admin-bulk-file-input" 
-                                            accept="image/*" 
-                                            multiple 
-                                            style={{ display: 'none' }} 
-                                            onChange={handleBulkImageUpload} 
+                                        <input
+                                            type="file"
+                                            id="admin-bulk-file-input"
+                                            accept="image/*"
+                                            multiple
+                                            style={{ display: 'none' }}
+                                            onChange={handleBulkImageUpload}
                                         />
                                         <button
                                             type="button"
@@ -3461,8 +3461,8 @@ export default function AdminPage() {
                                         const isUploading = uploadingSlot === slot.key;
 
                                         return (
-                                            <div 
-                                                key={slot.key} 
+                                            <div
+                                                key={slot.key}
                                                 style={{
                                                     backgroundColor: '#FFFFFF',
                                                     border: slot.isCover ? '2px solid var(--cta)' : '1px solid #E5E7EB',
@@ -3489,12 +3489,12 @@ export default function AdminPage() {
                                                 </div>
 
                                                 {/* Hidden Native File Input */}
-                                                <input 
-                                                    type="file" 
-                                                    id={`file-input-${slot.key}`} 
-                                                    accept="image/*" 
-                                                    style={{ display: 'none' }} 
-                                                    onChange={e => handleSingleImageUpload(slot.key, e)} 
+                                                <input
+                                                    type="file"
+                                                    id={`file-input-${slot.key}`}
+                                                    accept="image/*"
+                                                    style={{ display: 'none' }}
+                                                    onChange={e => handleSingleImageUpload(slot.key, e)}
                                                 />
 
                                                 {/* If Image Exists */}
@@ -3512,12 +3512,12 @@ export default function AdminPage() {
                                                             justifyContent: 'center',
                                                             position: 'relative'
                                                         }}>
-                                                            <img 
-                                                                src={formatImageUrl(val)} 
-                                                                alt={slot.label} 
+                                                            <img
+                                                                src={formatImageUrl(val)}
+                                                                alt={slot.label}
                                                                 loading="lazy"
                                                                 referrerPolicy="no-referrer"
-                                                                style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
+                                                                style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                                                                 onError={handleAdminImgError}
                                                             />
                                                             {isDataUrl && (
@@ -3577,12 +3577,12 @@ export default function AdminPage() {
                                                                 {showUrlInputs[slot.key] ? 'Hide URL details' : 'View/Edit URL'}
                                                             </button>
                                                             {showUrlInputs[slot.key] && (
-                                                                <input 
-                                                                    type="text" 
-                                                                    className="form-control" 
-                                                                    style={{ fontSize: '0.75rem', marginTop: '4px', padding: '4px 8px' }} 
-                                                                    value={val} 
-                                                                    onChange={e => setProductForm({ ...productForm, [slot.key]: e.target.value })} 
+                                                                <input
+                                                                    type="text"
+                                                                    className="form-control"
+                                                                    style={{ fontSize: '0.75rem', marginTop: '4px', padding: '4px 8px' }}
+                                                                    value={val}
+                                                                    onChange={e => setProductForm({ ...productForm, [slot.key]: e.target.value })}
                                                                 />
                                                             )}
 
@@ -3592,7 +3592,7 @@ export default function AdminPage() {
                                                 ) : (
                                                     /* Empty Slot: Upload from Gallery Drop Area */
                                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                                        <div 
+                                                        <div
                                                             onClick={() => document.getElementById(`file-input-${slot.key}`).click()}
                                                             style={{
                                                                 border: '2px dashed #D1D5DB',
@@ -3642,13 +3642,13 @@ export default function AdminPage() {
                                                                 {showUrlInputs[slot.key] ? 'Close URL box' : 'Or paste URL'}
                                                             </button>
                                                             {showUrlInputs[slot.key] && (
-                                                                <input 
-                                                                    type="url" 
-                                                                    className="form-control" 
-                                                                    placeholder="https://..." 
-                                                                    style={{ fontSize: '0.75rem', marginTop: '6px', padding: '4px 8px' }} 
-                                                                    value={productForm[slot.key] || ''} 
-                                                                    onChange={e => setProductForm({ ...productForm, [slot.key]: e.target.value })} 
+                                                                <input
+                                                                    type="url"
+                                                                    className="form-control"
+                                                                    placeholder="https://..."
+                                                                    style={{ fontSize: '0.75rem', marginTop: '6px', padding: '4px 8px' }}
+                                                                    value={productForm[slot.key] || ''}
+                                                                    onChange={e => setProductForm({ ...productForm, [slot.key]: e.target.value })}
                                                                 />
                                                             )}
 
@@ -3668,16 +3668,16 @@ export default function AdminPage() {
                                 <label>Description (HTML allowed)</label>
                                 <textarea className="form-control" rows="5" placeholder="Detailed product description..." value={productForm.description || ''} onChange={e => setProductForm({ ...productForm, description: e.target.value })} />
                             </div>
-                            
-                            <h5 style={{marginBottom: 15, display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+
+                            <h5 style={{ marginBottom: 15, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 Dynamic Content
                                 <div className="form-check form-switch" style={{ fontSize: '1rem', fontWeight: 'normal' }}>
-                                    <input 
-                                        className="form-check-input" 
-                                        type="checkbox" 
-                                        id="hasOfferToggle" 
-                                        checked={productForm.hasOffer !== false} 
-                                        onChange={e => setProductForm({ ...productForm, hasOffer: e.target.checked })} 
+                                    <input
+                                        className="form-check-input"
+                                        type="checkbox"
+                                        id="hasOfferToggle"
+                                        checked={productForm.hasOffer !== false}
+                                        onChange={e => setProductForm({ ...productForm, hasOffer: e.target.checked })}
                                     />
                                     <label className="form-check-label" htmlFor="hasOfferToggle">Enable Offer (Timer & Bundles)</label>
                                 </div>
@@ -3720,20 +3720,20 @@ export default function AdminPage() {
                                     </span>
                                 </div>
                                 <div className="form-check form-switch" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                    <input 
-                                        type="checkbox" 
-                                        id="stockCheck" 
-                                        className="form-check-input" 
+                                    <input
+                                        type="checkbox"
+                                        id="stockCheck"
+                                        className="form-check-input"
                                         role="switch"
-                                        checked={Boolean(productForm.in_stock)} 
+                                        checked={Boolean(productForm.in_stock)}
                                         onChange={e => {
                                             const checked = e.target.checked;
-                                            setProductForm({ 
-                                                ...productForm, 
+                                            setProductForm({
+                                                ...productForm,
                                                 in_stock: checked,
                                                 stock_quantity: checked ? 9999 : 0
                                             });
-                                        }} 
+                                        }}
                                         style={{ width: '40px', height: '22px', cursor: 'pointer' }}
                                     />
                                     <label htmlFor="stockCheck" className="form-check-label" style={{ fontWeight: 800, fontSize: '0.95rem', cursor: 'pointer', color: productForm.in_stock ? '#059669' : '#DC2626' }}>
@@ -3750,8 +3750,8 @@ export default function AdminPage() {
 
             {/* ── ORDER MANAGE MODAL ── */}
             {showOrderModal && selectedOrder && createPortal(
-                <div 
-                    className="admin-modal-overlay" 
+                <div
+                    className="admin-modal-overlay"
                     onClick={(e) => { if (e.target === e.currentTarget) setShowOrderModal(false) }}
                 >
                     <div className="admin-modal" style={{ maxWidth: 800 }} onClick={(e) => e.stopPropagation()}>
@@ -3775,8 +3775,8 @@ export default function AdminPage() {
                                                     <>
                                                         <p style={{ margin: '0 0 5px 0' }}><strong>Customer:</strong> {custName} {custPhone ? `(+91 ${custPhone})` : ''}</p>
                                                         <p style={{ margin: '0 0 5px 0' }}><strong>Payment:</strong> {selectedOrder.payment_method?.toUpperCase()}
-                                                            <span style={{ 
-                                                                marginLeft: 6, 
+                                                            <span style={{
+                                                                marginLeft: 6,
                                                                 background: selectedOrder.status === 'pending_verification' ? '#FEF3C7' : '#DCFCE7',
                                                                 color: selectedOrder.status === 'pending_verification' ? '#92400E' : '#15803D',
                                                                 padding: '2px 8px',
@@ -3809,8 +3809,8 @@ export default function AdminPage() {
                                     {/* Action Shortcuts */}
                                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', paddingTop: '10px', borderTop: '1px solid #E2E8F0', marginTop: '10px' }}>
                                         {selectedOrder.status === 'pending_verification' && (
-                                            <button 
-                                                type="button" 
+                                            <button
+                                                type="button"
                                                 className="btn btn-sm"
                                                 style={{ background: '#059669', color: '#FFFFFF', fontWeight: 700 }}
                                                 onClick={() => handleApprovePayment(selectedOrder.id)}
@@ -3819,8 +3819,8 @@ export default function AdminPage() {
                                             </button>
                                         )}
 
-                                        <button 
-                                            type="button" 
+                                        <button
+                                            type="button"
                                             className="btn btn-sm btn-outline-warning"
                                             style={{ fontWeight: 700 }}
                                             onClick={() => openDispatchModal(selectedOrder)}
@@ -3828,8 +3828,8 @@ export default function AdminPage() {
                                             <i className="bi bi-truck" /> {selectedOrder.tracking_number ? 'Update Courier Tracking' : 'Dispatch via Courier'}
                                         </button>
 
-                                        <button 
-                                            type="button" 
+                                        <button
+                                            type="button"
                                             className="btn btn-sm"
                                             style={{ background: '#25D366', color: '#FFFFFF', fontWeight: 700 }}
                                             onClick={() => handleWhatsAppOrder(selectedOrder)}
@@ -3837,8 +3837,8 @@ export default function AdminPage() {
                                             <i className="bi bi-whatsapp" /> WhatsApp Customer
                                         </button>
 
-                                        <button 
-                                            type="button" 
+                                        <button
+                                            type="button"
                                             className="btn btn-sm btn-outline-dark"
                                             style={{ fontWeight: 700 }}
                                             onClick={() => openPrintLabelModal(selectedOrder)}
@@ -3846,16 +3846,16 @@ export default function AdminPage() {
                                             <i className="bi bi-printer-fill" /> Print Shipping Label
                                         </button>
 
-                                        <button 
-                                            type="button" 
+                                        <button
+                                            type="button"
                                             className="btn btn-sm btn-outline-success"
                                             style={{ fontWeight: 700 }}
                                             onClick={() => openBillModal(selectedOrder)}
                                         >
-                                            <i className="bi bi-receipt" /> Generate / Print Bill
+                                            <i className="bi bi-file-earmark-text" /> Delivery Challan
                                         </button>
 
-                                        <a 
+                                        <a
                                             href={`/track/${selectedOrder.order_number}`}
                                             target="_blank"
                                             rel="noopener noreferrer"
@@ -3882,20 +3882,20 @@ export default function AdminPage() {
                                 <div style={{ maxHeight: 180, overflowY: 'auto', marginBottom: 25, border: '1px solid #eee', borderRadius: 8, padding: 10 }}>
                                     {(selectedOrder.order_items || []).map(item => (
                                         <div key={item.id} style={{ display: 'flex', gap: 15, padding: '10px 0', borderBottom: '1px solid #f1f5f9' }}>
-                                            <img 
-                                                src={formatImageUrl(item.image_url)} 
-                                                alt={item.name} 
-                                                width={50} 
-                                                height={50} 
+                                            <img
+                                                src={formatImageUrl(item.image_url)}
+                                                alt={item.name}
+                                                width={50}
+                                                height={50}
                                                 loading="lazy"
                                                 decoding="async"
                                                 referrerPolicy="no-referrer"
-                                                onError={handleAdminImgError} 
-                                                style={{ objectFit: 'contain', borderRadius: 4, border: '1px solid #eee', backgroundColor: '#F9FAFB' }} 
+                                                onError={handleAdminImgError}
+                                                style={{ objectFit: 'contain', borderRadius: 4, border: '1px solid #eee', backgroundColor: '#F9FAFB' }}
                                             />
                                             <div>
                                                 <p style={{ margin: 0, fontWeight: 600 }}>
-                                                    {item.name} 
+                                                    {item.name}
                                                     {item.color ? <span style={{ color: '#666', fontWeight: 400, marginLeft: 6 }}>({item.color})</span> : null}
                                                 </p>
                                                 <p style={{ margin: 0, fontSize: '0.85rem', color: '#666', marginTop: 4 }}>Qty: {item.quantity} × ₹{item.price}</p>
@@ -3966,8 +3966,8 @@ export default function AdminPage() {
 
             {/* ── QUICK COURIER DISPATCH MODAL ── */}
             {dispatchModalOrder && createPortal(
-                <div 
-                    className="admin-modal-overlay" 
+                <div
+                    className="admin-modal-overlay"
                     onClick={(e) => { if (e.target === e.currentTarget) setDispatchModalOrder(null) }}
                 >
                     <div className="admin-modal" style={{ maxWidth: '520px' }} onClick={(e) => e.stopPropagation()}>
@@ -4000,7 +4000,7 @@ export default function AdminPage() {
 
                             <div className="form-group mb-3">
                                 <label style={{ fontWeight: 700 }}>Select Courier Partner *</label>
-                                <select 
+                                <select
                                     className="form-control"
                                     value={dispatchForm.courier_name}
                                     onChange={(e) => setDispatchForm({ ...dispatchForm, courier_name: e.target.value })}
@@ -4015,8 +4015,8 @@ export default function AdminPage() {
 
                             <div className="form-group mb-3">
                                 <label style={{ fontWeight: 700 }}>Consignment / Tracking Number *</label>
-                                <input 
-                                    type="text" 
+                                <input
+                                    type="text"
                                     className="form-control"
                                     placeholder="e.g. D12345678 or SMC98765432"
                                     value={dispatchForm.tracking_number}
@@ -4031,15 +4031,15 @@ export default function AdminPage() {
                             </div>
 
                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' }}>
-                                <button 
-                                    type="button" 
+                                <button
+                                    type="button"
                                     className="btn btn-outline-secondary"
                                     onClick={() => setDispatchModalOrder(null)}
                                 >
                                     Cancel
                                 </button>
-                                <button 
-                                    type="submit" 
+                                <button
+                                    type="submit"
                                     className="btn btn-primary"
                                     style={{ background: '#D97706', borderColor: '#D97706', fontWeight: 700 }}
                                 >
@@ -4054,24 +4054,24 @@ export default function AdminPage() {
 
             {/* ── COURIER SHIPPING LABEL (TO & FROM) PRINT MODAL ── */}
             {printLabelOrder && createPortal(
-                <div 
-                    className="admin-modal-overlay" 
+                <div
+                    className="admin-modal-overlay"
                     style={{ overflowY: 'auto', padding: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                     onClick={(e) => { if (e.target === e.currentTarget) setPrintLabelOrder(null) }}
                 >
-                    <div 
-                        className="admin-modal" 
-                        style={{ 
-                            maxWidth: '560px', 
+                    <div
+                        className="admin-modal"
+                        style={{
+                            maxWidth: '560px',
                             width: '100%',
-                            maxHeight: '90vh', 
-                            display: 'flex', 
-                            flexDirection: 'column', 
+                            maxHeight: '90vh',
+                            display: 'flex',
+                            flexDirection: 'column',
                             borderRadius: '16px',
                             overflow: 'hidden',
                             boxShadow: '0 25px 60px rgba(0,0,0,0.3)',
                             margin: 'auto'
-                        }} 
+                        }}
                         onClick={(e) => e.stopPropagation()}
                     >
                         {/* Pinned Modal Header */}
@@ -4101,10 +4101,10 @@ export default function AdminPage() {
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #111827', paddingBottom: '10px', marginBottom: '12px' }}>
                                     <div>
                                         <div style={{ fontSize: '1.35rem', fontWeight: 900, letterSpacing: '0.5px' }}>
-                                            S.N.T
+                                            S.N.Traders
                                         </div>
                                         <div style={{ fontSize: '0.75rem', color: '#4B5563', textTransform: 'uppercase', fontWeight: 700 }}>
-                                            Automotive Key Blanks, Flip Keys & Remotes
+
                                         </div>
                                     </div>
                                     <div style={{ textAlign: 'right' }}>
@@ -4151,7 +4151,7 @@ export default function AdminPage() {
                                                 </div>
                                                 {contactPerson && contactPerson !== recipientName && (
                                                     <div style={{ fontSize: '0.875rem', fontWeight: 600, color: '#374151', marginTop: '2px' }}>
-                                                        Attn: {contactPerson}
+                                                        Person name: {contactPerson}
                                                     </div>
                                                 )}
                                                 <div style={{ fontSize: '1rem', lineHeight: '1.4', marginTop: '6px', fontWeight: 600, color: '#111827' }}>
@@ -4168,12 +4168,12 @@ export default function AdminPage() {
                                             {/* FROM SECTION */}
                                             <div style={{ border: '1px solid #6B7280', borderRadius: '6px', padding: '8px 10px', marginBottom: '12px', background: '#FAFAFA' }}>
                                                 <div style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', color: '#4B5563', marginBottom: '4px' }}>
-                                                    IF UNDELIVERED, RETURN TO (Consignor / Sender):
+                                                    From (Sender):
                                                 </div>
                                                 <div style={{ fontSize: '1rem', fontWeight: 800, color: '#111827' }}>
-                                                    S.N.T
+                                                    S.N.Traders
                                                 </div>
-                                                <div style={{ fontSize: '0.8125rem', color: '#374151', lineHeight: '1.35' }}>
+                                                <div style={{ fontSize: '1rem', lineHeight: '1.4', marginTop: '6px', fontWeight: 600, color: '#111827' }}>
                                                     Amanpuri B-54, Nangloi, New Delhi - 110041
                                                 </div>
                                                 <div style={{ fontSize: '0.875rem', fontWeight: 800, marginTop: '4px', color: '#111827' }}>
@@ -4185,13 +4185,13 @@ export default function AdminPage() {
                                 })()}
 
                                 {/* Footer Info & Tracking QR */}
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #111827', paddingTop: '8px' }}>
+                                {/* <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #111827', paddingTop: '8px' }}>
                                     <div style={{ fontSize: '0.8125rem', color: '#374151', lineHeight: 1.4 }}>
                                         <div><strong>Date:</strong> {new Date(printLabelOrder.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
                                     </div>
 
                                     <div style={{ textAlign: 'center' }}>
-                                        <QRCode 
+                                        <QRCode
                                             value={`${window.location.origin}/track/${printLabelOrder.order_number}`}
                                             size={54}
                                             style={{ height: '54px', width: '54px' }}
@@ -4201,21 +4201,21 @@ export default function AdminPage() {
                                             SCAN TO TRACK
                                         </div>
                                     </div>
-                                </div>
+                                </div> */}
                             </div>
                         </div>
 
                         {/* Pinned Action Footer */}
                         <div className="no-print" style={{ flexShrink: 0, padding: '12px 20px', background: '#FFFFFF', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-                            <button 
-                                type="button" 
-                                className="btn btn-outline-secondary" 
+                            <button
+                                type="button"
+                                className="btn btn-outline-secondary"
                                 onClick={() => setPrintLabelOrder(null)}
                             >
                                 Close
                             </button>
-                            <button 
-                                type="button" 
+                            <button
+                                type="button"
                                 className="btn btn-primary"
                                 style={{ background: '#111827', borderColor: '#111827', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '8px' }}
                                 onClick={handlePrintShippingLabel}
@@ -4230,32 +4230,32 @@ export default function AdminPage() {
 
             {/* ── IN-WEBSITE TAX INVOICE / BILL MODAL ── */}
             {billOrder && createPortal(
-                <div 
-                    className="admin-modal-overlay" 
+                <div
+                    className="admin-modal-overlay"
                     style={{ overflowY: 'auto', padding: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                     onClick={(e) => { if (e.target === e.currentTarget) setBillOrder(null) }}
                 >
-                    <div 
-                        className="admin-modal" 
-                        style={{ 
-                            maxWidth: '840px', 
+                    <div
+                        className="admin-modal"
+                        style={{
+                            maxWidth: '840px',
                             width: '100%',
-                            maxHeight: '92vh', 
-                            display: 'flex', 
-                            flexDirection: 'column', 
+                            maxHeight: '92vh',
+                            display: 'flex',
+                            flexDirection: 'column',
                             borderRadius: '16px',
                             overflow: 'hidden',
                             boxShadow: '0 25px 60px rgba(0,0,0,0.35)',
                             margin: 'auto'
-                        }} 
+                        }}
                         onClick={(e) => e.stopPropagation()}
                     >
                         {/* Pinned Modal Header */}
                         <div className="admin-modal__head no-print" style={{ flexShrink: 0, padding: '14px 20px', background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <div>
                                 <h3 style={{ margin: 0, fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <i className="bi bi-receipt" style={{ color: '#059669' }} />
-                                    Tax Invoice / Retail Bill
+                                    <i className="bi bi-file-earmark-text" style={{ color: '#059669' }} />
+                                    Delivery Challan
                                 </h3>
                                 <div style={{ fontSize: '0.8rem', color: '#6B7280', marginTop: '2px' }}>
                                     Order #{billOrder.order_number} &bull; Sender: S.N.T (Nangloi, New Delhi)
@@ -4276,7 +4276,7 @@ export default function AdminPage() {
                                     </label>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                         <span style={{ fontWeight: 800, color: '#1E40AF' }}>₹</span>
-                                        <input 
+                                        <input
                                             type="number"
                                             min="0"
                                             className="form-control form-control-sm"
@@ -4287,7 +4287,7 @@ export default function AdminPage() {
                                     </div>
                                     <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                                         {[0, 50, 70, 80, 100, 150].map(amt => (
-                                            <button 
+                                            <button
                                                 key={amt}
                                                 type="button"
                                                 className="btn btn-xs"
@@ -4309,7 +4309,7 @@ export default function AdminPage() {
                                     </div>
                                 </div>
                                 <div>
-                                    <button 
+                                    <button
                                         type="button"
                                         className="btn btn-sm btn-outline-primary"
                                         onClick={() => handleSaveOrderShipping(billOrder.id, billShippingCharge)}
@@ -4337,11 +4337,11 @@ export default function AdminPage() {
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #111827', paddingBottom: '14px', marginBottom: '14px' }}>
                                     <div>
                                         <div style={{ fontSize: '1.6rem', fontWeight: 900, letterSpacing: '1px', color: '#111827' }}>
-                                            S.N.T
+                                            S.N.Traders
                                         </div>
-                                        <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#374151', textTransform: 'uppercase', marginTop: '2px' }}>
+                                        {/* <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#374151', textTransform: 'uppercase', marginTop: '2px' }}>
                                             Automotive Key Blanks, Flip Keys & Remotes
-                                        </div>
+                                        </div> */}
                                         <div style={{ fontSize: '0.82rem', color: '#4B5563', marginTop: '3px' }}>
                                             Amanpuri B-54, Nangloi, New Delhi - 110041
                                         </div>
@@ -4351,13 +4351,13 @@ export default function AdminPage() {
                                     </div>
                                     <div style={{ textAlign: 'right' }}>
                                         <div style={{ display: 'inline-block', background: '#111827', color: '#FFFFFF', padding: '4px 12px', borderRadius: '4px', fontSize: '0.85rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                            TAX INVOICE / RETAIL BILL
+                                            DELIVERY CHALLAN
                                         </div>
                                         <div style={{ fontSize: '0.75rem', color: '#6B7280', marginTop: '4px', fontWeight: 600 }}>
                                             ORIGINAL FOR RECIPIENT
                                         </div>
                                         <div style={{ marginTop: '6px', fontSize: '0.9rem', fontWeight: 800 }}>
-                                            Invoice No: <span style={{ fontFamily: 'monospace' }}>INV-{billOrder.order_number}</span>
+                                            Challan No: <span style={{ fontFamily: 'monospace' }}>DC-{billOrder.order_number}</span>
                                         </div>
                                         <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#374151' }}>
                                             Date: {new Date(billOrder.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
@@ -4409,7 +4409,7 @@ export default function AdminPage() {
                                                     <strong>Order ID:</strong> #{billOrder.order_number}
                                                 </div>
                                                 <div style={{ fontSize: '0.85rem', marginBottom: '3px' }}>
-                                                    <strong>Payment Mode:</strong> {billOrder.payment_method || 'Prepaid UPI'}
+                                                    <strong>Payment Mode:</strong> UPI
                                                 </div>
                                                 {billOrder.utr_number && (
                                                     <div style={{ fontSize: '0.85rem', marginBottom: '3px' }}>
@@ -4447,16 +4447,15 @@ export default function AdminPage() {
                                                     <tr style={{ background: '#F3F4F6' }}>
                                                         <th style={{ border: '1px solid #9CA3AF', padding: '6px 8px', fontSize: '0.75rem', fontWeight: 800, textAlign: 'center', width: '36px' }}>#</th>
                                                         <th style={{ border: '1px solid #9CA3AF', padding: '6px 8px', fontSize: '0.75rem', fontWeight: 800, textAlign: 'left' }}>Item Description</th>
-                                                        <th style={{ border: '1px solid #9CA3AF', padding: '6px 8px', fontSize: '0.75rem', fontWeight: 800, textAlign: 'center', width: '70px' }}>HSN</th>
-                                                        <th style={{ border: '1px solid #9CA3AF', padding: '6px 8px', fontSize: '0.75rem', fontWeight: 800, textAlign: 'center', width: '55px' }}>Qty</th>
-                                                        <th style={{ border: '1px solid #9CA3AF', padding: '6px 8px', fontSize: '0.75rem', fontWeight: 800, textAlign: 'right', width: '85px' }}>Rate (₹)</th>
-                                                        <th style={{ border: '1px solid #9CA3AF', padding: '6px 8px', fontSize: '0.75rem', fontWeight: 800, textAlign: 'right', width: '95px' }}>Amount (₹)</th>
+                                                        <th style={{ border: '1px solid #9CA3AF', padding: '6px 8px', fontSize: '0.75rem', fontWeight: 800, textAlign: 'center', width: '60px' }}>Qty</th>
+                                                        <th style={{ border: '1px solid #9CA3AF', padding: '6px 8px', fontSize: '0.75rem', fontWeight: 800, textAlign: 'right', width: '95px' }}>Rate (₹)</th>
+                                                        <th style={{ border: '1px solid #9CA3AF', padding: '6px 8px', fontSize: '0.75rem', fontWeight: 800, textAlign: 'right', width: '105px' }}>Amount (₹)</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
                                                     {items.length === 0 ? (
                                                         <tr>
-                                                            <td colSpan="6" style={{ textAlign: 'center', padding: '12px', border: '1px solid #D1D5DB' }}>
+                                                            <td colSpan="5" style={{ textAlign: 'center', padding: '12px', border: '1px solid #D1D5DB' }}>
                                                                 Order Items (Total: ₹{billOrder.total})
                                                             </td>
                                                         </tr>
@@ -4465,14 +4464,16 @@ export default function AdminPage() {
                                                             const qty = Number(item.quantity || 1);
                                                             const price = Number(item.price || 0);
                                                             const lineTotal = qty * price;
+                                                            const itemTitle = item.name || item.title || item.product_name || 'Automotive Key Blank';
                                                             return (
                                                                 <tr key={item.id || idx}>
                                                                     <td style={{ border: '1px solid #D1D5DB', padding: '6px 8px', textAlign: 'center', fontSize: '0.8rem' }}>{idx + 1}</td>
-                                                                    <td style={{ border: '1px solid #D1D5DB', padding: '6px 8px', fontSize: '0.82rem', fontWeight: 600 }}>
-                                                                        {item.title || item.product_name || 'Automotive Key Blank'}
-                                                                        {item.sku && <span style={{ fontSize: '0.72rem', color: '#6B7280', display: 'block' }}>SKU: {item.sku}</span>}
+                                                                    <td style={{ border: '1px solid #D1D5DB', padding: '6px 10px', fontSize: '0.85rem' }}>
+                                                                        <div style={{ fontWeight: 700, color: '#111827' }}>
+                                                                            {itemTitle}
+                                                                        </div>
+                                                                        {item.sku && <span style={{ fontSize: '0.72rem', color: '#6B7280', display: 'block', marginTop: '2px' }}>SKU: {item.sku}</span>}
                                                                     </td>
-                                                                    <td style={{ border: '1px solid #D1D5DB', padding: '6px 8px', textAlign: 'center', fontSize: '0.75rem', color: '#4B5563' }}>8301</td>
                                                                     <td style={{ border: '1px solid #D1D5DB', padding: '6px 8px', textAlign: 'center', fontSize: '0.82rem', fontWeight: 700 }}>{qty}</td>
                                                                     <td style={{ border: '1px solid #D1D5DB', padding: '6px 8px', textAlign: 'right', fontSize: '0.82rem' }}>{price.toFixed(2)}</td>
                                                                     <td style={{ border: '1px solid #D1D5DB', padding: '6px 8px', textAlign: 'right', fontSize: '0.85rem', fontWeight: 700 }}>{lineTotal.toFixed(2)}</td>
@@ -4487,7 +4488,7 @@ export default function AdminPage() {
                                             <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '16px', marginBottom: '14px' }}>
                                                 <div style={{ border: '1px solid #E5E7EB', borderRadius: '6px', padding: '10px 12px', background: '#FAFAFA' }}>
                                                     <div style={{ fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', color: '#6B7280', marginBottom: '4px' }}>
-                                                        Invoice Amount In Words:
+                                                        Amount In Words:
                                                     </div>
                                                     <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#111827', fontStyle: 'italic', lineHeight: 1.3 }}>
                                                         {numberToIndianWords(grandTotal)}
@@ -4526,13 +4527,12 @@ export default function AdminPage() {
 
                                             {/* 5. Terms & Signatures */}
                                             <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: '16px', borderTop: '1px solid #111827', paddingTop: '10px', marginTop: '10px' }}>
-                                                <div style={{ fontSize: '0.72rem', color: '#4B5563', lineHeight: 1.4 }}>
-                                                    <div style={{ fontWeight: 800, textTransform: 'uppercase', color: '#111827', marginBottom: '3px' }}>
+                                                <div style={{ fontSize: '0.75rem', color: '#1F2937', lineHeight: 1.5 }}>
+                                                    <div style={{ fontWeight: 800, textTransform: 'uppercase', color: '#111827', marginBottom: '4px' }}>
                                                         Terms & Conditions:
                                                     </div>
-                                                    1. Goods once sold will be replaced only if found defective on arrival.<br />
-                                                    2. All disputes are subject to New Delhi jurisdiction only.<br />
-                                                    3. This is a computer generated invoice and requires no physical signature.
+                                                    <div style={{ fontWeight: 600 }}>Goods Delivered only Approval basis</div>
+                                                    <div style={{ marginTop: '2px' }}>Goods sent on approval basis only. Please approve or return within 7 days, else it will be treated as a confirmed</div>
                                                 </div>
                                                 <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'flex-end', minHeight: '65px' }}>
                                                     <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#111827' }}>
@@ -4551,20 +4551,20 @@ export default function AdminPage() {
 
                         {/* Pinned Action Footer */}
                         <div className="no-print" style={{ flexShrink: 0, padding: '12px 20px', background: '#FFFFFF', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-                            <button 
-                                type="button" 
-                                className="btn btn-outline-secondary" 
+                            <button
+                                type="button"
+                                className="btn btn-outline-secondary"
                                 onClick={() => setBillOrder(null)}
                             >
                                 Close
                             </button>
-                            <button 
-                                type="button" 
+                            <button
+                                type="button"
                                 className="btn btn-primary"
                                 style={{ background: '#059669', borderColor: '#059669', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '8px' }}
                                 onClick={handlePrintBill}
                             >
-                                <i className="bi bi-printer-fill" /> Print Bill / Save PDF
+                                <i className="bi bi-printer-fill" /> Print Challan / Save PDF
                             </button>
                         </div>
                     </div>
@@ -4574,10 +4574,10 @@ export default function AdminPage() {
 
             {/* ── RENAME MODAL ── */}
             {renameModal.open && createPortal(
-                <div 
-                    className="admin-modal-overlay" 
-                    onClick={(e) => { 
-                        if (e.target === e.currentTarget) setRenameModal({ open: false, type: 'category', category: '', oldName: '', newName: '', count: 0 }) 
+                <div
+                    className="admin-modal-overlay"
+                    onClick={(e) => {
+                        if (e.target === e.currentTarget) setRenameModal({ open: false, type: 'category', category: '', oldName: '', newName: '', count: 0 })
                     }}
                 >
                     <div className="admin-modal" style={{ maxWidth: '520px' }} onClick={(e) => e.stopPropagation()}>
@@ -4586,8 +4586,8 @@ export default function AdminPage() {
                                 <i className="bi bi-pencil-square" style={{ color: 'var(--primary-color)', marginRight: '8px' }} />
                                 Rename {renameModal.type === 'category' ? 'Category' : 'Subcategory'}
                             </h3>
-                            <button 
-                                className="close-btn" 
+                            <button
+                                className="close-btn"
                                 onClick={() => setRenameModal({ open: false, type: 'category', category: '', oldName: '', newName: '', count: 0 })}
                             >
                                 <i className="bi bi-x-lg" />
@@ -4612,27 +4612,27 @@ export default function AdminPage() {
 
                             <div className="form-group mb-3">
                                 <label style={{ fontWeight: 600 }}>New {renameModal.type === 'category' ? 'Category' : 'Subcategory'} Name</label>
-                                <input 
-                                    type="text" 
-                                    className="form-control" 
-                                    value={renameModal.newName} 
-                                    onChange={e => setRenameModal({ ...renameModal, newName: e.target.value })} 
-                                    required 
-                                    autoFocus 
+                                <input
+                                    type="text"
+                                    className="form-control"
+                                    value={renameModal.newName}
+                                    onChange={e => setRenameModal({ ...renameModal, newName: e.target.value })}
+                                    required
+                                    autoFocus
                                     placeholder={`Enter new ${renameModal.type} name...`}
                                 />
                             </div>
 
                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' }}>
-                                <button 
-                                    type="button" 
-                                    className="btn btn-outline-secondary" 
+                                <button
+                                    type="button"
+                                    className="btn btn-outline-secondary"
                                     onClick={() => setRenameModal({ open: false, type: 'category', category: '', oldName: '', newName: '', count: 0 })}
                                 >
                                     Cancel
                                 </button>
-                                <button 
-                                    type="submit" 
+                                <button
+                                    type="submit"
                                     className="btn btn-primary"
                                     disabled={loading || !renameModal.newName.trim()}
                                 >
@@ -4647,8 +4647,8 @@ export default function AdminPage() {
 
             {/* ── HERO SLIDE ADD / EDIT MODAL ── */}
             {showSlideModal && createPortal(
-                <div 
-                    className="admin-modal-overlay" 
+                <div
+                    className="admin-modal-overlay"
                     onClick={(e) => { if (e.target === e.currentTarget) setShowSlideModal(false) }}
                 >
                     <div className="admin-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '620px' }}>
@@ -4671,8 +4671,8 @@ export default function AdminPage() {
                                 />
                                 {slideSearchQuery.trim() && (
                                     <div style={{ maxHeight: '180px', overflowY: 'auto', background: '#FFFFFF', border: '1px solid #CBD5E1', borderRadius: '6px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}>
-                                        {products.filter(p => 
-                                            p.name?.toLowerCase().includes(slideSearchQuery.toLowerCase()) || 
+                                        {products.filter(p =>
+                                            p.name?.toLowerCase().includes(slideSearchQuery.toLowerCase()) ||
                                             p.sku?.toLowerCase().includes(slideSearchQuery.toLowerCase()) ||
                                             p.category?.toLowerCase().includes(slideSearchQuery.toLowerCase())
                                         ).slice(0, 5).map(prod => (
